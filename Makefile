@@ -43,7 +43,11 @@ typecheck:
 	cd backend && mypy app
 
 test:
-	cd backend && pytest -v
+	@docker compose exec -T db psql -U multik -c "CREATE DATABASE multik_test;" 2>/dev/null || true
+	cd backend && \
+		DATABASE_URL=postgresql+asyncpg://multik:multik_dev@localhost:5432/multik_test \
+		SECRET_KEY=test-secret-key-only \
+		pytest -v
 
 test-arch:
 	@echo "Verificando isolamento de imports da Yelum..."

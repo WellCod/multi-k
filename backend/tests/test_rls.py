@@ -34,7 +34,9 @@ async def test_corretor_nao_ve_eventos_de_outro(
     await db.execute(
         text("SELECT set_config('app.usuario_id', :uid, true)"), {"uid": str(b.id)}
     )
-    await db.execute(text("SELECT set_config('app.papel', :p, true)"), {"p": "corretor"})
+    await db.execute(
+        text("SELECT set_config('app.papel', :p, true)"), {"p": "corretor"}
+    )
 
     res = await db.execute(select(EventoDB))
     visivel = res.scalars().all()
@@ -85,7 +87,9 @@ async def test_corretor_ve_proprio_evento(db: AsyncSession) -> None:
     await db.execute(
         text("SELECT set_config('app.usuario_id', :uid, true)"), {"uid": str(d.id)}
     )
-    await db.execute(text("SELECT set_config('app.papel', :p, true)"), {"p": "corretor"})
+    await db.execute(
+        text("SELECT set_config('app.papel', :p, true)"), {"p": "corretor"}
+    )
 
     res = await db.execute(select(EventoDB).where(EventoDB.usuario_id == d.id))
     assert len(res.scalars().all()) == 1
