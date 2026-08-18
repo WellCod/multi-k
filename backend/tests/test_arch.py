@@ -25,8 +25,14 @@ SCAN_DIRS = ["app/domain", "app/api", "app/infra"]
 SCAN_FILES = ["app/main.py"]
 
 MONEY_NAMES = {
-    "premio", "valor", "comissao", "parcela",
-    "desconto", "iof", "price", "amount",
+    "premio",
+    "valor",
+    "comissao",
+    "parcela",
+    "desconto",
+    "iof",
+    "price",
+    "amount",
 }
 
 
@@ -67,9 +73,7 @@ def test_secret_provider_not_bypassed() -> None:
 
     allowed = str(root / "app" / "infra" / "secrets.py")
     violations = [
-        line
-        for line in result.stdout.strip().splitlines()
-        if allowed not in line
+        line for line in result.stdout.strip().splitlines() if allowed not in line
     ]
 
     assert not violations, (
@@ -105,20 +109,14 @@ def test_float_not_used_for_money() -> None:
 
             if isinstance(node, ast.Assign):
                 for t in node.targets:
-                    if not (
-                        isinstance(t, ast.Name) and t.id in MONEY_NAMES
-                    ):
+                    if not (isinstance(t, ast.Name) and t.id in MONEY_NAMES):
                         continue
                     val = node.value
-                    if isinstance(val, ast.Constant) and isinstance(
-                        val.value, float
-                    ):
+                    if isinstance(val, ast.Constant) and isinstance(val.value, float):
                         violations.append(
-                            f"{py_file}:{node.lineno} "
-                            "float literal em campo monetário"
+                            f"{py_file}:{node.lineno} float literal em campo monetário"
                         )
 
     assert not violations, (
-        "float detectado em campo monetário (use Decimal):\n"
-        + "\n".join(violations)
+        "float detectado em campo monetário (use Decimal):\n" + "\n".join(violations)
     )
