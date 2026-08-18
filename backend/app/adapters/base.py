@@ -12,7 +12,6 @@ from datetime import date
 from decimal import Decimal
 from typing import Protocol, runtime_checkable
 
-
 # ---------------------------------------------------------------------------
 # Tipos canônicos de fronteira
 # ---------------------------------------------------------------------------
