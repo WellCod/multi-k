@@ -30,20 +30,21 @@ Sistema para corretores de seguros cotarem, compararem e gerirem apólices junto
 
 ```
 React SPA (Vite + TypeScript)
-      │ cookie de sessão (httponly/secure/samesite=strict)
-FastAPI (Python 3.12)          ← authN/authZ · auditoria · rate limit
-      │
+      │  cookie de sessão (httponly · secure · samesite=strict)
+      ▼
+FastAPI (Python 3.12)     ← authN/authZ · auditoria · rate limit
+      │                              │
+      │                        PostgreSQL 16
+      │                       (RLS por papel)
       ├── Domínio (eventos imutáveis)
       └── Orquestrador de cotação
                 │
-          PortaSeguradora  ←─── interface canônica (Protocol)
+          PortaSeguradora  ◄── interface canônica (Protocol)
                 │
-      ┌─────────┴────────────┐
-    Fake                  Yelum (fase 5+)
-                               │
-                    integracao-tst.grupohdiseguros.com.br
-      │
-PostgreSQL 16 (RLS por papel)
+      ┌─────────┼──────────────┐
+    Fake      Yelum (fase 5)  Porto (fase futura)
+                │
+    integracao-tst.grupohdiseguros.com.br
 ```
 
 **Decisões de design documentadas em [`docs/adr.md`](docs/adr.md)** — 32 ADRs cobrindo produto, domínio, stack, segurança e processo.
