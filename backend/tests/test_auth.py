@@ -42,7 +42,9 @@ async def test_login_senha_errada(db: AsyncSession, client: AsyncClient) -> None
     assert r.status_code == 401
 
 
-async def test_login_usuario_inexistente(client: AsyncClient) -> None:
+async def test_login_usuario_inexistente(
+    engine: AsyncEngine, client: AsyncClient
+) -> None:
     r = await client.post(
         "/auth/login",
         json={"email": "naoexiste@test.com", "senha": "qualquer"},

@@ -30,36 +30,29 @@ from app.infra.models import Base, Usuario  # noqa: E402
 
 _TEST_URL = os.environ["DATABASE_URL"]
 
-_RLS_SQL = """
-ALTER TABLE eventos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE eventos FORCE ROW LEVEL SECURITY;
-DO $$ BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies
-        WHERE tablename = 'eventos' AND policyname = 'eventos_isolamento'
-    ) THEN
-        CREATE POLICY eventos_isolamento ON eventos
+_RLS_STMTS = [
+    "ALTER TABLE eventos ENABLE ROW LEVEL SECURITY",
+    "ALTER TABLE eventos FORCE ROW LEVEL SECURITY",
+    """CREATE POLICY eventos_isolamento ON eventos
         USING (
             current_setting('app.papel', true) = 'admin'
             OR usuario_id::text = current_setting('app.usuario_id', true)
-        );
-    END IF;
-END $$;
-CREATE OR REPLACE FUNCTION enforce_audit_append_only()
-RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-    RAISE EXCEPTION 'auditoria é append-only: % proibido', TG_OP;
-END;
-$$;
-DROP TRIGGER IF EXISTS tg_auditoria_no_update ON auditoria;
-CREATE TRIGGER tg_auditoria_no_update
-    BEFORE UPDATE ON auditoria
-    FOR EACH ROW EXECUTE FUNCTION enforce_audit_append_only();
-DROP TRIGGER IF EXISTS tg_auditoria_no_delete ON auditoria;
-CREATE TRIGGER tg_auditoria_no_delete
-    BEFORE DELETE ON auditoria
-    FOR EACH ROW EXECUTE FUNCTION enforce_audit_append_only();
-"""
+        )""",
+    """CREATE OR REPLACE FUNCTION enforce_audit_append_only()
+        RETURNS trigger LANGUAGE plpgsql AS $fn$
+        BEGIN
+            RAISE EXCEPTION 'auditoria é append-only: % proibido', TG_OP;
+        END;
+        $fn$""",
+    "DROP TRIGGER IF EXISTS tg_auditoria_no_update ON auditoria",
+    """CREATE TRIGGER tg_auditoria_no_update
+        BEFORE UPDATE ON auditoria
+        FOR EACH ROW EXECUTE FUNCTION enforce_audit_append_only()""",
+    "DROP TRIGGER IF EXISTS tg_auditoria_no_delete ON auditoria",
+    """CREATE TRIGGER tg_auditoria_no_delete
+        BEFORE DELETE ON auditoria
+        FOR EACH ROW EXECUTE FUNCTION enforce_audit_append_only()""",
+]
 
 
 @pytest_asyncio.fixture(scope="module")
@@ -68,10 +61,8 @@ async def engine() -> AsyncGenerator[AsyncEngine, None]:
     async with e.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-        for stmt in _RLS_SQL.strip().split(";"):
-            stmt = stmt.strip()
-            if stmt:
-                await conn.execute(text(stmt))
+        for stmt in _RLS_STMTS:
+            await conn.execute(text(stmt))
     yield e
     async with e.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
