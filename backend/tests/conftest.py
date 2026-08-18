@@ -8,7 +8,7 @@ import os
 # Define antes de qualquer import do app para que db.py use este URL.
 os.environ.setdefault(
     "DATABASE_URL",
-    "postgresql+asyncpg://multik:multik_test@localhost:5432/multik_test",
+    "postgresql+asyncpg://multik:multik_dev@localhost:5432/multik_test",
 )
 os.environ.setdefault("SECRET_KEY", "test-secret-key-only")
 
