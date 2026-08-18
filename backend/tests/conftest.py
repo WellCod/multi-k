@@ -52,6 +52,9 @@ _RLS_STMTS = [
     """CREATE TRIGGER tg_auditoria_no_delete
         BEFORE DELETE ON auditoria
         FOR EACH ROW EXECUTE FUNCTION enforce_audit_append_only()""",
+    # POSTGRES_USER cria superuser; superusers ignoram RLS mesmo com FORCE.
+    # Removemos SUPERUSER do role atual para que as politicas sejam aplicadas.
+    "DO $$ BEGIN EXECUTE format('ALTER ROLE %I NOSUPERUSER', current_user); END $$",
 ]
 
 
