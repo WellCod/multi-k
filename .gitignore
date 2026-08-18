@@ -1,0 +1,183 @@
+# =============================================================================
+# SEGURANÇA — BLOCO CRÍTICO: NÃO REMOVA, NÃO REORDENE
+# Estas linhas protegem credenciais e documentação confidencial da Yelum.
+# =============================================================================
+.env
+.env.*
+!.env.example
+
+# Coleções Postman contêm usuário/senha de homologação
+*.postman_collection.json
+*.postman_environment.json
+*.postman_workspace.json
+
+# Documentação confidencial da Yelum (cláusula de não-reprodução)
+docs/yelum/
+*.pdf
+
+# Segredos, chaves e certificados
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+id_rsa
+id_rsa.pub
+*.ppk
+secrets/
+credentials.json
+service-account*.json
+service_account*.json
+gcp-key*.json
+*-sa-key.json
+google-credentials*.json
+
+# =============================================================================
+# PYTHON
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Ambientes virtuais
+.venv/
+venv/
+ENV/
+env/
+.env/
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+*.py,cover
+nosetests.xml
+
+# Mypy / Ruff / Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Alembic
+# (versões do schema ficam no repo; apenas arquivos gerados são ignorados)
+
+# =============================================================================
+# NODE / FRONTEND
+# =============================================================================
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+.eslintcache
+.stylelintcache
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Vite
+frontend/.vite/
+
+# =============================================================================
+# DOCKER
+# =============================================================================
+# Não ignoramos docker-compose.yml (credenciais de dev são explicitamente dev)
+# Volumes locais
+postgres_data/
+.docker/
+
+# =============================================================================
+# IDEs e editores
+# =============================================================================
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# =============================================================================
+# SISTEMA OPERACIONAL
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# =============================================================================
+# LOGS
+# =============================================================================
+*.log
+logs/
+log/
+
+# =============================================================================
+# BANCO DE DADOS LOCAL / TESTES
+# =============================================================================
+*.sqlite
+*.sqlite3
+*.db
+
+# =============================================================================
+# RELATÓRIOS E EXPORTS GERADOS
+# =============================================================================
+# CSVs e XLSXs podem conter PII de clientes; não commitamos exports
+exports/
+reports/
+*.xlsx
+*.xls
+# *.csv — NÃO ignoramos; seeds sintéticos em CSV ficam no repo
+
+# =============================================================================
+# ARQUIVOS DE CONFIGURAÇÃO LOCAL (ficam na máquina, não no repo)
+# =============================================================================
+CLAUDE.md
+agentes.md
+.claude/
+
+# =============================================================================
+# MISC
+# =============================================================================
+*.tmp
+*.temp
+*.bak
+*.orig
+.cache/
+.ipynb_checkpoints/
