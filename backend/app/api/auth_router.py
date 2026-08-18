@@ -1,0 +1,109 @@
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.infra import audit
+from app.infra.auth_service import (
+    checar_rate_limit,
+    criar_sessao,
+    invalidar_sessao,
+    registrar_falha,
+    resetar_tentativas,
+    verificar_senha,
+)
+from app.infra.db import get_db
+from app.infra.models import Usuario
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+_COOKIE = "sid"
+_MAX_AGE = 8 * 3600
+
+
+class LoginInput(BaseModel):
+    email: str
+    senha: str
+
+
+class LoginOutput(BaseModel):
+    nome: str
+    papel: str
+
+
+@router.post("/login", response_model=LoginOutput)
+async def login(
+    body: LoginInput,
+    request: Request,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> LoginOutput:
+    ip = request.client.host if request.client else None
+
+    await checar_rate_limit(db, body.email)
+    if ip:
+        await checar_rate_limit(db, ip)
+
+    res = await db.execute(
+        select(Usuario)
+        .where(Usuario.email == body.email)
+        .where(Usuario.ativo.is_(True))
+    )
+    usuario = res.scalar_one_or_none()
+
+    if usuario is None or not verificar_senha(usuario.senha_hash, body.senha):
+        await registrar_falha(db, body.email)
+        if ip:
+            await registrar_falha(db, ip)
+        await audit.registrar(
+            db,
+            tipo="falha_login",
+            dados={"email_hash": hash(body.email)},
+            ip_origem=ip,
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas.",
+        )
+
+    await resetar_tentativas(db, body.email)
+    sessao_id = await criar_sessao(db, usuario.id, ip)
+    await audit.registrar(
+        db,
+        tipo="login",
+        dados={},
+        usuario_id=usuario.id,
+        ip_origem=ip,
+    )
+    await db.commit()
+
+    response.set_cookie(
+        key=_COOKIE,
+        value=str(sessao_id),
+        httponly=True,
+        samesite="strict",
+        secure=False,
+        max_age=_MAX_AGE,
+    )
+    return LoginOutput(nome=usuario.nome, papel=usuario.papel)
+
+
+@router.post("/logout", status_code=200)
+async def logout(
+    request: Request,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, str]:
+    sid = request.cookies.get(_COOKIE)
+    if sid:
+        try:
+            await invalidar_sessao(db, UUID(sid))
+            await db.commit()
+        except ValueError:
+            pass
+    response.delete_cookie(_COOKIE)
+    return {}
