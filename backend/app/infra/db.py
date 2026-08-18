@@ -1,4 +1,3 @@
-import os
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
@@ -7,9 +6,11 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.infra.secrets import get_optional_secret
+
 
 def _build_url() -> str:
-    url = os.environ.get(
+    url = get_optional_secret(
         "DATABASE_URL",
         "postgresql+asyncpg://multik:multik_dev@localhost:5432/multik",
     )
