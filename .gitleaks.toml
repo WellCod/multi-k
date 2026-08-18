@@ -1,0 +1,5 @@
+[allowlist]
+description = "Arquivos de template e exemplos não contêm segredos reais"
+paths = [
+    ".env.example",
+]
