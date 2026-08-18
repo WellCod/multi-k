@@ -69,7 +69,7 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = ["structlog.*", "argon2.*", "asyncpg.*"]
-ignore_missing_stubs = true
+ignore_missing_imports = true
 
 # --- Pytest ---
 [tool.pytest.ini_options]

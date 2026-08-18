@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping, MutableMapping
 from typing import Any
 
 import structlog
@@ -26,8 +27,8 @@ ALLOWED_FIELDS: frozenset[str] = frozenset(
 
 
 def allowlist_processor(
-    logger: object, method: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+    logger: Any, method: str, event_dict: MutableMapping[str, Any]
+) -> Mapping[str, Any]:
     return {k: v for k, v in event_dict.items() if k in ALLOWED_FIELDS}
 
 
