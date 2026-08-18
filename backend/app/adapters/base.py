@@ -7,8 +7,6 @@ atravessa este módulo. O teste de arquitetura no CI garante isso.
 Adicionar uma nova seguradora = implementar PortaSeguradora. Zero mudança aqui.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
@@ -24,8 +22,8 @@ from typing import Protocol, runtime_checkable
 class Capacidades:
     """O que uma seguradora suporta — usado para montar a UI sem if/else por cia."""
 
-    ramos: list[str]          # ["auto", "residencia"]
-    coberturas: list[str]     # códigos canônicos (não os da seguradora)
+    ramos: list[str]
+    coberturas: list[str]
     franquias: list[str]
     parcelamentos: list[str]
 
@@ -96,7 +94,7 @@ class MovimentoCanonico:
     """Evento imutável vindo do E-Retorno."""
 
     id_movimento: str
-    tipo: str  # "emissao" | "parcela" | "comissao" | "sinistro" | "cancelamento"
+    tipo: str  # "emissao"|"parcela"|"comissao"|"sinistro"|"cancelamento"
     data: date
     valor: Decimal | None
     dados: dict[str, object] = field(default_factory=dict)
@@ -113,7 +111,7 @@ class PortaSeguradora(Protocol):
     Interface que toda seguradora deve implementar.
 
     `capacidades()` é síncrono — resposta local, sem IO.
-    Os demais métodos são assíncronos pois envolvem rede ou simulação de latência.
+    Os demais métodos são assíncronos pois envolvem rede ou latência simulada.
     """
 
     def capacidades(self) -> Capacidades: ...
