@@ -33,11 +33,11 @@ async def get_current_user(
             detail="Sessão expirada ou inválida.",
         )
     await db.execute(
-        text("SET LOCAL app.usuario_id = :uid"),
+        text("SELECT set_config('app.usuario_id', :uid, true)"),
         {"uid": str(usuario.id)},
     )
     await db.execute(
-        text("SET LOCAL app.papel = :papel"),
+        text("SELECT set_config('app.papel', :papel, true)"),
         {"papel": usuario.papel},
     )
     return usuario

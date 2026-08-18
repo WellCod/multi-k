@@ -31,8 +31,10 @@ async def test_corretor_nao_ve_eventos_de_outro(
     await db.flush()
 
     # Ativa RLS como corretor B
-    await db.execute(text("SET LOCAL app.usuario_id = :uid"), {"uid": str(b.id)})
-    await db.execute(text("SET LOCAL app.papel = :p"), {"p": "corretor"})
+    await db.execute(
+        text("SELECT set_config('app.usuario_id', :uid, true)"), {"uid": str(b.id)}
+    )
+    await db.execute(text("SELECT set_config('app.papel', :p, true)"), {"p": "corretor"})
 
     res = await db.execute(select(EventoDB))
     visivel = res.scalars().all()
@@ -56,8 +58,10 @@ async def test_admin_ve_todos_os_eventos(db: AsyncSession) -> None:
     await db.flush()
 
     # Ativa RLS como admin
-    await db.execute(text("SET LOCAL app.usuario_id = :uid"), {"uid": str(adm.id)})
-    await db.execute(text("SET LOCAL app.papel = :p"), {"p": "admin"})
+    await db.execute(
+        text("SELECT set_config('app.usuario_id', :uid, true)"), {"uid": str(adm.id)}
+    )
+    await db.execute(text("SELECT set_config('app.papel', :p, true)"), {"p": "admin"})
 
     res = await db.execute(select(EventoDB))
     todos = res.scalars().all()
@@ -78,8 +82,10 @@ async def test_corretor_ve_proprio_evento(db: AsyncSession) -> None:
     )
     await db.flush()
 
-    await db.execute(text("SET LOCAL app.usuario_id = :uid"), {"uid": str(d.id)})
-    await db.execute(text("SET LOCAL app.papel = :p"), {"p": "corretor"})
+    await db.execute(
+        text("SELECT set_config('app.usuario_id', :uid, true)"), {"uid": str(d.id)}
+    )
+    await db.execute(text("SELECT set_config('app.papel', :p, true)"), {"p": "corretor"})
 
     res = await db.execute(select(EventoDB).where(EventoDB.usuario_id == d.id))
     assert len(res.scalars().all()) == 1

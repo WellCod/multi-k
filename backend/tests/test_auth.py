@@ -1,7 +1,11 @@
 """Testes de autenticação: login, logout e rate limit."""
 
+from collections.abc import AsyncGenerator
+
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.domain.auth import Papel
@@ -15,6 +19,13 @@ async def client() -> AsyncClient:
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:
         yield c
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def reset_tentativas(engine: AsyncEngine) -> AsyncGenerator[None, None]:
+    yield
+    async with engine.begin() as conn:
+        await conn.execute(text("DELETE FROM tentativas_login"))
 
 
 async def test_login_sucesso(
