@@ -31,7 +31,7 @@ class EnvSecretProvider(SecretProvider):
     Lê segredos de variáveis de ambiente.
 
     Válido apenas em desenvolvimento com dados mock.
-    Quando a credencial real da Yelum chegar, substitua por SecretManagerProvider.
+    Em produção, substitua por SecretManagerProvider (GCP Secret Manager).
     """
 
     def get(self, key: str) -> str:
