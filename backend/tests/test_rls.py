@@ -98,9 +98,7 @@ async def test_corretor_ve_proprio_evento(db_rls: AsyncSession) -> None:
     )
     await db_rls.flush()
 
-    res = await db_rls.execute(
-        select(EventoDB).where(EventoDB.usuario_id == d.id)
-    )
+    res = await db_rls.execute(select(EventoDB).where(EventoDB.usuario_id == d.id))
     assert len(res.scalars().all()) == 1
 
 
