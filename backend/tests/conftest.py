@@ -11,6 +11,8 @@ os.environ.setdefault(
     "postgresql+asyncpg://multik:multik_dev@localhost:5432/multik_test",
 )
 os.environ.setdefault("SECRET_KEY", "test-secret-key-only")
+# Worker desabilitado em testes — jobs processados manualmente via processar_job()
+os.environ.setdefault("DISABLE_WORKER", "1")
 
 import uuid  # noqa: E402
 from collections.abc import AsyncGenerator  # noqa: E402
@@ -53,6 +55,22 @@ _RLS_STMTS = [
     """CREATE TRIGGER tg_auditoria_no_delete
         BEFORE DELETE ON auditoria
         FOR EACH ROW EXECUTE FUNCTION enforce_audit_append_only()""",
+    # RLS para clientes
+    "ALTER TABLE clientes ENABLE ROW LEVEL SECURITY",
+    "ALTER TABLE clientes FORCE ROW LEVEL SECURITY",
+    """CREATE POLICY clientes_isolamento ON clientes
+        USING (
+            current_setting('app.papel', true) = 'admin'
+            OR usuario_id::text = current_setting('app.usuario_id', true)
+        )""",
+    # RLS para cotacoes
+    "ALTER TABLE cotacoes ENABLE ROW LEVEL SECURITY",
+    "ALTER TABLE cotacoes FORCE ROW LEVEL SECURITY",
+    """CREATE POLICY cotacoes_isolamento ON cotacoes
+        USING (
+            current_setting('app.papel', true) = 'admin'
+            OR usuario_id::text = current_setting('app.usuario_id', true)
+        )""",
     # POSTGRES_USER cria o bootstrap superuser; PostgreSQL nao permite remover
     # SUPERUSER do bootstrap user. Criamos multik_app (sem superuser) para
     # testar RLS via SET LOCAL ROLE dentro da transacao de teste.
@@ -63,6 +81,7 @@ _RLS_STMTS = [
     END $$""",
     "GRANT USAGE ON SCHEMA public TO multik_app",
     "GRANT ALL ON ALL TABLES IN SCHEMA public TO multik_app",
+    "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO multik_app",
     "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO multik_app",
     "GRANT multik_app TO CURRENT_USER",
 ]
