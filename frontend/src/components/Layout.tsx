@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/cotacao", label: "Nova cotação" },
   { to: "/historico", label: "Histórico" },
+  { to: "/renovacoes", label: "Renovações" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

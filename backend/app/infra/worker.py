@@ -26,7 +26,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-def _get_adapter(cia: str) -> PortaSeguradora:
+def get_adapter(cia: str) -> PortaSeguradora:
     # FASE 5: adicionar dispatch por cia aqui (registry de adapters)
     if cia == "fake":
         return FakeSeguradora()
@@ -50,7 +50,7 @@ async def processar_job(
         dados_risco: dict[str, Any] = dict(cotacao.dados_risco)
         cia = job.cia
 
-    adapter = _get_adapter(cia)
+    adapter = get_adapter(cia)
     risco = RiscoCanonico(ramo=ramo, dados=dados_risco)
 
     try:
