@@ -9,7 +9,7 @@ Rodar: pytest tests/test_arch.py
 """
 
 import ast
-import subprocess
+import re
 from pathlib import Path
 
 FORBIDDEN_PATTERNS = [
@@ -40,19 +40,21 @@ def test_yelum_symbols_isolated() -> None:
     """Nenhum símbolo Yelum deve aparecer fora de adapters/yelum/."""
     root = Path(__file__).parent.parent
 
-    dir_targets = [str(root / d) for d in SCAN_DIRS]
-    file_targets = [str(root / f) for f in SCAN_FILES]
-    targets = dir_targets + file_targets
+    py_files: list[Path] = []
+    for d in SCAN_DIRS:
+        py_files.extend((root / d).rglob("*.py"))
+    for f in SCAN_FILES:
+        p = root / f
+        if p.exists():
+            py_files.append(p)
 
     violations: list[str] = []
-    for pattern in FORBIDDEN_PATTERNS:
-        result = subprocess.run(
-            ["grep", "-ri", "--include=*.py", pattern, *targets],
-            capture_output=True,
-            text=True,
-        )
-        for line in result.stdout.strip().splitlines():
-            violations.append(f"[{pattern}] {line}")
+    for py_file in py_files:
+        text = py_file.read_text(encoding="utf-8")
+        for pattern in FORBIDDEN_PATTERNS:
+            for i, line in enumerate(text.splitlines(), 1):
+                if re.search(pattern, line, re.IGNORECASE):
+                    violations.append(f"[{pattern}] {py_file}:{i}: {line.strip()}")
 
     assert not violations, (
         "Referências a Yelum encontradas fora de adapters/yelum/:\n"
@@ -64,17 +66,16 @@ def test_yelum_symbols_isolated() -> None:
 def test_secret_provider_not_bypassed() -> None:
     """Nenhum módulo do app deve chamar os.environ diretamente."""
     root = Path(__file__).parent.parent
+    allowed = root / "app" / "infra" / "secrets.py"
 
-    result = subprocess.run(
-        ["grep", "-rn", "--include=*.py", r"os\.environ", str(root / "app")],
-        capture_output=True,
-        text=True,
-    )
-
-    allowed = str(root / "app" / "infra" / "secrets.py")
-    violations = [
-        line for line in result.stdout.strip().splitlines() if allowed not in line
-    ]
+    violations: list[str] = []
+    for py_file in (root / "app").rglob("*.py"):
+        if py_file == allowed:
+            continue
+        text = py_file.read_text(encoding="utf-8")
+        for i, line in enumerate(text.splitlines(), 1):
+            if re.search(r"os\.environ", line):
+                violations.append(f"{py_file}:{i}: {line.strip()}")
 
     assert not violations, (
         "Uso direto de os.environ encontrado (use get_secret()):\n"
