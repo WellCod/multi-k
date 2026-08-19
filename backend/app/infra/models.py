@@ -197,6 +197,31 @@ class Cotacao(Base):
     )
 
 
+class Proposta(Base):
+    """Registro imutável de cada transmissão de proposta.
+
+    Append-only: nunca sofre UPDATE. Recotar + transmitir gera novo registro.
+    Parcelas e comissão são projeções computadas sobre este registro.
+    """
+
+    __tablename__ = "propostas"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    cotacao_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cotacoes.id"))
+    protocolo: Mapped[str] = mapped_column(String(100))
+    commissao_pct: Mapped[Decimal] = mapped_column(Numeric(5, 4))
+    plano_pagamento: Mapped[str] = mapped_column(String(20))
+    n_parcelas: Mapped[int] = mapped_column(Integer)
+    valor_parcela: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    comissao_parcela: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    inicio_vigencia: Mapped[date | None] = mapped_column(Date, default=None)
+    transmitida_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    usuario_id: Mapped[uuid.UUID] = mapped_column()
+    tenant_id: Mapped[uuid.UUID] = mapped_column(default=lambda: TENANT_ID)
+
+
 class CotacaoJob(Base):
     """Fila de trabalho para o orquestrador SKIP LOCKED."""
 
