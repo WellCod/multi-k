@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.models import Dominio
 
-_SEED: list[dict] = [
+_SEED: list[dict[str, str]] = [
     # Estado civil
     {"tipo": "estado_civil", "codigo": "solteiro", "descricao": "Solteiro(a)"},
     {"tipo": "estado_civil", "codigo": "casado", "descricao": "Casado(a)"},
