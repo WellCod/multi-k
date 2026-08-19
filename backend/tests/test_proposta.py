@@ -194,7 +194,5 @@ async def test_renovacoes_vazio(
 async def test_transmitir_sem_auth(
     client: AsyncClient, engine: AsyncEngine, sem_auth: bool
 ) -> None:
-    r = await client.post(
-        f"/cotacoes/{uuid.uuid4()}/transmitir", json=_TRANSMITIR_BODY
-    )
+    r = await client.post(f"/cotacoes/{uuid.uuid4()}/transmitir", json=_TRANSMITIR_BODY)
     assert r.status_code == 401
