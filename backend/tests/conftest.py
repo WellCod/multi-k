@@ -71,6 +71,14 @@ _RLS_STMTS = [
             current_setting('app.papel', true) = 'admin'
             OR usuario_id::text = current_setting('app.usuario_id', true)
         )""",
+    # RLS para propostas
+    "ALTER TABLE propostas ENABLE ROW LEVEL SECURITY",
+    "ALTER TABLE propostas FORCE ROW LEVEL SECURITY",
+    """CREATE POLICY propostas_isolamento ON propostas
+        USING (
+            current_setting('app.papel', true) = 'admin'
+            OR usuario_id::text = current_setting('app.usuario_id', true)
+        )""",
     # POSTGRES_USER cria o bootstrap superuser; PostgreSQL nao permite remover
     # SUPERUSER do bootstrap user. Criamos multik_app (sem superuser) para
     # testar RLS via SET LOCAL ROLE dentro da transacao de teste.

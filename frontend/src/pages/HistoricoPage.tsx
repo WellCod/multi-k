@@ -111,14 +111,24 @@ export function HistoricoPage() {
               ) : (
                 <p className="text-sm text-gray-400">—</p>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => handleRecotar(c)}
-              >
-                Recotar
-              </Button>
+              <div className="flex gap-2 mt-2 justify-end">
+                {(c.status === "sucesso" || c.status === "restricao") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/cotacoes/${c.id}/comparativo`)}
+                  >
+                    Comparativo
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRecotar(c)}
+                >
+                  Recotar
+                </Button>
+              </div>
             </div>
           </div>
         ))}
