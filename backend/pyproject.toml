@@ -15,6 +15,7 @@ dependencies = [
     "httpx>=0.27.0",
     "argon2-cffi>=23.1.0",
     "structlog>=24.1.0",
+    "reportlab>=4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -68,7 +69,7 @@ python_version = "3.12"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["structlog.*", "argon2.*", "asyncpg.*"]
+module = ["structlog.*", "argon2.*", "asyncpg.*", "reportlab.*"]
 ignore_missing_imports = true
 
 # --- Pytest ---

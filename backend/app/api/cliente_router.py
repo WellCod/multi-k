@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import CurrentUser
 from app.infra.cpf import cpf_para_idx
 from app.infra.db import get_db
-from app.infra.models import Cliente, Imovel, Veiculo
+from app.infra.models import Cliente, Cotacao, Imovel, Proposta, Veiculo
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
 
@@ -329,3 +329,70 @@ async def adicionar_imovel(
     await db.commit()
     await db.refresh(i)
     return _imovel_out(i)
+
+
+class TimelineItem(BaseModel):
+    tipo: str
+    data: str
+    dados: dict[str, Any]
+
+
+@router.get("/{cliente_id}/timeline", response_model=list[TimelineItem])
+async def timeline_cliente(
+    cliente_id: uuid.UUID,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[TimelineItem]:
+    """Linha do tempo do cliente: criação, cotações e propostas ordenadas."""
+    cliente = await _get_cliente_ou_404(cliente_id, usuario.id, db)
+
+    items: list[TimelineItem] = [
+        TimelineItem(
+            tipo="cliente.criado",
+            data=cliente.criado_em.isoformat(),
+            dados={"nome": cliente.nome},
+        )
+    ]
+
+    cotacoes_r = await db.execute(
+        select(Cotacao)
+        .where(Cotacao.cliente_id == cliente_id)
+        .order_by(Cotacao.criado_em)
+    )
+    for cotacao in cotacoes_r.scalars().all():
+        items.append(
+            TimelineItem(
+                tipo="cotacao.criada",
+                data=cotacao.criado_em.isoformat(),
+                dados={
+                    "id": str(cotacao.id),
+                    "ramo": cotacao.ramo,
+                    "status": cotacao.status,
+                    "premio_total": (
+                        str(cotacao.premio_total) if cotacao.premio_total else None
+                    ),
+                },
+            )
+        )
+
+        propostas_r = await db.execute(
+            select(Proposta)
+            .where(Proposta.cotacao_id == cotacao.id)
+            .order_by(Proposta.transmitida_em)
+        )
+        for proposta in propostas_r.scalars().all():
+            items.append(
+                TimelineItem(
+                    tipo="proposta.transmitida",
+                    data=proposta.transmitida_em.isoformat(),
+                    dados={
+                        "id": str(proposta.id),
+                        "protocolo": proposta.protocolo,
+                        "n_parcelas": proposta.n_parcelas,
+                        "valor_parcela": str(proposta.valor_parcela),
+                    },
+                )
+            )
+
+    items.sort(key=lambda x: x.data)
+    return items

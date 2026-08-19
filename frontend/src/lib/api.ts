@@ -83,6 +83,8 @@ export const api = {
       }),
     imoveis: (clienteId: string) =>
       request<Imovel[]>(`/clientes/${clienteId}/imoveis`),
+    timeline: (id: string) =>
+      request<TimelineItem[]>(`/clientes/${id}/timeline`),
   },
 
   // ---- Cotações ----
@@ -96,7 +98,31 @@ export const api = {
     list: () => request<Cotacao[]>("/cotacoes"),
     recotar: (id: string) =>
       request<CotacaoCriada>(`/cotacoes/${id}/recotar`, { method: "POST" }),
+    comparativo: (id: string) =>
+      request<ItemComparativo[]>(`/cotacoes/${id}/comparativo`),
+    comparativoPdfUrl: (id: string) =>
+      `${BASE}/cotacoes/${id}/comparativo/pdf`,
+    transmitir: (id: string, body: TransmitirInput) =>
+      request<Proposta>(`/cotacoes/${id}/transmitir`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   },
+
+  // ---- Propostas ----
+  propostas: {
+    get: (id: string) => request<Proposta>(`/propostas/${id}`),
+    parcelas: (id: string) => request<Parcela[]>(`/propostas/${id}/parcelas`),
+  },
+
+  // ---- Renovações ----
+  renovacoes: {
+    list: (dias?: number) => {
+      const params = dias ? `?dias=${dias}` : "";
+      return request<Renovacao[]>(`/renovacoes${params}`);
+    },
+  },
+
 };
 
 // ---- Types ----
@@ -209,4 +235,61 @@ export interface Cotacao {
   versao_anterior_id: string | null;
   criado_em: string;
   dados_risco: Record<string, unknown>;
+}
+
+export interface TransmitirInput {
+  plano_pagamento: string;
+  n_parcelas: number;
+  comissao_pct: string;
+  inicio_vigencia?: string;
+  dados_negocio?: Record<string, unknown>;
+}
+
+export interface Proposta {
+  id: string;
+  cotacao_id: string;
+  protocolo: string;
+  plano_pagamento: string;
+  n_parcelas: number;
+  valor_parcela: string;
+  comissao_parcela: string;
+  comissao_pct: string;
+  inicio_vigencia: string | null;
+  transmitida_em: string;
+}
+
+export interface Parcela {
+  numero: number;
+  vencimento: string | null;
+  valor: string;
+  comissao: string;
+}
+
+export interface ItemComparativo {
+  cia: string;
+  cotacao_id_cia: string | null;
+  premio_total: string | null;
+  restricoes: Restricao[];
+  mensagens: string[];
+  necessita_vistoria: boolean;
+  status: string;
+}
+
+export interface Renovacao {
+  proposta_id: string;
+  cotacao_id: string;
+  cliente_id: string | null;
+  protocolo: string;
+  ramo: string;
+  inicio_vigencia: string;
+  fim_vigencia: string;
+  dias_para_vencer: number;
+  janela: "D30" | "D45" | "D60";
+  premio_total: string | null;
+}
+
+export interface TimelineItem {
+  tipo: string;
+  data: string;
+  dados: Record<string, unknown>;
 }
