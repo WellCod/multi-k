@@ -1,15 +1,52 @@
-// Esqueleto da SPA — preenchido nas fases seguintes
+import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import { Layout } from "@/components/Layout";
+import { LoginPage } from "@/pages/LoginPage";
+import { CotacaoPage } from "@/pages/CotacaoPage";
+import { HistoricoPage } from "@/pages/HistoricoPage";
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/cotacao"
+        element={
+          <RequireAuth>
+            <Layout>
+              <CotacaoPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/historico"
+        element={
+          <RequireAuth>
+            <Layout>
+              <HistoricoPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route path="*" element={<Navigate to="/cotacao" replace />} />
+    </Routes>
+  );
+}
 
 export default function App() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-semibold text-gray-900">multi-K</h1>
-        <p className="text-sm text-gray-500">Multicálculo e gestão de seguros</p>
-        <span className="inline-block px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
-          FASE 0 — Setup
-        </span>
-      </div>
-    </div>
+    <Router>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </Router>
   );
 }

@@ -1,5 +1,7 @@
 """Ponto de entrada da aplicação FastAPI."""
 
+import asyncio
+import contextlib
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -9,12 +11,15 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth_router import router as auth_router
+from app.api.cliente_router import router as cliente_router
 from app.api.cotacao_router import router as cotacao_router
 from app.api.dominio_router import router as dominio_router
 from app.api.health import router as health_router
 from app.infra.db import AsyncSessionLocal
 from app.infra.logging_config import configure_logging
+from app.infra.secrets import get_optional_secret
 from app.infra.seed import seed_if_empty
+from app.infra.worker import start_worker
 
 configure_logging()
 
@@ -23,7 +28,17 @@ configure_logging()
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     async with AsyncSessionLocal() as db:
         await seed_if_empty(db)
+
+    worker_task: asyncio.Task[None] | None = None
+    if not get_optional_secret("DISABLE_WORKER", ""):
+        worker_task = start_worker(AsyncSessionLocal)
+
     yield
+
+    if worker_task is not None:
+        worker_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker_task
 
 
 app = FastAPI(
@@ -59,5 +74,6 @@ async def correlation_id_middleware(
 
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(cliente_router)
 app.include_router(cotacao_router)
 app.include_router(dominio_router)
