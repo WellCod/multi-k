@@ -103,16 +103,18 @@ def _gerar_pdf(cotacao: Cotacao, itens: list[ItemComparativoOut]) -> bytes:
         story.append(Paragraph("Nenhum resultado disponível.", styles["Normal"]))
     else:
         headers = [
-            "Seguradora", "Prêmio Total (R$)", "Restrições", "Vistoria", "Status"
+            "Seguradora",
+            "Prêmio Total (R$)",
+            "Restrições",
+            "Vistoria",
+            "Status",
         ]
         rows: list[list[str]] = [headers]
         for item in itens:
             premio = (
                 f"{item.premio_total:,.2f}" if item.premio_total is not None else "—"
             )
-            restricoes_txt = (
-                "; ".join(r["codigo"] for r in item.restricoes) or "—"
-            )
+            restricoes_txt = "; ".join(r["codigo"] for r in item.restricoes) or "—"
             vistoria = "Sim" if item.necessita_vistoria else "Não"
             rows.append(
                 [item.cia.upper(), premio, restricoes_txt, vistoria, item.status]
