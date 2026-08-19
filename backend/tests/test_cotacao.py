@@ -1,12 +1,15 @@
 """Testes do endpoint de cotação."""
 
+import uuid
+
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.adapters.fake.adapter import FakeSeguradora
-from app.api.cotacao_router import get_adapter
 from app.domain.auth import Papel
+from app.infra.models import CotacaoJob
+from app.infra.worker import processar_job
 from app.main import app
 from tests.conftest import criar_usuario
 
@@ -32,16 +35,6 @@ async def client() -> AsyncClient:
         yield c
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def zero_latency():
-    """Remove latência do adapter durante testes."""
-    app.dependency_overrides[get_adapter] = lambda: FakeSeguradora(
-        latencia_min=0, latencia_max=0
-    )
-    yield
-    app.dependency_overrides.pop(get_adapter, None)
-
-
 async def _login(client: AsyncClient, db: AsyncSession, email: str) -> AsyncClient:
     await criar_usuario(db, email, Papel.CORRETOR)
     await db.commit()
@@ -50,18 +43,44 @@ async def _login(client: AsyncClient, db: AsyncSession, email: str) -> AsyncClie
     return client
 
 
+async def _processar_jobs_da_cotacao(
+    cotacao_id: uuid.UUID,
+    engine: AsyncEngine,
+) -> None:
+    """Processa synchronously os jobs pendentes para uma cotação nos testes."""
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as db:
+        result = await db.execute(
+            select(CotacaoJob).where(CotacaoJob.cotacao_id == cotacao_id)
+        )
+        jobs = result.scalars().all()
+        job_data = [(j.id, j.cotacao_id) for j in jobs]
+
+    for job_id, cot_id in job_data:
+        await processar_job(job_id, cot_id, factory)
+
+
 async def test_cotacao_sucesso(
     db: AsyncSession, client: AsyncClient, engine: AsyncEngine
 ) -> None:
     await _login(client, db, "corretor_cot@test.com")
     r = await client.post("/cotacoes", json=_RISCO_AUTO)
-    assert r.status_code == 200
+    assert r.status_code == 202
     body = r.json()
-    assert body["sucesso"] is True
-    assert body["cotacao_id"] is not None
-    assert body["premio_total"] is not None
-    assert body["restricoes"] == []
-    assert body["necessita_vistoria"] is False
+    cotacao_id = uuid.UUID(body["id"])
+    assert body["status"] == "aguardando"
+
+    await _processar_jobs_da_cotacao(cotacao_id, engine)
+
+    r2 = await client.get(f"/cotacoes/{cotacao_id}")
+    assert r2.status_code == 200
+    body2 = r2.json()
+    assert body2["status"] == "sucesso"
+    assert body2["premio_total"] is not None
+    assert body2["restricoes"] == []
+    assert body2["necessita_vistoria"] is False
 
 
 async def test_cotacao_restricao(
@@ -69,9 +88,14 @@ async def test_cotacao_restricao(
 ) -> None:
     await _login(client, db, "corretor_res@test.com")
     r = await client.post("/cotacoes", json=_RISCO_AUTO_RESTRICAO)
-    assert r.status_code == 200
-    body = r.json()
-    assert body["sucesso"] is True
+    assert r.status_code == 202
+    cotacao_id = uuid.UUID(r.json()["id"])
+
+    await _processar_jobs_da_cotacao(cotacao_id, engine)
+
+    r2 = await client.get(f"/cotacoes/{cotacao_id}")
+    body = r2.json()
+    assert body["status"] == "restricao"
     assert body["necessita_vistoria"] is True
     assert len(body["restricoes"]) > 0
 
@@ -81,16 +105,51 @@ async def test_cotacao_erro(
 ) -> None:
     await _login(client, db, "corretor_err@test.com")
     r = await client.post("/cotacoes", json=_RISCO_AUTO_ERRO)
-    assert r.status_code == 200
-    body = r.json()
-    assert body["sucesso"] is False
-    assert body["cotacao_id"] is None
+    assert r.status_code == 202
+    cotacao_id = uuid.UUID(r.json()["id"])
+
+    await _processar_jobs_da_cotacao(cotacao_id, engine)
+
+    r2 = await client.get(f"/cotacoes/{cotacao_id}")
+    body = r2.json()
+    assert body["status"] == "erro"
     assert body["premio_total"] is None
 
 
 async def test_cotacao_sem_auth(client: AsyncClient, engine: AsyncEngine) -> None:
     r = await client.post("/cotacoes", json=_RISCO_AUTO)
     assert r.status_code == 401
+
+
+async def test_recotar(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await _login(client, db, "corretor_rec@test.com")
+    r = await client.post("/cotacoes", json=_RISCO_AUTO)
+    cotacao_id = uuid.UUID(r.json()["id"])
+    await _processar_jobs_da_cotacao(cotacao_id, engine)
+
+    r2 = await client.post(f"/cotacoes/{cotacao_id}/recotar")
+    assert r2.status_code == 202
+    nova_id = uuid.UUID(r2.json()["id"])
+    assert nova_id != cotacao_id
+
+    await _processar_jobs_da_cotacao(nova_id, engine)
+
+    r3 = await client.get(f"/cotacoes/{nova_id}")
+    body = r3.json()
+    assert body["status"] == "sucesso"
+    assert body["versao_anterior_id"] == str(cotacao_id)
+
+
+async def test_listar_cotacoes(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await _login(client, db, "corretor_list@test.com")
+    await client.post("/cotacoes", json=_RISCO_AUTO)
+    r = await client.get("/cotacoes")
+    assert r.status_code == 200
+    assert len(r.json()) >= 1
 
 
 async def test_dominios_retorna_lista(
