@@ -1,17 +1,30 @@
 """Ponto de entrada da aplicação FastAPI."""
 
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 import structlog.contextvars
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth_router import router as auth_router
+from app.api.cotacao_router import router as cotacao_router
+from app.api.dominio_router import router as dominio_router
 from app.api.health import router as health_router
+from app.infra.db import AsyncSessionLocal
 from app.infra.logging_config import configure_logging
+from app.infra.seed import seed_if_empty
 
 configure_logging()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    async with AsyncSessionLocal() as db:
+        await seed_if_empty(db)
+    yield
+
 
 app = FastAPI(
     title="multi-K API",
@@ -19,6 +32,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -45,3 +59,5 @@ async def correlation_id_middleware(
 
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(cotacao_router)
+app.include_router(dominio_router)
