@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 from app.domain.auth import TENANT_ID, Papel  # noqa: E402
 from app.infra.auth_service import hash_senha  # noqa: E402
 from app.infra.models import Base, Usuario  # noqa: E402
+from app.infra.seed import seed_if_empty  # noqa: E402
 
 _TEST_URL = os.environ["DATABASE_URL"]
 
@@ -75,6 +76,11 @@ async def engine() -> AsyncGenerator[AsyncEngine, None]:
         await conn.run_sync(Base.metadata.create_all)
         for stmt in _RLS_STMTS:
             await conn.execute(text(stmt))
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        e, expire_on_commit=False
+    )
+    async with factory() as db:
+        await seed_if_empty(db)
     yield e
     async with e.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
