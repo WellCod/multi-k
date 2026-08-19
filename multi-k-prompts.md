@@ -11,7 +11,7 @@ Um prompt por fase. Cola inteiro no Claude Code, junto com `multi-k-escopo.md`.
 ## FASE 0 — Setup local
 
 ```
-Projeto multi-K: multicálculo e gestão para corretora de seguros (Klubi).
+Projeto multi-K: multicálculo e gestão para corretora de seguros.
 Stack: Python 3.12 + FastAPI + Postgres 16 + React 18 + Vite + TypeScript + Tailwind + shadcn/ui.
 Tudo roda local via Docker Compose. Nada de cloud nesta fase.
 
@@ -188,7 +188,7 @@ Este é o único artefato que não existe no portal da seguradora — é onde
 o produto justifica existir. Densidade acima de decoração.
 
 2. PDF PARA O CLIENTE
-Comparativo com logo da Klubi. É o entregável que vai pro cliente final.
+Comparativo com logo da corretora. É o entregável que vai pro cliente final.
 Nota: quando a Yelum liberar, use a API de Impressão dela para cotação,
 proposta, apólice, parcelas e carta verde. NÃO construa gerador para esses.
 Construa apenas o comparativo, que é nosso.

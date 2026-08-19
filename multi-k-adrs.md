@@ -32,7 +32,7 @@ Arquivo único em vez de `docs/adr/NNNN-*.md`: com 1 dev e uso principal sendo c
 
 **Status:** Aceita · substitui a posição inicial (Porto Auto primeiro)
 
-**Contexto.** O pedido original era Porto Auto. Mas o acesso à Porto é opaco — só aceitam parceiros previamente indicados pelas áreas de produto, e não há como ler o catálogo sem aprovação. A Yelum tem documentação técnica em mãos, canal de acesso nomeado (ponto focal comercial, que a Klubi já tem como corretora com código ativo) e o E-Retorno cobre metade do MVP.
+**Contexto.** O pedido original era Porto Auto. Mas o acesso à Porto é opaco — só aceitam parceiros previamente indicados pelas áreas de produto, e não há como ler o catálogo sem aprovação. A Yelum tem documentação técnica em mãos, canal de acesso nomeado (ponto focal comercial, que a corretora já tem como parceira com código ativo) e o E-Retorno cobre metade do MVP.
 
 **Decisão.** Yelum é a primeira integração. Porto entra na fase de acoplamento.
 
@@ -74,7 +74,7 @@ Arquivo único em vez de `docs/adr/NNNN-*.md`: com 1 dev e uso principal sendo c
 
 **Status:** Aceita
 
-Klubi → multi-K. Curto, carrega a marca sem explicação. "Multi-Kalculo" descartado: a troca de C por K em nome longo lê como marca de 2010, e o produto já está indo além de cotação (gestão, comissão, sinistro) — "Kalculo" ficaria pequeno.
+multi-K — nome do produto. Curto, carrega a marca sem explicação. "Multi-Kalculo" descartado: a troca de C por K em nome longo lê como marca de 2010, e o produto já está indo além de cotação (gestão, comissão, sinistro) — "Kalculo" ficaria pequeno.
 
 ---
 
@@ -310,7 +310,7 @@ Domínio é evento, trabalho é I/O externo. ORM e admin do Django atrapalham no
 - Token é **opaco (~28 chars), não JWT** — não dá para ler expiração. Cache em memória do processo, `401` como sinal de expirado, reautentica e repete uma vez. Nunca em Redis, nunca em disco
 - Rotação é 100% nossa: a chave do portal expira `never`
 
-**Por quê o risco é maior que o normal.** Vazamento não dá acesso a uma API com escopo — dá acesso ao portal inteiro, com tudo que um corretor pode fazer lá, em nome da Klubi.
+**Por quê o risco é maior que o normal.** Vazamento não dá acesso a uma API com escopo — dá acesso ao portal inteiro, com tudo que um corretor pode fazer lá, em nome da corretora.
 
 **Sinal de violação.** Decodificar o token para ler `exp`. Cachear em store compartilhado. `os.environ` direto. Credencial no banco.
 
@@ -368,7 +368,7 @@ Os PDFs da Yelum têm cláusula explícita de não-reprodução, e a collection 
 
 **Decisão.** Ainda assim, **transmitir** não é automático no MVP.
 
-**Por quê.** Cotar é reversível. Transmitir é ato jurídico em nome da corretora. E o gate de paridade (ADR-026) ainda não passou — transmitir com prêmio divergente não é bug de tela, é proposta errada assinada pela Klubi.
+**Por quê.** Cotar é reversível. Transmitir é ato jurídico em nome da corretora. E o gate de paridade (ADR-026) ainda não passou — transmitir com prêmio divergente não é bug de tela, é proposta errada assinada pela corretora.
 
 **Revisitar.** Depois do gate.
 
@@ -406,7 +406,7 @@ A Yelum expõe API de Impressão para cotação, proposta, apólice, parcelas e 
 
 **Decisão.** Usar a **convenção do gênero** (funil `segurado → objeto → perfil → coberturas → resultado`, que é pública e observável) e o conjunto de KPIs que o dashboard do Segfy demonstra ser o pulso operacional de uma corretora. Não replicar telas.
 
-**Por quê.** Duas razões: as telas deles rodam atrás de login, então qualquer "reprodução" seria invenção com o nome deles colado; e a UI deles carrega complexidade que existe pelas restrições **deles** — 22 cias, milhares de corretoras, múltiplos ramos. Metade daquilo é configuração que a Klubi não precisa.
+**Por quê.** Duas razões: as telas deles rodam atrás de login, então qualquer "reprodução" seria invenção com o nome deles colado; e a UI deles carrega complexidade que existe pelas restrições **deles** — 22 cias, milhares de corretoras, múltiplos ramos. Metade daquilo é configuração que a corretora não precisa.
 
 **Melhoria deliberada sobre o Segfy.** "Comissão produzida" vira **dois** números — produzida e recebida. A lacuna entre eles é a conciliação, e deixá-la visível na home é o que faz alguém agir.
 

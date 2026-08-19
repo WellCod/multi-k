@@ -1,6 +1,6 @@
 # multi-K — Escopo
 
-Multicálculo e gestão da Klubi. Substitui o documento anterior baseado em Porto Auto.
+Multicálculo e gestão de seguros. Substitui o documento anterior baseado em Porto Auto.
 
 **Decisões fechadas:** Yelum primeiro (Porto na fase 2 de acoplamento) · Auto como produto, Residência como banco de provas · Python/FastAPI + React/Vite + Postgres · auth própria · local no MVP, GCP depois · Marketplace + E-Retorno no escopo · 2–5 corretores · carteira 70%+ auto.
 
@@ -143,7 +143,7 @@ Prioridade estrutural: **o Security Assessment assinado é pré-requisito para l
 
 ### Ativo crítico: credenciais Yelum
 
-Quatro segredos, e dois deles são o login humano do portal. Vazou = terceiro operando como a Klubi.
+Quatro segredos, e dois deles são o login humano do portal. Vazou = terceiro operando como a corretora.
 
 - **Pede um usuário de portal dedicado à integração**, separado do login pessoal de qualquer corretor
 - Local (mock): `.env` no `.gitignore` é aceitável **enquanto não houver credencial real**
