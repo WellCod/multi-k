@@ -12,9 +12,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth_router import router as auth_router
 from app.api.cliente_router import router as cliente_router
+from app.api.comparativo_router import router as comparativo_router
 from app.api.cotacao_router import router as cotacao_router
 from app.api.dominio_router import router as dominio_router
 from app.api.health import router as health_router
+from app.api.proposta_router import router as proposta_router
+from app.api.renovacao_router import router as renovacao_router
 from app.infra.db import AsyncSessionLocal
 from app.infra.logging_config import configure_logging
 from app.infra.secrets import get_optional_secret
@@ -76,4 +79,7 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(cliente_router)
 app.include_router(cotacao_router)
+app.include_router(comparativo_router)
+app.include_router(proposta_router)
+app.include_router(renovacao_router)
 app.include_router(dominio_router)

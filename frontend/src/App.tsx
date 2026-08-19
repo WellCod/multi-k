@@ -4,6 +4,9 @@ import { Layout } from "@/components/Layout";
 import { LoginPage } from "@/pages/LoginPage";
 import { CotacaoPage } from "@/pages/CotacaoPage";
 import { HistoricoPage } from "@/pages/HistoricoPage";
+import { ComparativoPage } from "@/pages/ComparativoPage";
+import { ClienteDetailPage } from "@/pages/ClienteDetailPage";
+import { RenovacaoPage } from "@/pages/RenovacaoPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -32,6 +35,36 @@ function AppRoutes() {
           <RequireAuth>
             <Layout>
               <HistoricoPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/cotacoes/:cotacaoId/comparativo"
+        element={
+          <RequireAuth>
+            <Layout>
+              <ComparativoPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/clientes/:clienteId"
+        element={
+          <RequireAuth>
+            <Layout>
+              <ClienteDetailPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/renovacoes"
+        element={
+          <RequireAuth>
+            <Layout>
+              <RenovacaoPage />
             </Layout>
           </RequireAuth>
         }
