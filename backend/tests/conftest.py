@@ -52,9 +52,18 @@ _RLS_STMTS = [
     """CREATE TRIGGER tg_auditoria_no_delete
         BEFORE DELETE ON auditoria
         FOR EACH ROW EXECUTE FUNCTION enforce_audit_append_only()""",
-    # POSTGRES_USER cria superuser; superusers ignoram RLS mesmo com FORCE.
-    # Removemos SUPERUSER do role atual para que as politicas sejam aplicadas.
-    "DO $$ BEGIN EXECUTE format('ALTER ROLE %I NOSUPERUSER', current_user); END $$",
+    # POSTGRES_USER cria o bootstrap superuser; PostgreSQL nao permite remover
+    # SUPERUSER do bootstrap user. Criamos multik_app (sem superuser) para
+    # testar RLS via SET LOCAL ROLE dentro da transacao de teste.
+    """DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'multik_app') THEN
+            CREATE ROLE multik_app NOSUPERUSER;
+        END IF;
+    END $$""",
+    "GRANT USAGE ON SCHEMA public TO multik_app",
+    "GRANT ALL ON ALL TABLES IN SCHEMA public TO multik_app",
+    "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO multik_app",
+    "GRANT multik_app TO CURRENT_USER",
 ]
 
 
@@ -79,6 +88,23 @@ async def db(engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     )
     async with factory() as session:
         await session.begin()
+        yield session
+        await session.rollback()
+
+
+@pytest_asyncio.fixture
+async def db_rls(engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
+    """Sessao com SET LOCAL ROLE multik_app para testar RLS.
+
+    multik_app e nao-superuser, entao as politicas de Row Level Security
+    sao aplicadas. Use este fixture em tests/test_rls.py.
+    """
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        await session.begin()
+        await session.execute(text("SET LOCAL ROLE multik_app"))
         yield session
         await session.rollback()
 
