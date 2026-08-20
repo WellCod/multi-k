@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NAV = [
+  { to: "/home", label: "Home" },
   { to: "/cotacao", label: "Nova cotação" },
   { to: "/historico", label: "Histórico" },
   { to: "/renovacoes", label: "Renovações" },
+  { to: "/relatorios", label: "Relatórios" },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
