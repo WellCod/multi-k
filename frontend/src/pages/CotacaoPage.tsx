@@ -962,9 +962,7 @@ export function CotacaoPage() {
   const [step, setStep] = useState<number>(() => {
     return loadRascunho()?.step ?? 1;
   });
-  const [step1Data, setStep1Data] = useState<Step1Data | undefined>(
-    () => loadRascunho()?.step1,
-  );
+  const [step1Data, setStep1Data] = useState<Step1Data | undefined>(undefined);
   const [step2Data, setStep2Data] = useState<Step2Data | undefined>(
     () => loadRascunho()?.step2,
   );
@@ -1132,7 +1130,7 @@ export function CotacaoPage() {
     setStep1Data(data);
     setClienteId(cliente?.id);
     setStep(2);
-    persistRascunho({ step1: data, step: 2, clienteId: cliente?.id });
+    persistRascunho({ step: 2, clienteId: cliente?.id });
   };
 
   const handleStep2 = (data: Step2Data) => {

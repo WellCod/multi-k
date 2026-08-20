@@ -2,27 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, type ItemComparativo, type Proposta, type Cotacao } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/StatusBadge";
 
 const PARCELAMENTOS = ["AVISTA", "2X", "3X", "6X", "10X"];
 
 function fmtReal(v: string | null) {
   if (!v) return "—";
   return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    sucesso: "bg-green-100 text-green-800",
-    restricao: "bg-yellow-100 text-yellow-800",
-    erro: "bg-red-100 text-red-800",
-    processando: "bg-blue-100 text-blue-800",
-    aguardando: "bg-gray-100 text-gray-600",
-  };
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${map[status] ?? "bg-gray-100 text-gray-600"}`}>
-      {status}
-    </span>
-  );
 }
 
 interface TransmitirModalProps {
@@ -60,13 +46,15 @@ function TransmitirModal({ cotacaoId, onClose, onSuccess }: TransmitirModalProps
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-lg font-semibold mb-4">Transmitir proposta</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Transmitir proposta</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Plano de pagamento</label>
+            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+              Plano de pagamento
+            </label>
             <select
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               value={plano}
               onChange={(e) => {
                 setPlano(e.target.value);
@@ -79,22 +67,26 @@ function TransmitirModal({ cotacaoId, onClose, onSuccess }: TransmitirModalProps
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Comissão (%)</label>
+            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+              Comissão (%)
+            </label>
             <input
               type="number"
               step="0.01"
               min="0.01"
               max="100"
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               value={Number(comissao) * 100}
               onChange={(e) => setComissao((Number(e.target.value) / 100).toFixed(4))}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Início vigência</label>
+            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+              Início vigência
+            </label>
             <input
               type="date"
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               value={vigencia}
               onChange={(e) => setVigencia(e.target.value)}
             />
@@ -138,7 +130,7 @@ export function ComparativoPage() {
     setShowModal(false);
   };
 
-  if (loading) return <p className="text-sm text-gray-500">Carregando comparativo…</p>;
+  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Carregando comparativo…</p>;
   if (err) return <p className="text-sm text-red-600">{err}</p>;
   if (!cotacao || !cotacaoId) return null;
 
@@ -147,22 +139,25 @@ export function ComparativoPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:underline">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+        >
           ← Voltar
         </button>
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
           Comparativo — {cotacao.ramo.charAt(0).toUpperCase() + cotacao.ramo.slice(1)}
         </h1>
         <StatusBadge status={cotacao.status} />
       </div>
 
       {proposta && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <p className="font-medium text-green-800">Proposta transmitida com sucesso!</p>
-          <p className="text-sm text-green-700 mt-1">
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
+          <p className="font-medium text-green-800 dark:text-green-300">Proposta transmitida com sucesso!</p>
+          <p className="text-sm text-green-700 dark:text-green-400 mt-1">
             Protocolo: <span className="font-mono font-semibold">{proposta.protocolo}</span>
           </p>
-          <p className="text-sm text-green-700">
+          <p className="text-sm text-green-700 dark:text-green-400">
             {proposta.n_parcelas}× de {fmtReal(proposta.valor_parcela)} &nbsp;|&nbsp;
             Comissão: {fmtReal(proposta.comissao_parcela)}/parcela
           </p>
@@ -178,38 +173,49 @@ export function ComparativoPage() {
       )}
 
       {itens.length === 0 ? (
-        <p className="text-sm text-gray-500">Nenhum resultado disponível (cotação em processamento).</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Nenhum resultado disponível (cotação em processamento).
+        </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-gray-50 border-b text-left">
-                <th className="px-4 py-2 font-medium">Seguradora</th>
-                <th className="px-4 py-2 font-medium">Prêmio total</th>
-                <th className="px-4 py-2 font-medium">Restrições</th>
-                <th className="px-4 py-2 font-medium">Vistoria</th>
-                <th className="px-4 py-2 font-medium">Status</th>
+              <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-left">
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Seguradora</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Prêmio total</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Restrições</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Vistoria</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Status</th>
               </tr>
             </thead>
             <tbody>
               {itens.map((item, i) => (
-                <tr key={i} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 font-semibold uppercase">{item.cia}</td>
-                  <td className="px-4 py-3 font-mono">{fmtReal(item.premio_total)}</td>
+                <tr
+                  key={i}
+                  className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                >
+                  <td className="px-4 py-3 font-semibold uppercase text-gray-900 dark:text-white">
+                    {item.cia}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-gray-900 dark:text-white">
+                    {fmtReal(item.premio_total)}
+                  </td>
                   <td className="px-4 py-3">
-                    {item.restricoes.length === 0
-                      ? <span className="text-gray-400">—</span>
-                      : item.restricoes.map((r) => (
-                          <span key={r.codigo} className="block text-xs text-yellow-700">
-                            {r.codigo}: {r.mensagem}
-                          </span>
-                        ))}
+                    {item.restricoes.length === 0 ? (
+                      <span className="text-gray-400 dark:text-gray-500">—</span>
+                    ) : (
+                      item.restricoes.map((r) => (
+                        <span key={r.codigo} className="block text-xs text-yellow-700 dark:text-yellow-400">
+                          {r.codigo}: {r.mensagem}
+                        </span>
+                      ))
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {item.necessita_vistoria ? (
-                      <span className="text-yellow-700 text-xs font-medium">Sim</span>
+                      <span className="text-yellow-700 dark:text-yellow-400 text-xs font-medium">Sim</span>
                     ) : (
-                      <span className="text-gray-400 text-xs">Não</span>
+                      <span className="text-gray-400 dark:text-gray-500 text-xs">Não</span>
                     )}
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
@@ -225,7 +231,7 @@ export function ComparativoPage() {
           href={api.cotacoes.comparativoPdfUrl(cotacaoId)}
           target="_blank"
           rel="noreferrer"
-          className="px-4 py-2 border rounded text-sm hover:bg-gray-50 transition-colors"
+          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           Baixar PDF
         </a>
