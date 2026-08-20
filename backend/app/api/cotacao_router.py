@@ -2,7 +2,7 @@
 
 import uuid
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/cotacoes", tags=["cotacoes"])
 
 
 class CriarCotacaoInput(BaseModel):
-    ramo: str
+    ramo: Literal["auto", "residencia"]
     dados: dict[str, Any]
     cliente_id: uuid.UUID | None = None
     versao_anterior_id: uuid.UUID | None = None
