@@ -384,11 +384,24 @@ function Step1({
         <Field label="Profissão">
           <Select {...register("profissao")}>
             <option value="">—</option>
-            {profissoes.map((d) => (
-              <option key={d.codigo} value={d.codigo}>
-                {d.descricao}
-              </option>
-            ))}
+            {profissoes.length > 0
+              ? profissoes.map((d) => (
+                  <option key={d.codigo} value={d.codigo}>
+                    {d.descricao}
+                  </option>
+                ))
+              : [
+                  ["autonomo", "Autônomo"],
+                  ["assalariado", "Assalariado"],
+                  ["empresario", "Empresário"],
+                  ["aposentado", "Aposentado"],
+                  ["estudante", "Estudante"],
+                  ["servidor_publico", "Servidor público"],
+                ].map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
           </Select>
         </Field>
       </div>
@@ -405,17 +418,14 @@ function Step1({
 // ---------------------------------------------------------------------------
 
 function Step2Auto({
-  dominios,
   defaultValues,
   onBack,
   onNext,
 }: {
-  dominios: Dominio[];
   defaultValues?: Step2Data;
   onBack: () => void;
   onNext: (data: Step2Data) => void;
 }) {
-  const finalidades = dominios.filter((d) => d.tipo === "finalidade_veiculo");
   const {
     register,
     handleSubmit,
@@ -465,11 +475,8 @@ function Step2Auto({
         <Field label="Finalidade" error={errors.finalidade?.message}>
           <Select {...register("finalidade")}>
             <option value="">—</option>
-            {finalidades.map((d) => (
-              <option key={d.codigo} value={d.codigo}>
-                {d.descricao}
-              </option>
-            ))}
+            <option value="pessoal">Pessoal</option>
+            <option value="comercial">Comercial</option>
           </Select>
         </Field>
       </div>
@@ -962,7 +969,6 @@ export function CotacaoPage() {
 
         {step === 2 && ramo === "auto" && (
           <Step2Auto
-            dominios={dominios}
             defaultValues={step2Data}
             onBack={() => setStep(1)}
             onNext={handleStep2}
