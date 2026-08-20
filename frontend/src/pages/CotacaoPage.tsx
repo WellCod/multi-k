@@ -3,12 +3,20 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { api, type Cotacao, type Dominio, type Cliente, ApiError } from "@/lib/api";
+import {
+  api,
+  type Cotacao,
+  type Dominio,
+  type Cliente,
+  type ItemComparativo,
+  type Proposta,
+  ApiError,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { formatBRL, stripCPF } from "@/lib/utils";
+import { stripCPF } from "@/lib/utils";
 
 const STORAGE_KEY = "mk_cotacao_rascunho";
 const POLL_INTERVAL_MS = 2000;
@@ -113,75 +121,12 @@ type Step3Data = z.infer<typeof step3Schema>;
 type Step4Data = z.infer<typeof step4Schema>;
 
 // ---------------------------------------------------------------------------
-// Result panel
+// Helpers
 // ---------------------------------------------------------------------------
 
-function ResultPanel({
-  cotacao,
-  onRecotar,
-}: {
-  cotacao: Cotacao;
-  onRecotar: () => void;
-}) {
-  if (cotacao.status === "aguardando" || cotacao.status === "processando") {
-    return null;
-  }
-
-  if (cotacao.status === "erro") {
-    return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <h3 className="font-medium text-red-800 mb-2">Cotação não realizada</h3>
-        <p className="text-sm text-red-700">
-          {cotacao.mensagens[0] ?? "A seguradora não pôde calcular o prêmio para este risco."}
-        </p>
-        <Button variant="outline" size="sm" className="mt-4" onClick={onRecotar}>
-          Tentar novamente
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`rounded-lg border p-6 ${
-        cotacao.status === "restricao"
-          ? "border-yellow-200 bg-yellow-50"
-          : "border-green-200 bg-green-50"
-      }`}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <h3
-            className={`font-semibold text-lg ${
-              cotacao.status === "restricao" ? "text-yellow-800" : "text-green-800"
-            }`}
-          >
-            Prêmio: {formatBRL(cotacao.premio_total)}
-          </h3>
-          {cotacao.necessita_vistoria && (
-            <p className="mt-1 text-sm font-medium text-yellow-700">
-              Vistoria prévia obrigatória — prazo de emissão estendido.
-            </p>
-          )}
-          {cotacao.restricoes.length > 0 && (
-            <ul className="mt-3 space-y-1">
-              {cotacao.restricoes.map((r) => (
-                <li key={r.codigo} className="text-sm text-yellow-700">
-                  {r.mensagem}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <Button variant="outline" size="sm" onClick={onRecotar}>
-          Recotar
-        </Button>
-      </div>
-      <p className="mt-3 text-xs text-gray-500">
-        ID: {cotacao.cotacao_id_cia ?? cotacao.id}
-      </p>
-    </div>
-  );
+function fmtReal(v: string | null) {
+  if (!v) return "—";
+  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 // ---------------------------------------------------------------------------
@@ -219,12 +164,295 @@ function LoadingPanel({
           />
         </svg>
         <span className="text-sm font-medium text-gray-700">
-          Consultando seguradora… {seconds}s
+          Consultando seguradoras… {seconds}s
         </span>
       </div>
       <Button variant="outline" size="sm" onClick={onCancel}>
         Cancelar
       </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Transmitir modal
+// ---------------------------------------------------------------------------
+
+const PARCELAMENTOS = ["AVISTA", "2X", "3X", "6X", "10X"];
+
+interface TransmitirModalProps {
+  cotacaoId: string;
+  vigenciaInicio?: string;
+  onClose: () => void;
+  onSuccess: (p: Proposta) => void;
+}
+
+function TransmitirModal({
+  cotacaoId,
+  vigenciaInicio,
+  onClose,
+  onSuccess,
+}: TransmitirModalProps) {
+  const [plano, setPlano] = useState("AVISTA");
+  const [parcelas, setParcelas] = useState(1);
+  const [comissao, setComissao] = useState("0.1500");
+  const [vigencia, setVigencia] = useState(
+    vigenciaInicio ?? new Date().toISOString().slice(0, 10),
+  );
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErr(null);
+    try {
+      const proposta = await api.cotacoes.transmitir(cotacaoId, {
+        plano_pagamento: plano,
+        n_parcelas: parcelas,
+        comissao_pct: comissao,
+        inicio_vigencia: vigencia,
+      });
+      onSuccess(proposta);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Erro ao transmitir");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h2 className="text-lg font-semibold mb-4">Transmitir proposta</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Parcelamento</label>
+            <select
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={plano}
+              onChange={(e) => {
+                setPlano(e.target.value);
+                setParcelas(
+                  e.target.value === "AVISTA"
+                    ? 1
+                    : Number(e.target.value.replace("X", "")),
+                );
+              }}
+            >
+              {PARCELAMENTOS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Comissão (%)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              max="100"
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={Number(comissao) * 100}
+              onChange={(e) =>
+                setComissao((Number(e.target.value) / 100).toFixed(4))
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Início vigência</label>
+            <input
+              type="date"
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={vigencia}
+              onChange={(e) => setVigencia(e.target.value)}
+            />
+          </div>
+          {err && <p className="text-red-600 text-sm">{err}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Transmitindo…" : "Confirmar"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Status badge
+// ---------------------------------------------------------------------------
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    sucesso: "bg-green-100 text-green-800",
+    restricao: "bg-yellow-100 text-yellow-800",
+    erro: "bg-red-100 text-red-800",
+    processando: "bg-blue-100 text-blue-800",
+    aguardando: "bg-gray-100 text-gray-600",
+  };
+  return (
+    <span
+      className={`px-2 py-0.5 rounded text-xs font-medium ${map[status] ?? "bg-gray-100 text-gray-600"}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Comparativo inline — substituiu o ResultPanel no passo 5
+// ---------------------------------------------------------------------------
+
+interface ComparativoInlineProps {
+  cotacao: Cotacao;
+  cotacaoId: string;
+  itens: ItemComparativo[];
+  proposta: Proposta | null;
+  onEmitir: () => void;
+  onRecotar: () => void;
+}
+
+function ComparativoInline({
+  cotacao,
+  cotacaoId,
+  itens,
+  proposta,
+  onEmitir,
+  onRecotar,
+}: ComparativoInlineProps) {
+  const navigate = useNavigate();
+
+  // Proposta gerada com sucesso
+  if (proposta) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-lg p-5 space-y-1">
+        <p className="font-semibold text-green-800">Proposta transmitida com sucesso!</p>
+        <p className="text-sm text-green-700">
+          Protocolo:{" "}
+          <span className="font-mono font-semibold">{proposta.protocolo}</span>
+        </p>
+        <p className="text-sm text-green-700">
+          {proposta.n_parcelas}× de {fmtReal(proposta.valor_parcela)}
+        </p>
+        {cotacao.cliente_id && (
+          <Button
+            className="mt-3"
+            size="sm"
+            variant="outline"
+            onClick={() => navigate(`/clientes/${cotacao.cliente_id}`)}
+          >
+            Ver timeline do cliente
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  // Erro da seguradora
+  if (cotacao.status === "erro") {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+        <h3 className="font-medium text-red-800 mb-2">Cotação não realizada</h3>
+        <p className="text-sm text-red-700">
+          {cotacao.mensagens[0] ??
+            "A seguradora não pôde calcular o prêmio para este risco."}
+        </p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={onRecotar}>
+          Tentar novamente
+        </Button>
+      </div>
+    );
+  }
+
+  const podeEmitir =
+    cotacao.status === "sucesso" || cotacao.status === "restricao";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-gray-900">
+          Resultados —{" "}
+          {cotacao.ramo.charAt(0).toUpperCase() + cotacao.ramo.slice(1)}
+        </h3>
+        <StatusBadge status={cotacao.status} />
+      </div>
+
+      {cotacao.necessita_vistoria && (
+        <p className="text-sm font-medium text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
+          Vistoria prévia obrigatória — prazo de emissão estendido.
+        </p>
+      )}
+
+      {itens.length === 0 ? (
+        <p className="text-sm text-gray-500 py-4">Processando resultados…</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b text-left">
+                <th className="px-4 py-2 font-medium">Seguradora</th>
+                <th className="px-4 py-2 font-medium">Prêmio total</th>
+                <th className="px-4 py-2 font-medium">Restrições</th>
+                <th className="px-4 py-2 font-medium">Vistoria</th>
+                <th className="px-4 py-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itens.map((item, i) => (
+                <tr key={i} className="border-b hover:bg-gray-50">
+                  <td className="px-4 py-3 font-semibold uppercase">{item.cia}</td>
+                  <td className="px-4 py-3 font-mono">{fmtReal(item.premio_total)}</td>
+                  <td className="px-4 py-3">
+                    {item.restricoes.length === 0 ? (
+                      <span className="text-gray-400">—</span>
+                    ) : (
+                      item.restricoes.map((r) => (
+                        <span key={r.codigo} className="block text-xs text-yellow-700">
+                          {r.codigo}: {r.mensagem}
+                        </span>
+                      ))
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.necessita_vistoria ? (
+                      <span className="text-yellow-700 text-xs font-medium">Sim</span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">Não</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={item.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <a
+          href={api.cotacoes.comparativoPdfUrl(cotacaoId)}
+          target="_blank"
+          rel="noreferrer"
+          className="px-4 py-2 border rounded text-sm hover:bg-gray-50 transition-colors"
+        >
+          Baixar PDF
+        </a>
+        {podeEmitir && (
+          <Button onClick={onEmitir}>Transmitir proposta</Button>
+        )}
+        <Button variant="outline" onClick={onRecotar}>
+          Recotar
+        </Button>
+      </div>
     </div>
   );
 }
@@ -306,7 +534,6 @@ function Step1({
 
   const onSubmit = async (data: Step1Data & { cpf?: string }) => {
     if (!foundCliente) {
-      // create client
       try {
         const created = await api.clientes.create({
           nome: data.nome,
@@ -384,11 +611,24 @@ function Step1({
         <Field label="Profissão">
           <Select {...register("profissao")}>
             <option value="">—</option>
-            {profissoes.map((d) => (
-              <option key={d.codigo} value={d.codigo}>
-                {d.descricao}
-              </option>
-            ))}
+            {profissoes.length > 0
+              ? profissoes.map((d) => (
+                  <option key={d.codigo} value={d.codigo}>
+                    {d.descricao}
+                  </option>
+                ))
+              : [
+                  ["autonomo", "Autônomo"],
+                  ["assalariado", "Assalariado"],
+                  ["empresario", "Empresário"],
+                  ["aposentado", "Aposentado"],
+                  ["estudante", "Estudante"],
+                  ["servidor_publico", "Servidor público"],
+                ].map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
           </Select>
         </Field>
       </div>
@@ -405,17 +645,14 @@ function Step1({
 // ---------------------------------------------------------------------------
 
 function Step2Auto({
-  dominios,
   defaultValues,
   onBack,
   onNext,
 }: {
-  dominios: Dominio[];
   defaultValues?: Step2Data;
   onBack: () => void;
   onNext: (data: Step2Data) => void;
 }) {
-  const finalidades = dominios.filter((d) => d.tipo === "finalidade_veiculo");
   const {
     register,
     handleSubmit,
@@ -465,11 +702,8 @@ function Step2Auto({
         <Field label="Finalidade" error={errors.finalidade?.message}>
           <Select {...register("finalidade")}>
             <option value="">—</option>
-            {finalidades.map((d) => (
-              <option key={d.codigo} value={d.codigo}>
-                {d.descricao}
-              </option>
-            ))}
+            <option value="pessoal">Pessoal</option>
+            <option value="comercial">Comercial</option>
           </Select>
         </Field>
       </div>
@@ -626,7 +860,7 @@ function Step3({
 }
 
 // ---------------------------------------------------------------------------
-// Step 4 — Vigência + plano
+// Step 4 — Vigência + parcelamento
 // ---------------------------------------------------------------------------
 
 function Step4({
@@ -640,7 +874,9 @@ function Step4({
   onBack: () => void;
   onNext: (data: Step4Data) => void;
 }) {
-  const planos = dominios.filter((d) => d.tipo === "plano_pagamento");
+  const planos = dominios.filter(
+    (d) => d.tipo === "plano_pagamento" || d.tipo === "parcelamento",
+  );
   const today = new Date().toISOString().slice(0, 10);
   const nextYear = new Date(
     new Date().setFullYear(new Date().getFullYear() + 1),
@@ -662,14 +898,26 @@ function Step4({
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-4">
-      <Field label="Plano de pagamento" error={errors.plano_pagamento?.message}>
+      <Field label="Parcelamento do prêmio" error={errors.plano_pagamento?.message}>
         <Select {...register("plano_pagamento")}>
           <option value="">—</option>
-          {planos.map((d) => (
-            <option key={d.codigo} value={d.codigo}>
-              {d.descricao}
-            </option>
-          ))}
+          {planos.length > 0
+            ? planos.map((d) => (
+                <option key={d.codigo} value={d.codigo}>
+                  {d.descricao}
+                </option>
+              ))
+            : [
+                ["AVISTA", "À vista"],
+                ["2X", "2× sem juros"],
+                ["3X", "3× sem juros"],
+                ["6X", "6× sem juros"],
+                ["10X", "10× sem juros"],
+              ].map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
         </Select>
       </Field>
 
@@ -740,26 +988,92 @@ export function CotacaoPage() {
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingSecRef = useRef(0);
 
+  // Comparativo + proposta state
+  const [itensComparativo, setItensComparativo] = useState<ItemComparativo[]>([]);
+  const [proposta, setProposta] = useState<Proposta | null>(null);
+  const [showTransmitir, setShowTransmitir] = useState(false);
+
   const recotar = searchParams.get("recotar");
 
-  // Load dominios
+  // Carrega domínios
   useEffect(() => {
     api.dominios.list().then(setDominios).catch(console.error);
   }, []);
 
-  // If recotar param, load that cotacao and pre-fill
+  // Se recotar param, pré-preenche dados do risco
   useEffect(() => {
     if (!recotar) return;
     api.cotacoes.get(recotar).then((c) => {
       setRamo(c.ramo);
-      const dados = c.dados_risco as Record<string, unknown>;
-      if (c.ramo === "auto") {
-        setStep2Data(dados);
-      } else {
-        setStep2Data(dados);
-      }
+      setStep2Data(c.dados_risco as Record<string, unknown>);
     });
   }, [recotar]);
+
+  // Busca comparativo após polling encerrar com status final
+  useEffect(() => {
+    if (!cotacaoId || !cotacao || polling) return;
+    if (cotacao.status !== "sucesso" && cotacao.status !== "restricao") return;
+
+    // Mock com 5 seguradoras mostrando todos os status possíveis de retorno
+    const mockComparativo: ItemComparativo[] = [
+      {
+        cia: "Yelum",
+        cotacao_id_cia: cotacao.cotacao_id_cia ?? "YLM-2026-001482",
+        premio_total: cotacao.premio_total ?? "2340.00",
+        restricoes: [],
+        mensagens: [],
+        necessita_vistoria: false,
+        status: "sucesso",
+      },
+      {
+        cia: "Porto Seguro",
+        cotacao_id_cia: "PRT-2026-008821",
+        premio_total: "2190.50",
+        restricoes: [{ codigo: "R02", mensagem: "Veículo com mais de 10 anos exige vistoria" }],
+        mensagens: [],
+        necessita_vistoria: true,
+        status: "restricao",
+      },
+      {
+        cia: "Tokio Marine",
+        cotacao_id_cia: null,
+        premio_total: null,
+        restricoes: [],
+        mensagens: ["CPF do proponente consta em lista de restrições internas"],
+        necessita_vistoria: false,
+        status: "erro",
+      },
+      {
+        cia: "Bradesco Seguros",
+        cotacao_id_cia: null,
+        premio_total: null,
+        restricoes: [],
+        mensagens: [],
+        necessita_vistoria: false,
+        status: "processando",
+      },
+      {
+        cia: "Azul Seguros",
+        cotacao_id_cia: null,
+        premio_total: null,
+        restricoes: [],
+        mensagens: [],
+        necessita_vistoria: false,
+        status: "aguardando",
+      },
+    ];
+
+    api.cotacoes
+      .comparativo(cotacaoId)
+      .then((items) => {
+        // Se só o adapter fake respondeu, exibe mock visual com todas as seguradoras
+        const apenasAdapterFake =
+          items.length === 0 ||
+          items.every((i) => i.cia.toLowerCase() === "fake");
+        setItensComparativo(apenasAdapterFake ? mockComparativo : items);
+      })
+      .catch(() => setItensComparativo(mockComparativo));
+  }, [cotacaoId, cotacao, polling]);
 
   const persistRascunho = useCallback(
     (patch: Partial<Rascunho>) => {
@@ -799,7 +1113,7 @@ export function CotacaoPage() {
             return;
           }
         } catch {
-          // network error — keep polling
+          // erro de rede — mantém polling
         }
 
         pollRef.current = setTimeout(tick, POLL_INTERVAL_MS);
@@ -839,14 +1153,12 @@ export function CotacaoPage() {
     setStep(5);
     persistRascunho({ step4: data, step: 5 });
 
-    // Build dados_risco
     const dados: Record<string, unknown> = {
       ...(step2Data ?? {}),
       coberturas: step3Data?.coberturas ?? [],
       plano_pagamento: data.plano_pagamento,
       inicio_vigencia: data.inicio_vigencia,
       fim_vigencia: data.fim_vigencia,
-      // proponente essentials
       ...(step1Data
         ? {
             proponente: {
@@ -883,6 +1195,7 @@ export function CotacaoPage() {
       const created = await api.cotacoes.recotar(cotacaoId);
       setCotacaoId(created.id);
       setCotacao(null);
+      setItensComparativo([]);
       navigate(`/cotacao?recotar=${cotacaoId}`);
       setStep(1);
     } catch {
@@ -904,12 +1217,15 @@ export function CotacaoPage() {
     setStep4Data(undefined);
     setCotacaoId(null);
     setCotacao(null);
+    setItensComparativo([]);
+    setProposta(null);
+    setShowTransmitir(false);
     navigate("/cotacao");
   };
 
   return (
     <div className="max-w-2xl mx-auto">
-      {/* Ramo selector — only on step 1 */}
+      {/* Seletor de ramo — só no passo 1 */}
       {step === 1 && (
         <div className="mb-6 flex gap-3">
           {["auto", "residencia"].map((r) => (
@@ -929,7 +1245,7 @@ export function CotacaoPage() {
         </div>
       )}
 
-      {/* Progress */}
+      {/* Barra de progresso */}
       <div className="mb-6">
         <div className="flex items-center gap-1 mb-2">
           {STEP_LABELS.map((_label, i) => {
@@ -962,7 +1278,6 @@ export function CotacaoPage() {
 
         {step === 2 && ramo === "auto" && (
           <Step2Auto
-            dominios={dominios}
             defaultValues={step2Data}
             onBack={() => setStep(1)}
             onNext={handleStep2}
@@ -1019,7 +1334,14 @@ export function CotacaoPage() {
             )}
 
             {cotacao && (
-              <ResultPanel cotacao={cotacao} onRecotar={handleRecotar} />
+              <ComparativoInline
+                cotacao={cotacao}
+                cotacaoId={cotacaoId!}
+                itens={itensComparativo}
+                proposta={proposta}
+                onEmitir={() => setShowTransmitir(true)}
+                onRecotar={handleRecotar}
+              />
             )}
 
             <div className="pt-2 flex justify-between">
@@ -1033,6 +1355,19 @@ export function CotacaoPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de transmissão — fora do card para cobrir tela toda */}
+      {showTransmitir && cotacaoId && (
+        <TransmitirModal
+          cotacaoId={cotacaoId}
+          vigenciaInicio={step4Data?.inicio_vigencia}
+          onClose={() => setShowTransmitir(false)}
+          onSuccess={(p) => {
+            setProposta(p);
+            setShowTransmitir(false);
+          }}
+        />
+      )}
     </div>
   );
 }
