@@ -23,13 +23,12 @@ const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 120_000;
 
 // ---------------------------------------------------------------------------
-// Rascunho persistido em localStorage
+// Rascunho — sessionStorage apenas (PII não persiste além da sessão)
 // ---------------------------------------------------------------------------
 
 interface Rascunho {
   ramo: string;
   step: number;
-  step1?: Step1Data;
   step2?: Step2Data;
   step3?: Step3Data;
   step4?: Step4Data;
@@ -37,12 +36,12 @@ interface Rascunho {
 }
 
 function saveRascunho(r: Rascunho) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(r));
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(r));
 }
 
 function loadRascunho(): Rascunho | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = sessionStorage.getItem(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as Rascunho) : null;
   } catch {
     return null;
@@ -50,7 +49,7 @@ function loadRascunho(): Rascunho | null {
 }
 
 function clearRascunho() {
-  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
 }
 
 // ---------------------------------------------------------------------------
