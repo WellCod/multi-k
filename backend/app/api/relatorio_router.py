@@ -92,14 +92,14 @@ async def _dados_producao(
     corte = _corte(periodo)
 
     # Cotações no período
-    q_cot = select(Cotacao).where(Cotacao.criado_em >= corte)
+    q_cot = select(Cotacao).where(Cotacao.criado_em >= corte).limit(10_000)
     if usuario_id is not None:
         q_cot = q_cot.where(Cotacao.usuario_id == usuario_id)
     res_cot = await db.execute(q_cot)
     cotacoes = res_cot.scalars().all()
 
     # Propostas no período
-    q_prop = select(Proposta).where(Proposta.transmitida_em >= corte)
+    q_prop = select(Proposta).where(Proposta.transmitida_em >= corte).limit(10_000)
     if usuario_id is not None:
         q_prop = q_prop.where(Proposta.usuario_id == usuario_id)
     res_prop = await db.execute(q_prop)
@@ -174,13 +174,13 @@ async def _dados_funil(
     """Calcula funil de conversão por ramo no período."""
     corte = _corte(periodo)
 
-    q_cot = select(Cotacao).where(Cotacao.criado_em >= corte)
+    q_cot = select(Cotacao).where(Cotacao.criado_em >= corte).limit(10_000)
     if usuario_id is not None:
         q_cot = q_cot.where(Cotacao.usuario_id == usuario_id)
     res_cot = await db.execute(q_cot)
     cotacoes = res_cot.scalars().all()
 
-    q_prop = select(Proposta).where(Proposta.transmitida_em >= corte)
+    q_prop = select(Proposta).where(Proposta.transmitida_em >= corte).limit(10_000)
     if usuario_id is not None:
         q_prop = q_prop.where(Proposta.usuario_id == usuario_id)
     res_prop = await db.execute(q_prop)
