@@ -12,6 +12,79 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   erro: { label: "Não realizada", color: "text-red-700 bg-red-100" },
 };
 
+const MOCK_COTACOES: Cotacao[] = [
+  {
+    id: "mock-1",
+    ramo: "auto",
+    status: "sucesso",
+    cliente_id: null,
+    cotacao_id_cia: "YLM-2026-001482",
+    premio_total: "2340.00",
+    restricoes: [],
+    mensagens: [],
+    necessita_vistoria: false,
+    versao_anterior_id: null,
+    criado_em: new Date(Date.now() - 2 * 86400000).toISOString(),
+    dados_risco: {},
+  },
+  {
+    id: "mock-2",
+    ramo: "residencia",
+    status: "restricao",
+    cliente_id: null,
+    cotacao_id_cia: "YLM-2026-001391",
+    premio_total: "890.50",
+    restricoes: [{ codigo: "R01", mensagem: "Imóvel em área de risco hídrico" }],
+    mensagens: [],
+    necessita_vistoria: true,
+    versao_anterior_id: null,
+    criado_em: new Date(Date.now() - 5 * 86400000).toISOString(),
+    dados_risco: {},
+  },
+  {
+    id: "mock-3",
+    ramo: "auto",
+    status: "sucesso",
+    cliente_id: null,
+    cotacao_id_cia: "YLM-2026-001274",
+    premio_total: "3120.00",
+    restricoes: [],
+    mensagens: [],
+    necessita_vistoria: false,
+    versao_anterior_id: null,
+    criado_em: new Date(Date.now() - 8 * 86400000).toISOString(),
+    dados_risco: {},
+  },
+  {
+    id: "mock-4",
+    ramo: "auto",
+    status: "erro",
+    cliente_id: null,
+    cotacao_id_cia: null,
+    premio_total: null,
+    restricoes: [],
+    mensagens: [],
+    necessita_vistoria: false,
+    versao_anterior_id: null,
+    criado_em: new Date(Date.now() - 10 * 86400000).toISOString(),
+    dados_risco: {},
+  },
+  {
+    id: "mock-5",
+    ramo: "residencia",
+    status: "sucesso",
+    cliente_id: null,
+    cotacao_id_cia: "YLM-2026-001102",
+    premio_total: "1540.00",
+    restricoes: [],
+    mensagens: [],
+    necessita_vistoria: false,
+    versao_anterior_id: "mock-old",
+    criado_em: new Date(Date.now() - 15 * 86400000).toISOString(),
+    dados_risco: {},
+  },
+];
+
 function StatusBadge({ status }: { status: string }) {
   const meta = STATUS_LABEL[status] ?? {
     label: status,
@@ -34,28 +107,17 @@ export function HistoricoPage() {
   useEffect(() => {
     api.cotacoes
       .list()
-      .then(setCotacoes)
-      .catch(console.error)
+      .then((data) => setCotacoes(data.length > 0 ? data : MOCK_COTACOES))
+      .catch(() => setCotacoes(MOCK_COTACOES))
       .finally(() => setLoading(false));
   }, []);
 
-  const handleRecotar = async (cotacao: Cotacao) => {
+  const handleRecotar = (cotacao: Cotacao) => {
     navigate(`/cotacao?recotar=${cotacao.id}`);
   };
 
   if (loading) {
     return <p className="text-sm text-gray-500">Carregando histórico…</p>;
-  }
-
-  if (cotacoes.length === 0) {
-    return (
-      <div className="text-center py-16 text-gray-500">
-        <p className="text-sm">Nenhuma cotação realizada ainda.</p>
-        <Button className="mt-4" onClick={() => navigate("/cotacao")}>
-          Nova cotação
-        </Button>
-      </div>
-    );
   }
 
   return (

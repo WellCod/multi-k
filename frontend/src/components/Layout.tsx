@@ -7,6 +7,7 @@ const NAV = [
   { to: "/home", label: "Home" },
   { to: "/cotacao", label: "Nova cotação" },
   { to: "/historico", label: "Histórico" },
+  { to: "/clientes", label: "Clientes" },
   { to: "/renovacoes", label: "Renovações" },
   { to: "/relatorios", label: "Relatórios" },
 ];
