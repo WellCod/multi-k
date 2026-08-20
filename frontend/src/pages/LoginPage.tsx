@@ -41,16 +41,16 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-xl font-semibold text-gray-900">multi-K</h1>
-          <p className="text-sm text-gray-500 mt-1">Multicálculo e gestão de seguros</p>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">multi-K</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Multicálculo e gestão de seguros</p>
         </div>
 
         <form
           onSubmit={handleSubmit(onSubmit)}
-          className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm space-y-4"
+          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm space-y-4"
         >
           <div className="space-y-1.5">
             <Label htmlFor="email">E-mail</Label>

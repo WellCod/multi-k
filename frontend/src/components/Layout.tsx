@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { useDarkMode } from "@/lib/use-dark-mode";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -12,10 +13,53 @@ const NAV = [
   { to: "/relatorios", label: "Relatórios" },
 ];
 
+function MoonIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  );
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const { dark, toggle } = useDarkMode();
 
   const handleLogout = async () => {
     await logout();
@@ -23,11 +67,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+      <header className="sticky top-0 z-10 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="mx-auto max-w-6xl px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <span className="font-semibold text-gray-900 text-sm">multi-K</span>
+            <span className="font-semibold text-gray-900 dark:text-white text-sm">multi-K</span>
             <nav className="flex gap-1">
               {NAV.map(({ to, label }) => (
                 <Link
@@ -36,8 +80,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "px-3 py-1.5 rounded text-sm transition-colors",
                     pathname.startsWith(to)
-                      ? "bg-blue-50 text-blue-700 font-medium"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100",
+                      ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700",
                   )}
                 >
                   {label}
@@ -45,9 +89,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">{user?.nome}</span>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400">{user?.nome}</span>
+            <button
+              onClick={toggle}
+              title={dark ? "Modo claro" : "Modo escuro"}
+              className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              {dark ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
+            >
               Sair
             </Button>
           </div>
