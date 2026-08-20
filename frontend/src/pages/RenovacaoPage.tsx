@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { api, type Renovacao } from "@/lib/api";
 
 const JANELA_CONFIG = {
-  D30: { label: "≤ 30 dias", color: "bg-red-100 text-red-800 border-red-200" },
-  D45: { label: "31–45 dias", color: "bg-orange-100 text-orange-800 border-orange-200" },
-  D60: { label: "46–60 dias", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+  D30: { label: "≤ 30 dias", color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-700" },
+  D45: { label: "31–45 dias", color: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:border-orange-700" },
+  D60: { label: "46–60 dias", color: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700" },
 };
 
 const hoje = new Date();
@@ -96,8 +96,8 @@ function fmtReal(v: string | null) {
   return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function fmtDate(d: string) {
-  return new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
+function fmtDate(dt: string) {
+  return new Date(dt + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
 function JanelaBadge({ janela }: { janela: "D30" | "D45" | "D60" }) {
@@ -135,7 +135,7 @@ export function RenovacaoPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Renovações</h1>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Renovações</h1>
         <div className="flex gap-2 text-xs text-gray-500">
           {(["D30", "D45", "D60"] as const).map((j) => (
             <JanelaBadge key={j} janela={j} />
@@ -143,7 +143,7 @@ export function RenovacaoPage() {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-gray-500">Carregando…</p>}
+      {loading && <p className="text-sm text-gray-500 dark:text-gray-400">Carregando…</p>}
       {err && <p className="text-sm text-red-600">{err}</p>}
 
       {(["D30", "D45", "D60"] as const).map((janela) => {
@@ -153,41 +153,58 @@ export function RenovacaoPage() {
           <div key={janela}>
             <div className="flex items-center gap-2 mb-3">
               <JanelaBadge janela={janela} />
-              <span className="text-sm text-gray-500">{grupo.length} apólice(s)</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {grupo.length} apólice{grupo.length !== 1 ? "s" : ""}
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="bg-gray-50 border-b text-left">
-                    <th className="px-4 py-2 font-medium">Protocolo</th>
-                    <th className="px-4 py-2 font-medium">Ramo</th>
-                    <th className="px-4 py-2 font-medium">Prêmio</th>
-                    <th className="px-4 py-2 font-medium">Vigência até</th>
-                    <th className="px-4 py-2 font-medium">Dias</th>
-                    <th className="px-4 py-2 font-medium"></th>
+                  <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-left">
+                    <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Protocolo</th>
+                    <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Ramo</th>
+                    <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Prêmio</th>
+                    <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Vigência até</th>
+                    <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300 text-center">Dias</th>
+                    <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {grupo.map((r) => (
-                    <tr key={r.proposta_id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs">{r.protocolo}</td>
-                      <td className="px-4 py-3 capitalize">{r.ramo}</td>
-                      <td className="px-4 py-3">{fmtReal(r.premio_total)}</td>
-                      <td className="px-4 py-3">{fmtDate(r.fim_vigencia)}</td>
+                    <tr
+                      key={r.proposta_id}
+                      className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    >
+                      <td className="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
+                        {r.protocolo}
+                      </td>
+                      <td className="px-4 py-3 capitalize text-gray-900 dark:text-white">{r.ramo}</td>
+                      <td className="px-4 py-3 text-gray-900 dark:text-white">{fmtReal(r.premio_total)}</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{fmtDate(r.fim_vigencia)}</td>
                       <td className="px-4 py-3 font-semibold text-center">
-                        {r.dias_para_vencer}
+                        <span
+                          className={
+                            r.dias_para_vencer <= 30
+                              ? "text-red-700 dark:text-red-400"
+                              : r.dias_para_vencer <= 45
+                                ? "text-orange-600 dark:text-orange-400"
+                                : "text-yellow-600 dark:text-yellow-400"
+                          }
+                        >
+                          {r.dias_para_vencer}
+                        </span>
                       </td>
                       <td className="px-4 py-3 flex gap-2">
                         {r.cliente_id && (
                           <button
-                            className="text-xs text-blue-600 hover:underline"
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                             onClick={() => navigate(`/clientes/${r.cliente_id}`)}
                           >
                             Ver cliente
                           </button>
                         )}
                         <button
-                          className="text-xs text-indigo-600 hover:underline"
+                          className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
                           onClick={() => navigate(`/cotacao?recotar=${r.cotacao_id}`)}
                         >
                           Renovar
