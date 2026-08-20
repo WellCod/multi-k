@@ -7,6 +7,7 @@ import { HomePage } from "@/pages/HomePage";
 import { CotacaoPage } from "@/pages/CotacaoPage";
 import { HistoricoPage } from "@/pages/HistoricoPage";
 import { ComparativoPage } from "@/pages/ComparativoPage";
+import { ClientesPage } from "@/pages/ClientesPage";
 import { ClienteDetailPage } from "@/pages/ClienteDetailPage";
 import { RenovacaoPage } from "@/pages/RenovacaoPage";
 import { RelatoriosPage } from "@/pages/RelatoriosPage";
@@ -68,6 +69,16 @@ function AppRoutes() {
           <RequireAuth>
             <Layout>
               <ComparativoPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/clientes"
+        element={
+          <RequireAuth>
+            <Layout>
+              <ClientesPage />
             </Layout>
           </RequireAuth>
         }

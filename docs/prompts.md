@@ -9,6 +9,16 @@ Um prompt por fase. Cole inteiro no assistente junto com `docs/escopo.md` e `doc
 ---
 
 ## FASE 0 — Setup local ✅ concluída
+## FASE 1 — Fundação ✅ concluída
+## FASE 2 — Cotação end-to-end ✅ concluída
+## FASE 3 — Comparativo, PDF, gestão ✅ concluída
+## FASE 4 — Dashboard, relatórios, seed ✅ concluída
+
+---
+
+<!-- original prompts preservados abaixo -->
+
+## FASE 0 — Setup local (referência)
 
 Stack: Python 3.12 + FastAPI + Postgres 16 + React 18 + Vite + TypeScript + Tailwind + shadcn/ui.
 
