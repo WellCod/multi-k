@@ -58,7 +58,7 @@ async def test_busca_por_cpf(
         "/clientes",
         json={"nome": "Maria Costa", "cpf": _CPF_B},
     )
-    r = await client.get("/clientes/busca", params={"cpf": _CPF_B})
+    r = await client.post("/clientes/busca", json={"cpf": _CPF_B})
     assert r.status_code == 200
     items = r.json()
     assert len(items) == 1
@@ -69,7 +69,7 @@ async def test_busca_cpf_nao_encontrado(
     db: AsyncSession, client: AsyncClient, engine: AsyncEngine
 ) -> None:
     await _login(client, db, "cor_cli_miss@test.com")
-    r = await client.get("/clientes/busca", params={"cpf": "00000000000"})
+    r = await client.post("/clientes/busca", json={"cpf": "00000000000"})
     assert r.status_code == 200
     assert r.json() == []
 
