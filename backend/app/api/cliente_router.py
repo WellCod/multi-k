@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser
+from app.infra import audit
 from app.infra.cpf import cpf_para_idx
 from app.infra.db import get_db
 from app.infra.models import Cliente, Cotacao, Imovel, Proposta, Veiculo
@@ -199,19 +200,29 @@ async def criar_cliente(
         usuario_id=usuario.id,
     )
     db.add(cliente)
+    await audit.registrar(
+        db,
+        tipo="cliente.criado",
+        dados={"cliente_id": str(cliente.id)},
+        usuario_id=usuario.id,
+    )
     await db.commit()
     await db.refresh(cliente)
     return _cliente_out(cliente)
 
 
-@router.get("/busca", response_model=list[ClienteOut])
+class BuscaCpfInput(BaseModel):
+    cpf: str = Field(pattern=r"^\d{11}$")
+
+
+@router.post("/busca", response_model=list[ClienteOut])
 async def buscar_por_cpf(
-    cpf: str,
+    body: BuscaCpfInput,
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[ClienteOut]:
-    """Busca por CPF via índice cego — o CPF em claro não é transmitido ao banco."""
-    idx = cpf_para_idx(cpf)
+    """Busca por CPF via índice cego — CPF recebido no body, nunca em query string."""
+    idx = cpf_para_idx(body.cpf)
     result = await db.execute(
         select(Cliente)
         .where(Cliente.cpf_idx == idx)
@@ -292,6 +303,12 @@ async def adicionar_veiculo(
         cep_pernoite=body.cep_pernoite,
     )
     db.add(v)
+    await audit.registrar(
+        db,
+        tipo="veiculo.adicionado",
+        dados={"cliente_id": str(cliente_id)},
+        usuario_id=usuario.id,
+    )
     await db.commit()
     await db.refresh(v)
     return _veiculo_out(v)
@@ -326,6 +343,12 @@ async def adicionar_imovel(
         tipo_construcao=body.tipo_construcao,
     )
     db.add(i)
+    await audit.registrar(
+        db,
+        tipo="imovel.adicionado",
+        dados={"cliente_id": str(cliente_id)},
+        usuario_id=usuario.id,
+    )
     await db.commit()
     await db.refresh(i)
     return _imovel_out(i)
@@ -359,7 +382,21 @@ async def timeline_cliente(
         .where(Cotacao.cliente_id == cliente_id)
         .order_by(Cotacao.criado_em)
     )
-    for cotacao in cotacoes_r.scalars().all():
+    cotacoes = cotacoes_r.scalars().all()
+
+    # 1 query para todas as propostas — evita N+1
+    cotacao_ids = [c.id for c in cotacoes]
+    propostas_por_cotacao: dict[uuid.UUID, list[Proposta]] = {}
+    if cotacao_ids:
+        props_r = await db.execute(
+            select(Proposta)
+            .where(Proposta.cotacao_id.in_(cotacao_ids))
+            .order_by(Proposta.transmitida_em)
+        )
+        for p in props_r.scalars().all():
+            propostas_por_cotacao.setdefault(p.cotacao_id, []).append(p)
+
+    for cotacao in cotacoes:
         items.append(
             TimelineItem(
                 tipo="cotacao.criada",
@@ -374,13 +411,7 @@ async def timeline_cliente(
                 },
             )
         )
-
-        propostas_r = await db.execute(
-            select(Proposta)
-            .where(Proposta.cotacao_id == cotacao.id)
-            .order_by(Proposta.transmitida_em)
-        )
-        for proposta in propostas_r.scalars().all():
+        for proposta in propostas_por_cotacao.get(cotacao.id, []):
             items.append(
                 TimelineItem(
                     tipo="proposta.transmitida",

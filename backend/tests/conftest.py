@@ -13,6 +13,8 @@ os.environ.setdefault(
 os.environ.setdefault("SECRET_KEY", "test-secret-key-only")
 # Worker desabilitado em testes — jobs processados manualmente via processar_job()
 os.environ.setdefault("DISABLE_WORKER", "1")
+# Desativa secure cookie para que o httpx (http://test) consiga enviar o cookie
+os.environ.setdefault("DEBUG", "true")
 
 import uuid  # noqa: E402
 from collections.abc import AsyncGenerator  # noqa: E402

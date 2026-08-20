@@ -68,7 +68,10 @@ export const api = {
         body: JSON.stringify(body),
       }),
     busca: (cpf: string) =>
-      request<Cliente[]>(`/clientes/busca?cpf=${encodeURIComponent(cpf)}`),
+      request<Cliente[]>("/clientes/busca", {
+        method: "POST",
+        body: JSON.stringify({ cpf }),
+      }),
     addVeiculo: (clienteId: string, body: VeiculoInput) =>
       request<Veiculo>(`/clientes/${clienteId}/veiculos`, {
         method: "POST",

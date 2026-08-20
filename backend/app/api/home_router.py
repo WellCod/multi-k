@@ -268,9 +268,11 @@ async def home_admin(
     """KPIs da carteira — visível apenas para admins."""
     hoje = date.today()
 
-    # Busca todas as propostas (RLS admin vê tudo)
+    # Busca propostas (cap de segurança — 50k registros)
     res_props = await db.execute(
-        select(Proposta, Cotacao).join(Cotacao, Proposta.cotacao_id == Cotacao.id)
+        select(Proposta, Cotacao)
+        .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
+        .limit(50_000)
     )
     todas_propostas = res_props.all()
 
@@ -332,8 +334,8 @@ async def home_admin(
             str(corretor_stats[uid]["premio_total"])
         ) + (cotacao.premio_total or Decimal("0"))
 
-    # Cotações por corretor
-    res_cots_all = await db.execute(select(Cotacao))
+    # Cotações por corretor (cap de segurança)
+    res_cots_all = await db.execute(select(Cotacao).limit(50_000))
     for cot in res_cots_all.scalars().all():
         uid = cot.usuario_id
         if uid not in corretor_stats:
