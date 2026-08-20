@@ -17,6 +17,10 @@ from app.infra.auth_service import (
 )
 from app.infra.db import get_db
 from app.infra.models import Usuario
+from app.infra.secrets import get_optional_secret
+
+_debug = get_optional_secret("DEBUG", "false").lower() in ("true", "1", "yes")
+_SECURE_COOKIE = not _debug
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -86,7 +90,7 @@ async def login(
         value=str(sessao_id),
         httponly=True,
         samesite="strict",
-        secure=False,
+        secure=_SECURE_COOKIE,
         max_age=_MAX_AGE,
     )
     return LoginOutput(nome=usuario.nome, papel=usuario.papel)
