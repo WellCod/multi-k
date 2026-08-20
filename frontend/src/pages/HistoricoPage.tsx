@@ -1,16 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Cotacao } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Pagination } from "@/components/Pagination";
 import { formatBRL, formatDate } from "@/lib/utils";
 
-const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  aguardando: { label: "Aguardando", color: "text-gray-500 bg-gray-100" },
-  processando: { label: "Processando", color: "text-blue-700 bg-blue-100" },
-  sucesso: { label: "Sucesso", color: "text-green-700 bg-green-100" },
-  restricao: { label: "Com restrição", color: "text-yellow-700 bg-yellow-100" },
-  erro: { label: "Não realizada", color: "text-red-700 bg-red-100" },
-};
+const PAGE_SIZE = 10;
 
 const MOCK_COTACOES: Cotacao[] = [
   {
@@ -85,23 +82,11 @@ const MOCK_COTACOES: Cotacao[] = [
   },
 ];
 
-function StatusBadge({ status }: { status: string }) {
-  const meta = STATUS_LABEL[status] ?? {
-    label: status,
-    color: "text-gray-700 bg-gray-100",
-  };
-  return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${meta.color}`}
-    >
-      {meta.label}
-    </span>
-  );
-}
-
 export function HistoricoPage() {
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busca, setBusca] = useState("");
+  const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -112,89 +97,126 @@ export function HistoricoPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [busca]);
+
+  const filtradas = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return cotacoes;
+    return cotacoes.filter(
+      (c) =>
+        c.ramo.toLowerCase().includes(q) ||
+        c.cotacao_id_cia?.toLowerCase().includes(q) ||
+        c.status.toLowerCase().includes(q),
+    );
+  }, [cotacoes, busca]);
+
+  const paginated = filtradas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const handleRecotar = (cotacao: Cotacao) => {
     navigate(`/cotacao?recotar=${cotacao.id}`);
   };
 
   if (loading) {
-    return <p className="text-sm text-gray-500">Carregando histórico…</p>;
+    return <p className="text-sm text-gray-500 dark:text-gray-400">Carregando histórico…</p>;
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-gray-900">Histórico de cotações</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Histórico de cotações</h2>
         <Button size="sm" onClick={() => navigate("/cotacao")}>
           Nova cotação
         </Button>
       </div>
 
-      <div className="space-y-3">
-        {cotacoes.map((c) => (
-          <div
-            key={c.id}
-            className="bg-white rounded-lg border border-gray-200 px-5 py-4 flex items-center justify-between gap-4"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-medium text-gray-900 capitalize">
-                  {c.ramo}
-                </span>
-                <StatusBadge status={c.status} />
-                {c.necessita_vistoria && (
-                  <span className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-1.5 py-0.5">
-                    Vistoria
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <span>{formatDate(c.criado_em)}</span>
-                {c.cotacao_id_cia && (
-                  <span className="font-mono truncate">{c.cotacao_id_cia}</span>
-                )}
-                {c.versao_anterior_id && (
-                  <span className="text-blue-600">Revisão</span>
-                )}
-              </div>
-              {c.restricoes.length > 0 && (
-                <ul className="mt-1 text-xs text-yellow-700 space-y-0.5">
-                  {c.restricoes.map((r) => (
-                    <li key={r.codigo}>{r.mensagem}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
+      <Input
+        placeholder="Filtrar por ramo, status ou ID da seguradora…"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        className="max-w-sm mb-4"
+      />
 
-            <div className="text-right flex-shrink-0">
-              {c.premio_total ? (
-                <p className="text-base font-semibold text-gray-900">
-                  {formatBRL(c.premio_total)}
-                </p>
-              ) : (
-                <p className="text-sm text-gray-400">—</p>
-              )}
-              <div className="flex gap-2 mt-2 justify-end">
-                {(c.status === "sucesso" || c.status === "restricao") && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/cotacoes/${c.id}/comparativo`)}
-                  >
-                    Comparativo
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleRecotar(c)}
-                >
-                  Recotar
-                </Button>
+      {filtradas.length === 0 ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {busca ? "Nenhuma cotação encontrada para este filtro." : "Nenhuma cotação registrada."}
+        </p>
+      ) : (
+        <>
+          <div className="space-y-3">
+            {paginated.map((c) => (
+              <div
+                key={c.id}
+                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between gap-4"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                      {c.ramo}
+                    </span>
+                    <StatusBadge status={c.status} />
+                    {c.necessita_vistoria && (
+                      <span className="text-xs text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-700 rounded px-1.5 py-0.5">
+                        Vistoria
+                      </span>
+                    )}
+                    {c.versao_anterior_id && (
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        Revisão
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <span>{formatDate(c.criado_em)}</span>
+                    {c.cotacao_id_cia && (
+                      <span className="font-mono truncate">{c.cotacao_id_cia}</span>
+                    )}
+                  </div>
+                  {c.restricoes.length > 0 && (
+                    <ul className="mt-1 text-xs text-yellow-700 dark:text-yellow-400 space-y-0.5">
+                      {c.restricoes.map((r) => (
+                        <li key={r.codigo}>{r.mensagem}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="text-right flex-shrink-0">
+                  {c.premio_total ? (
+                    <p className="text-base font-semibold text-gray-900 dark:text-white">
+                      {formatBRL(c.premio_total)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-400 dark:text-gray-500">—</p>
+                  )}
+                  <div className="flex gap-2 mt-2 justify-end">
+                    {(c.status === "sucesso" || c.status === "restricao") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/cotacoes/${c.id}/comparativo`)}
+                      >
+                        Comparativo
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => handleRecotar(c)}>
+                      Recotar
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
+
+          <Pagination
+            page={page}
+            total={filtradas.length}
+            perPage={PAGE_SIZE}
+            onChange={setPage}
+          />
+        </>
+      )}
     </div>
   );
 }
