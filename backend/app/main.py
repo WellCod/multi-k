@@ -16,7 +16,9 @@ from app.api.comparativo_router import router as comparativo_router
 from app.api.cotacao_router import router as cotacao_router
 from app.api.dominio_router import router as dominio_router
 from app.api.health import router as health_router
+from app.api.home_router import router as home_router
 from app.api.proposta_router import router as proposta_router
+from app.api.relatorio_router import router as relatorio_router
 from app.api.renovacao_router import router as renovacao_router
 from app.infra.db import AsyncSessionLocal
 from app.infra.logging_config import configure_logging
@@ -83,3 +85,5 @@ app.include_router(comparativo_router)
 app.include_router(proposta_router)
 app.include_router(renovacao_router)
 app.include_router(dominio_router)
+app.include_router(home_router)
+app.include_router(relatorio_router)
