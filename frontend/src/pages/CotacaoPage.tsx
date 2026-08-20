@@ -647,7 +647,9 @@ function Step4({
   onBack: () => void;
   onNext: (data: Step4Data) => void;
 }) {
-  const planos = dominios.filter((d) => d.tipo === "plano_pagamento");
+  const planos = dominios.filter(
+    (d) => d.tipo === "plano_pagamento" || d.tipo === "parcelamento",
+  );
   const today = new Date().toISOString().slice(0, 10);
   const nextYear = new Date(
     new Date().setFullYear(new Date().getFullYear() + 1),
@@ -669,14 +671,26 @@ function Step4({
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-4">
-      <Field label="Plano de pagamento" error={errors.plano_pagamento?.message}>
+      <Field label="Parcelamento do prêmio" error={errors.plano_pagamento?.message}>
         <Select {...register("plano_pagamento")}>
           <option value="">—</option>
-          {planos.map((d) => (
-            <option key={d.codigo} value={d.codigo}>
-              {d.descricao}
-            </option>
-          ))}
+          {planos.length > 0
+            ? planos.map((d) => (
+                <option key={d.codigo} value={d.codigo}>
+                  {d.descricao}
+                </option>
+              ))
+            : [
+                ["AVISTA", "À vista"],
+                ["2X", "2× sem juros"],
+                ["3X", "3× sem juros"],
+                ["6X", "6× sem juros"],
+                ["10X", "10× sem juros"],
+              ].map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
         </Select>
       </Field>
 
