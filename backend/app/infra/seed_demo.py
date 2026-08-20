@@ -277,11 +277,8 @@ async def criar_demo(factory: async_sessionmaker[AsyncSession]) -> None:
         db.add(admin)
         await db.flush()
 
-        # Define contexto RLS como admin para inserções subsequentes
-        await db.execute(
-            text("SET LOCAL app.usuario_id = :uid"),
-            {"uid": str(admin_uid)},
-        )
+        # Define contexto RLS — SET LOCAL não aceita parâmetros no Postgres
+        await db.execute(text(f"SET LOCAL app.usuario_id = '{admin_uid}'"))
 
         # ------------------------------------------------------------------
         # Cria ~40 clientes (~13 por corretor)
