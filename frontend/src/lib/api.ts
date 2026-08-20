@@ -123,6 +123,23 @@ export const api = {
     },
   },
 
+  // ---- Home ----
+  home: {
+    corretor: () => request<HomeCorretorOut>("/home/corretor"),
+    admin: () => request<HomeAdminOut>("/home/admin"),
+  },
+
+  // ---- Relatórios ----
+  relatorios: {
+    producao: (periodo: number) =>
+      request<ProducaoOut[]>(`/relatorios/producao?periodo=${periodo}`),
+    funil: (periodo: number) =>
+      request<FunilOut>(`/relatorios/funil?periodo=${periodo}`),
+    mix: (periodo: number) =>
+      request<MixOut[]>(`/relatorios/mix?periodo=${periodo}`),
+    exportUrl: (tipo: string, periodo: number, fmt: "csv" | "xlsx") =>
+      `${BASE}/relatorios/export/${fmt}?tipo=${tipo}&periodo=${periodo}`,
+  },
 };
 
 // ---- Types ----
@@ -292,4 +309,110 @@ export interface TimelineItem {
   tipo: string;
   data: string;
   dados: Record<string, unknown>;
+}
+
+// ---- Home ----
+
+export interface ItemRenovacaoHome {
+  proposta_id: string;
+  cotacao_id: string;
+  cliente_id: string | null;
+  protocolo: string;
+  ramo: string;
+  inicio_vigencia: string;
+  fim_vigencia: string;
+  dias_para_vencer: number;
+  janela: "D30" | "D45" | "D60";
+  premio_total: string | null;
+}
+
+export interface ItemPropostaParada {
+  cotacao_id: string;
+  cliente_id: string | null;
+  ramo: string;
+  status: string;
+  premio_total: string | null;
+  criado_em: string;
+}
+
+export interface ItemCotacaoAbandonada {
+  cotacao_id: string;
+  cliente_id: string | null;
+  ramo: string;
+  status: string;
+  criado_em: string;
+}
+
+export interface ItemParcelaVencendo {
+  proposta_id: string;
+  protocolo: string;
+  numero_parcela: number;
+  vencimento: string;
+  valor: string;
+  comissao: string;
+}
+
+export interface HomeCorretorOut {
+  renovacoes: ItemRenovacaoHome[];
+  propostas_paradas: ItemPropostaParada[];
+  cotacoes_abandonadas: ItemCotacaoAbandonada[];
+  parcelas_vencendo: ItemParcelaVencendo[];
+}
+
+export interface KpiRamo {
+  ramo: string;
+  count: number;
+  premio_total: string;
+}
+
+export interface KpiCorretor {
+  nome: string;
+  cotacoes: number;
+  propostas: number;
+  premio_total: string;
+}
+
+export interface HomeAdminOut {
+  segurados_vigentes: number;
+  apolices_vigentes: number;
+  cotacoes_em_andamento: number;
+  premio_liquido: string;
+  comissao_produzida: string;
+  comissao_recebida: string;
+  por_ramo: KpiRamo[];
+  por_corretor: KpiCorretor[];
+}
+
+// ---- Relatórios ----
+
+export interface ProducaoOut {
+  corretor_id: string;
+  corretor_nome: string;
+  cotacoes: number;
+  propostas: number;
+  taxa_conversao: string;
+  premio_total: string;
+  comissao_prevista: string;
+}
+
+export interface FunilRamoOut {
+  ramo: string;
+  cotacoes: number;
+  com_proposta: number;
+  taxa_conversao: string;
+  premio_medio: string;
+}
+
+export interface FunilOut {
+  total_cotacoes: number;
+  total_com_proposta: number;
+  taxa_conversao_geral: string;
+  por_ramo: FunilRamoOut[];
+}
+
+export interface MixOut {
+  ramo: string;
+  count: number;
+  pct: string;
+  premio_total: string;
 }
