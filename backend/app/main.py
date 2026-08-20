@@ -24,6 +24,7 @@ from app.infra.db import AsyncSessionLocal
 from app.infra.logging_config import configure_logging
 from app.infra.secrets import get_optional_secret
 from app.infra.seed import seed_if_empty
+from app.infra.seed_demo import criar_demo
 from app.infra.worker import start_worker
 
 configure_logging()
@@ -33,6 +34,7 @@ configure_logging()
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     async with AsyncSessionLocal() as db:
         await seed_if_empty(db)
+    await criar_demo(AsyncSessionLocal)
 
     worker_task: asyncio.Task[None] | None = None
     if not get_optional_secret("DISABLE_WORKER", ""):
