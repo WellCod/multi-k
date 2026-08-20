@@ -93,10 +93,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="text-xs text-gray-500 dark:text-gray-400">{user?.nome}</span>
             <button
               onClick={toggle}
-              title={dark ? "Modo claro" : "Modo escuro"}
-              className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title={dark ? "Mudar para modo claro" : "Mudar para modo escuro"}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
             >
               {dark ? <SunIcon /> : <MoonIcon />}
+              <span>{dark ? "Claro" : "Escuro"}</span>
             </button>
             <Button
               variant="ghost"
