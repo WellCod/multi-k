@@ -951,6 +951,54 @@ const STEP_LABELS = [
   "Resultado",
 ];
 
+const MOCK_COMPARATIVO: ItemComparativo[] = [
+  {
+    cia: "Yelum",
+    cotacao_id_cia: "YLM-2026-001482",
+    premio_total: "2340.00",
+    restricoes: [],
+    mensagens: [],
+    necessita_vistoria: false,
+    status: "sucesso",
+  },
+  {
+    cia: "Porto Seguro",
+    cotacao_id_cia: "PRT-2026-008821",
+    premio_total: "2190.50",
+    restricoes: [{ codigo: "R02", mensagem: "Veículo com mais de 10 anos exige vistoria" }],
+    mensagens: [],
+    necessita_vistoria: true,
+    status: "restricao",
+  },
+  {
+    cia: "Tokio Marine",
+    cotacao_id_cia: null,
+    premio_total: null,
+    restricoes: [],
+    mensagens: ["Proposta não aceita para este perfil"],
+    necessita_vistoria: false,
+    status: "erro",
+  },
+  {
+    cia: "Bradesco Seguros",
+    cotacao_id_cia: null,
+    premio_total: null,
+    restricoes: [],
+    mensagens: [],
+    necessita_vistoria: false,
+    status: "processando",
+  },
+  {
+    cia: "Azul Seguros",
+    cotacao_id_cia: null,
+    premio_total: null,
+    restricoes: [],
+    mensagens: [],
+    necessita_vistoria: false,
+    status: "aguardando",
+  },
+];
+
 export function CotacaoPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -962,9 +1010,7 @@ export function CotacaoPage() {
   const [step, setStep] = useState<number>(() => {
     return loadRascunho()?.step ?? 1;
   });
-  const [step1Data, setStep1Data] = useState<Step1Data | undefined>(
-    () => loadRascunho()?.step1,
-  );
+  const [step1Data, setStep1Data] = useState<Step1Data | undefined>(undefined);
   const [step2Data, setStep2Data] = useState<Step2Data | undefined>(
     () => loadRascunho()?.step2,
   );
@@ -996,82 +1042,36 @@ export function CotacaoPage() {
 
   // Carrega domínios
   useEffect(() => {
-    api.dominios.list().then(setDominios).catch(console.error);
+    api.dominios.list().then(setDominios).catch(() => {});
   }, []);
 
   // Se recotar param, pré-preenche dados do risco
   useEffect(() => {
     if (!recotar) return;
+    let cancelled = false;
     api.cotacoes.get(recotar).then((c) => {
+      if (cancelled) return;
       setRamo(c.ramo);
       setStep2Data(c.dados_risco as Record<string, unknown>);
-    });
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [recotar]);
 
   // Busca comparativo após polling encerrar com status final
   useEffect(() => {
     if (!cotacaoId || !cotacao || polling) return;
     if (cotacao.status !== "sucesso" && cotacao.status !== "restricao") return;
-
-    // Mock com 5 seguradoras mostrando todos os status possíveis de retorno
-    const mockComparativo: ItemComparativo[] = [
-      {
-        cia: "Yelum",
-        cotacao_id_cia: cotacao.cotacao_id_cia ?? "YLM-2026-001482",
-        premio_total: cotacao.premio_total ?? "2340.00",
-        restricoes: [],
-        mensagens: [],
-        necessita_vistoria: false,
-        status: "sucesso",
-      },
-      {
-        cia: "Porto Seguro",
-        cotacao_id_cia: "PRT-2026-008821",
-        premio_total: "2190.50",
-        restricoes: [{ codigo: "R02", mensagem: "Veículo com mais de 10 anos exige vistoria" }],
-        mensagens: [],
-        necessita_vistoria: true,
-        status: "restricao",
-      },
-      {
-        cia: "Tokio Marine",
-        cotacao_id_cia: null,
-        premio_total: null,
-        restricoes: [],
-        mensagens: ["CPF do proponente consta em lista de restrições internas"],
-        necessita_vistoria: false,
-        status: "erro",
-      },
-      {
-        cia: "Bradesco Seguros",
-        cotacao_id_cia: null,
-        premio_total: null,
-        restricoes: [],
-        mensagens: [],
-        necessita_vistoria: false,
-        status: "processando",
-      },
-      {
-        cia: "Azul Seguros",
-        cotacao_id_cia: null,
-        premio_total: null,
-        restricoes: [],
-        mensagens: [],
-        necessita_vistoria: false,
-        status: "aguardando",
-      },
-    ];
-
+    let cancelled = false;
     api.cotacoes
       .comparativo(cotacaoId)
       .then((items) => {
-        // Se só o adapter fake respondeu, exibe mock visual com todas as seguradoras
+        if (cancelled) return;
         const apenasAdapterFake =
-          items.length === 0 ||
-          items.every((i) => i.cia.toLowerCase() === "fake");
-        setItensComparativo(apenasAdapterFake ? mockComparativo : items);
+          items.length === 0 || items.every((i) => i.cia.toLowerCase() === "fake");
+        setItensComparativo(apenasAdapterFake ? MOCK_COMPARATIVO : items);
       })
-      .catch(() => setItensComparativo(mockComparativo));
+      .catch(() => { if (!cancelled) setItensComparativo(MOCK_COMPARATIVO); });
+    return () => { cancelled = true; };
   }, [cotacaoId, cotacao, polling]);
 
   const persistRascunho = useCallback(
@@ -1083,9 +1083,15 @@ export function CotacaoPage() {
   );
 
   const stopPolling = useCallback(() => {
-    if (pollRef.current) clearTimeout(pollRef.current);
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
     setPolling(false);
   }, []);
+
+  // Cleanup do polling ao desmontar o componente
+  useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
 
   const startPolling = useCallback(
     (id: string) => {
@@ -1132,7 +1138,7 @@ export function CotacaoPage() {
     setStep1Data(data);
     setClienteId(cliente?.id);
     setStep(2);
-    persistRascunho({ step1: data, step: 2, clienteId: cliente?.id });
+    persistRascunho({ step: 2, clienteId: cliente?.id });
   };
 
   const handleStep2 = (data: Step2Data) => {
