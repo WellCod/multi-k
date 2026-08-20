@@ -1,7 +1,6 @@
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { Layout } from "@/components/Layout";
-import { DemoWatermark } from "@/components/DemoWatermark";
 import { LoginPage } from "@/pages/LoginPage";
 import { HomePage } from "@/pages/HomePage";
 import { CotacaoPage } from "@/pages/CotacaoPage";
@@ -114,7 +113,6 @@ export default function App() {
     <Router>
       <AuthProvider>
         <AppRoutes />
-        <DemoWatermark />
       </AuthProvider>
     </Router>
   );
