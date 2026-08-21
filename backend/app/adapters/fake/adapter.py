@@ -30,7 +30,7 @@ class FakeSeguradora:
 
     def capacidades(self) -> Capacidades:
         return Capacidades(
-            ramos=["auto", "residencia"],
+            ramos=["auto", "moto", "imovel"],
             coberturas=[
                 "CASCO",
                 "RCF",
