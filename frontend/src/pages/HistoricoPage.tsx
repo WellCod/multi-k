@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Pagination } from "@/components/Pagination";
+import { Tooltip } from "@/components/Tooltip";
 import { formatBRL, formatDate } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
@@ -200,9 +201,11 @@ export function HistoricoPage() {
                         Comparativo
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => handleRecotar(c)}>
-                      Recotar
-                    </Button>
+                    <Tooltip text="Abre nova cotação pré-preenchida com os dados desta" position="top">
+                      <Button variant="outline" size="sm" onClick={() => handleRecotar(c)}>
+                        Refazer
+                      </Button>
+                    </Tooltip>
                   </div>
                 </div>
               </div>
