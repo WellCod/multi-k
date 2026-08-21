@@ -370,15 +370,16 @@ async def criar_demo(factory: async_sessionmaker[AsyncSession]) -> None:
                         ["auto", "moto", "imovel"], weights=[60, 25, 15]
                     )[0]
 
+                    tem_premio = status in ("sucesso", "restricao")
                     if ramo == "auto":
                         dados = _dados_risco_auto()
-                        premio = _premio_auto() if status in ("sucesso", "restricao") else None
+                        premio = _premio_auto() if tem_premio else None
                     elif ramo == "moto":
                         dados = _dados_risco_moto()
-                        premio = _premio_moto() if status in ("sucesso", "restricao") else None
+                        premio = _premio_moto() if tem_premio else None
                     else:
                         dados = _dados_risco_imovel()
-                        premio = _premio_imovel() if status in ("sucesso", "restricao") else None
+                        premio = _premio_imovel() if tem_premio else None
 
                     # Cotações "aguardando" ficam paradas há pelo menos 3 dias
                     if status == "aguardando":
