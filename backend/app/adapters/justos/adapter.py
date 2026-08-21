@@ -27,7 +27,7 @@ Campos obrigatórios em dados_negocio para transmitir():
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 import httpx
@@ -141,7 +141,7 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
 
     insurer_code = dados.get("insurer_code")
     if insurer_code is not None:
-        payload["insurer_code"] = int(insurer_code)  # type: ignore[arg-type]
+        payload["insurer_code"] = int(insurer_code)
 
     return payload
 
@@ -276,9 +276,7 @@ class JustosSeguradora:
             )
 
         protocolo = str(
-            links.get("app_download_url")
-            or links.get("checkout_url")
-            or quote_id
+            links.get("app_download_url") or links.get("checkout_url") or quote_id
         )
         return ResultadoTransmissao(sucesso=True, protocolo=protocolo)
 
