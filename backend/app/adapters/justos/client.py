@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -49,7 +49,7 @@ def _gerar_jwt() -> str:
         "iat": now,
         "exp": now + 600,
     }
-    return jwt.encode(payload, private_key_pem, algorithm="ES256")
+    return str(jwt.encode(payload, private_key_pem, algorithm="ES256"))
 
 
 async def _obter_token() -> str:
