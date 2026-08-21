@@ -17,6 +17,7 @@ dependencies = [
     "structlog>=24.1.0",
     "reportlab>=4.0.0",
     "openpyxl>=3.1.0",
+    "PyJWT[cryptography]>=2.8.0",
 ]
 
 [project.optional-dependencies]
@@ -71,7 +72,7 @@ python_version = "3.12"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["structlog.*", "argon2.*", "asyncpg.*", "reportlab.*", "openpyxl.*"]
+module = ["structlog.*", "argon2.*", "asyncpg.*", "reportlab.*", "openpyxl.*", "jwt.*"]
 ignore_missing_imports = true
 
 # --- Pytest ---
