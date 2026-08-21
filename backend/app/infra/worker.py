@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.adapters.base import PortaSeguradora, RiscoCanonico
 from app.adapters.fake.adapter import FakeSeguradora
+from app.adapters.justos.adapter import JustosSeguradora
 from app.infra.models import Cotacao, CotacaoJob
 
 logger = logging.getLogger(__name__)
@@ -27,9 +28,10 @@ def _utcnow() -> datetime:
 
 
 def get_adapter(cia: str) -> PortaSeguradora:
-    # FASE 5: adicionar dispatch por cia aqui (registry de adapters)
     if cia == "fake":
         return FakeSeguradora()
+    if cia == "justos":
+        return JustosSeguradora()
     raise ValueError(f"Adapter desconhecido: {cia}")
 
 

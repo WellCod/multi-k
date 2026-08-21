@@ -146,10 +146,16 @@ async def transmitir(
         )
 
     risco = RiscoCanonico(ramo=cotacao.ramo, dados=dict(cotacao.dados_risco))
+    # Mescla payload_original (ex: coverages_selected da Justos) sob dados_negocio
+    # do body — o body tem precedência para sobrescrever valores se necessário
+    merged_negocio: dict[str, Any] = {
+        **dict(cotacao.payload_original or {}),
+        **dict(body.dados_negocio),
+    }
     proposta_canonica = PropostaCanonica(
         cotacao_id=str(cotacao.cotacao_id_cia or cotacao_id),
         risco=risco,
-        dados_negocio=dict(body.dados_negocio),
+        dados_negocio=merged_negocio,
     )
 
     resultado = await adapter.transmitir(proposta_canonica)
