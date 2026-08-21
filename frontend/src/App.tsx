@@ -1,5 +1,6 @@
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { DarkModeContext, useDarkModeState } from "@/lib/use-dark-mode";
 import { Layout } from "@/components/Layout";
 import { LoginPage } from "@/pages/LoginPage";
 import { HomePage } from "@/pages/HomePage";
@@ -108,12 +109,23 @@ function AppRoutes() {
   );
 }
 
+function DarkModeProvider({ children }: { children: React.ReactNode }) {
+  const value = useDarkModeState();
+  return (
+    <DarkModeContext.Provider value={value}>
+      {children}
+    </DarkModeContext.Provider>
+  );
+}
+
 export default function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </Router>
+    <DarkModeProvider>
+      <Router>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </Router>
+    </DarkModeProvider>
   );
 }
