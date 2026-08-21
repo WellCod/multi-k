@@ -1,0 +1,56 @@
+# API Justos — Novo campo `info` no retorno do pricing
+
+Este documento descreve **um único acréscimo** ao retorno do endpoint de cálculo (pricing) da API da Justos: um novo campo de observação chamado `info`. Nenhum outro campo do contrato atual muda.
+
+## O campo `info`
+
+- **Nome:** `info`
+- **Tipo:** texto (string)
+- **Tamanho:** até **150 caracteres**
+- **Endpoint:** `POST /brokers/quote/{quote_uuid}/pricing` (o mesmo retorno de cálculo já utilizado)
+- **Posição:** no nível raiz da resposta, ao lado de `uuid`, `monthly` e `annual`
+- **Opcional:** pode não estar presente em todas as respostas
+- **Separado de `message`/`error`:** `info` é uma observação informativa, **não** uma mensagem de erro ou restrição — por isso vem em um campo próprio
+
+## Conteúdo do campo
+
+Texto **dinâmico**, gerado pela Justos a partir das coberturas selecionadas (`coverages_selected`) enviadas na requisição. Já vem **formatado e pronto para exibição** — basta renderizar o texto como está. Ele apresenta os descontos da cotação atual:
+
+- desconto para **pagamento à vista**
+- desconto para **parcelamento em 2 a 4x**
+
+com os respectivos valores em reais. **Os percentuais e valores variam de cotação para cotação** (dependem das coberturas escolhidas e do preço resultante); não são fixos.
+
+**Exemplo de valor:**
+
+`9% desconto pagando à vista: R$ 4.914,00 e 5% desconto parcelando em 2 a 4x: R$ 5.130,00`
+
+## Exemplo de resposta
+
+```json
+{
+  "uuid": "UUID_DA_COTACAO",
+  "info": "9% desconto pagando à vista: R$ 4.914,00 e 5% desconto parcelando em 2 a 4x: R$ 5.130,00",
+  "monthly": { "...": "(inalterado)" },
+  "annual": {
+    "total": 5400.00,
+    "installments": [
+      { "months": 1,  "total_amount": 4914.00 },
+      { "months": 2,  "total_amount": 5130.00 },
+      { "months": 10, "total_amount": 5400.00 }
+    ],
+    "coverages": { "...": "(inalterado)" }
+  }
+}
+```
+
+Valores ilustrativos. Os valores no `info` correspondem ao total da parcela **à vista** (`months: 1`) e ao total de **2 a 4x** (`months: 2`) presentes em `annual.installments`; o percentual exibido é o desconto sobre o preço cheio (parcela de maior valor), arredondado para número inteiro.
+
+## Onde exibir (sugestão)
+
+Conforme alinhado, a observação aparece no **detalhe da cotação** (não na tabela de comparação inicial) e no **print do resultado** enviado ao cliente.
+
+## Resumo da integração
+
+- **Justos:** já incluímos o campo `info` no retorno do pricing.
+- **Agger:** ler o campo `info` (texto, ≤150 caracteres) na resposta do cálculo e exibi-lo como observação, em campo separado de `message`/`error`.
