@@ -140,7 +140,7 @@ function LoadingPanel({
   onCancel: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 text-center space-y-4">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 text-center space-y-4">
       <div className="flex items-center justify-center gap-3">
         <svg
           className="animate-spin h-5 w-5 text-blue-500"
@@ -162,7 +162,7 @@ function LoadingPanel({
             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
           />
         </svg>
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
           Consultando seguradoras… {seconds}s
         </span>
       </div>
@@ -222,13 +222,13 @@ function TransmitirModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-lg font-semibold mb-4">Transmitir proposta</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Transmitir proposta</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Parcelamento</label>
+            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">Parcelamento</label>
             <select
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               value={plano}
               onChange={(e) => {
                 setPlano(e.target.value);
@@ -247,13 +247,13 @@ function TransmitirModal({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Comissão (%)</label>
+            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">Comissão (%)</label>
             <input
               type="number"
               step="0.01"
               min="0.01"
               max="100"
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               value={Number(comissao) * 100}
               onChange={(e) =>
                 setComissao((Number(e.target.value) / 100).toFixed(4))
@@ -261,10 +261,10 @@ function TransmitirModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Início vigência</label>
+            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">Início vigência</label>
             <input
               type="date"
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               value={vigencia}
               onChange={(e) => setVigencia(e.target.value)}
             />
@@ -290,15 +290,15 @@ function TransmitirModal({
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    sucesso: "bg-green-100 text-green-800",
-    restricao: "bg-yellow-100 text-yellow-800",
-    erro: "bg-red-100 text-red-800",
-    processando: "bg-blue-100 text-blue-800",
-    aguardando: "bg-gray-100 text-gray-600",
+    sucesso: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+    restricao: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+    erro: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+    processando: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+    aguardando: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
   };
   return (
     <span
-      className={`px-2 py-0.5 rounded text-xs font-medium ${map[status] ?? "bg-gray-100 text-gray-600"}`}
+      className={`px-2 py-0.5 rounded text-xs font-medium ${map[status] ?? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"}`}
     >
       {status}
     </span>
@@ -331,13 +331,13 @@ function ComparativoInline({
   // Proposta gerada com sucesso
   if (proposta) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-5 space-y-1">
-        <p className="font-semibold text-green-800">Proposta transmitida com sucesso!</p>
-        <p className="text-sm text-green-700">
+      <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-5 space-y-1">
+        <p className="font-semibold text-green-800 dark:text-green-300">Proposta transmitida com sucesso!</p>
+        <p className="text-sm text-green-700 dark:text-green-400">
           Protocolo:{" "}
           <span className="font-mono font-semibold">{proposta.protocolo}</span>
         </p>
-        <p className="text-sm text-green-700">
+        <p className="text-sm text-green-700 dark:text-green-400">
           {proposta.n_parcelas}× de {fmtReal(proposta.valor_parcela)}
         </p>
         {cotacao.cliente_id && (
@@ -357,9 +357,9 @@ function ComparativoInline({
   // Erro da seguradora
   if (cotacao.status === "erro") {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <h3 className="font-medium text-red-800 mb-2">Cotação não realizada</h3>
-        <p className="text-sm text-red-700">
+      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-6">
+        <h3 className="font-medium text-red-800 dark:text-red-300 mb-2">Cotação não realizada</h3>
+        <p className="text-sm text-red-700 dark:text-red-400">
           {cotacao.mensagens[0] ??
             "A seguradora não pôde calcular o prêmio para este risco."}
         </p>
@@ -376,7 +376,7 @@ function ComparativoInline({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-gray-900">
+        <h3 className="font-medium text-gray-900 dark:text-white">
           Resultados —{" "}
           {cotacao.ramo.charAt(0).toUpperCase() + cotacao.ramo.slice(1)}
         </h3>
@@ -384,7 +384,7 @@ function ComparativoInline({
       </div>
 
       {cotacao.necessita_vistoria && (
-        <p className="text-sm font-medium text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
+        <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded px-3 py-2">
           Vistoria prévia obrigatória — prazo de emissão estendido.
         </p>
       )}
@@ -395,17 +395,17 @@ function ComparativoInline({
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-gray-50 border-b text-left">
-                <th className="px-4 py-2 font-medium">Seguradora</th>
-                <th className="px-4 py-2 font-medium">Prêmio total</th>
-                <th className="px-4 py-2 font-medium">Restrições</th>
-                <th className="px-4 py-2 font-medium">Vistoria</th>
-                <th className="px-4 py-2 font-medium">Status</th>
+              <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-left">
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Seguradora</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Prêmio total</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Restrições</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Vistoria</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Status</th>
               </tr>
             </thead>
             <tbody>
               {itens.map((item, i) => (
-                <tr key={i} className="border-b hover:bg-gray-50">
+                <tr key={i} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-3 font-semibold uppercase">{item.cia}</td>
                   <td className="px-4 py-3 font-mono">{fmtReal(item.premio_total)}</td>
                   <td className="px-4 py-3">
@@ -441,7 +441,7 @@ function ComparativoInline({
           href={api.cotacoes.comparativoPdfUrl(cotacaoId)}
           target="_blank"
           rel="noreferrer"
-          className="px-4 py-2 border rounded text-sm hover:bg-gray-50 transition-colors"
+          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           Baixar PDF
         </a>
@@ -1233,7 +1233,7 @@ export function CotacaoPage() {
               className={`px-4 py-2 rounded text-sm font-medium border transition-colors ${
                 ramo === r
                   ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:border-blue-400"
               }`}
             >
               {r === "auto" ? "Auto" : "Residência"}
@@ -1251,20 +1251,20 @@ export function CotacaoPage() {
               <div key={s} className="flex items-center gap-1 flex-1">
                 <div
                   className={`h-1.5 flex-1 rounded-full transition-colors ${
-                    s <= step ? "bg-blue-500" : "bg-gray-200"
+                    s <= step ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-600"
                   }`}
                 />
               </div>
             );
           })}
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Passo {step} de 5 — {STEP_LABELS[step - 1]}
         </p>
       </div>
 
       {/* Steps */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
         {step === 1 && (
           <Step1
             dominios={dominios}
@@ -1316,11 +1316,11 @@ export function CotacaoPage() {
             )}
 
             {pollCancelled && (
-              <div className="text-sm text-gray-600 bg-gray-50 rounded p-4">
+              <div className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded p-4">
                 Consulta cancelada.{" "}
                 <button
                   type="button"
-                  className="text-blue-600 underline"
+                  className="text-blue-600 dark:text-blue-400 underline"
                   onClick={() => {
                     if (cotacaoId) startPolling(cotacaoId);
                   }}
