@@ -1,0 +1,287 @@
+# Documentação da API Justos — Busca de Apólices Vendidas (Multicálculo)
+
+*Última atualização: 19/08/2026*
+
+<aside>
+ℹ️
+
+Esta documentação descreve **apenas** o endpoint de **busca de apólices vendidas**, pensado para os parceiros de **Multicálculo** importarem automaticamente as apólices vendidas pela Justos. A **autenticação é a mesma** descrita na Documentação da API Justos (v2 — Segurado / Condutor Principal) — veja o resumo na seção 3.
+
+</aside>
+
+# **1. Visão Geral**
+
+O endpoint `GET /brokers/policy/export` retorna, de forma paginada e incremental, as apólices **vendidas** (em vigor ou encerradas) da corretora autenticada. O objetivo é permitir que o Multicálculo faça uma **varredura periódica** e cadastre/atualize as apólices do lado dele sem intervenção manual.
+
+Características:
+
+- **Escopo por corretora:** o token identifica a corretora; a resposta traz somente as apólices daquela corretora.
+- **Incremental:** cada chamada recebe um parâmetro de data (`updatedSince`) e retorna apenas o que mudou a partir dela (vendas novas e mudanças de status).
+- **Paginado:** `skip` / `take`.
+- **Pull-only:** não há webhook; o parceiro consulta no ritmo que quiser.
+
+# **2. URLs da API**
+
+- **Produção:** `https://api.justos.com.br`
+- **Staging:** `https://api.staging.justos.com.br`
+
+# **3. Autenticação**
+
+A autenticação é **idêntica** à da documentação principal. Em resumo:
+
+1. O parceiro gera um par de chaves (ES256) e compartilha a **chave pública** conosco.
+2. Com a chave privada, gera um **JWT** (`iss` = nome do parceiro, `aud` = `justos`).
+3. Troca esse JWT pelo **token de autorização** em `POST /brokers/auth/api-token` (enviando `token`, `brokerId` e `cpf_cnpj` da corretora).
+4. Usa o token retornado no header `Authorization: Bearer <token>` de todas as chamadas. O token é **válido por 60 minutos**.
+
+<aside>
+🔑
+
+Passo a passo detalhado (geração de chaves, exemplo de JWT e cURL) na Documentação da API Justos (v2 — Segurado / Condutor Principal), seção **3. Autenticação**.
+
+</aside>
+
+# **4. Buscando as Apólices**
+
+## **4.1. Endpoint**
+
+```bash
+curl --location 'https://api.justos.com.br/brokers/policy/export?updatedSince=2024-01-01T00:00:00Z&skip=0&take=50' \
+--header 'Authorization: Bearer TOKEN_RETORNADO_DA_API'
+```
+
+## **4.2. Parâmetros de query**
+
+| **Parâmetro** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| updatedSince | **Obrigatório.** Data/hora ISO 8601 (ex.: `2024-01-01T00:00:00Z`). Retorna apólices cujo `updatedAt` é maior ou igual a esse valor. Para a carga inicial, use uma data bem antiga; nas varreduras seguintes, use a data da última sincronização. | string (ISO 8601) |
+| skip | Quantidade de registros a pular (paginação). Padrão: `0`. | integer |
+| take | Tamanho da página. Padrão: `50`. Máximo: `100`. | integer |
+
+<aside>
+🔄
+
+**Como varrer:** os resultados vêm ordenados por `updatedAt` crescente. Faça a carga inicial com uma `updatedSince` antiga, paginando com `skip`/`take` até esgotar; depois, guarde o maior `updatedAt` recebido e use-o como `updatedSince` na próxima varredura. Use o `policyId` para deduplicar/atualizar do seu lado.
+
+</aside>
+
+## **4.3. Quais apólices entram**
+
+- Apólices em qualquer estado **exceto** as ainda não vigentes (`pending` e falha de emissão de bilhete) — essas **não** são retornadas.
+- O campo `status` é simplificado em dois valores:
+    - **`ACTIVE`** — apólice em vigor (inclui estados intermediários como falha de pagamento em uma apólice ainda ativa).
+    - **`INACTIVE`** — apólice fora de vigência por qualquer motivo: cancelamento (pelo segurado, pela corretora ou pela Justos), inadimplência, ou fim de vigência sem renovação. **Não significa, por si só, cancelamento pela corretora.** Apólices que ficaram inativas **sem nunca emitir documento** retornam `insurerPolicyNumber`, `policyPdfUrl`, `endorsementPdfUrl` e `endorsementCount` em `null`.
+
+# **5. Resposta**
+
+## **5.1. Exemplo**
+
+```json
+{
+  "total": 234,
+  "data": [
+    {
+      "policyId": "fdd8c4b8-33e6-49c5-80ed-5397567e0ecc",
+      "previousPolicyId": null,
+      "proposalId": 85,
+      "insurerPolicyNumber": "02241202605310246640",
+      "policyPdfUrl": "https://justos-br-prod-sa-east-1-bucket-pdf-generator.s3.sa-east-1.amazonaws.com/justosFullInsurance/02241202605310246640?X-Amz-Algorithm=...&X-Amz-Signature=...",
+      "endorsementPdfUrl": null,
+      "endorsementCount": 0,
+      "status": "ACTIVE",
+      "bonusClass": 5,
+      "cancellationDate": null,
+      "policyType": "annual",
+      "validFrom": "2026-03-01T00:00:00.000Z",
+      "validUntil": "2027-03-01T00:00:00.000Z",
+      "emissionDate": "2026-03-01T00:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z",
+      "insured": {
+        "name": "Maria Silva",
+        "cpfCnpj": "12345678910",
+        "email": "maria@exemplo.com",
+        "phone": "83999999999",
+        "birthday": "1990-01-01T00:00:00.000Z",
+        "sex": "F",
+        "address": {
+          "cep": "58075200",
+          "street": "Rua A",
+          "number": "120",
+          "complement": "Sala 5",
+          "city": "João Pessoa",
+          "state": "PB"
+        }
+      },
+      "vehicle": {
+        "plate": "ABC1D23",
+        "chassis": "9BWZZZ377VT004251",
+        "renavam": "12345678901",
+        "fipe": "005153-5",
+        "brand": "VOLKSWAGEN",
+        "model": "Bora 2.0",
+        "year": 2010,
+        "zeroKm": false
+      },
+      "coverages": [
+        {
+          "code": 17,
+          "name": "Colisão",
+          "slug": "colisao-e-desastres-naturais",
+          "optionName": "Franquia 25%",
+          "optionSlug": "franquia-25",
+          "insuredAmount": 80503,
+          "premium": 656.52,
+          "deductible": 4025.15
+        },
+        {
+          "code": 21,
+          "name": "Danos Materiais",
+          "slug": "danos-materiais",
+          "optionName": "100 mil",
+          "optionSlug": "material-100k",
+          "insuredAmount": 100000,
+          "premium": 442.08,
+          "deductible": null
+        }
+      ],
+      "premium": {
+        "netPremium": 2315.64,
+        "grossPremium": 2858.76,
+        "iof": 210.96,
+        "totalPremium": 2858.76
+      },
+      "commission": {
+        "percentage": 11,
+        "amount": 314.28
+      },
+      "installments": [
+        {
+          "number": 1,
+          "status": "PAID",
+          "dueDate": "2026-04-01T00:00:00.000Z",
+          "amount": 767.43,
+          "premium": 578.91,
+          "iof": 52.74,
+          "commission": 314.28,
+          "paymentMethod": "CARD"
+        }
+      ],
+      "broker": {
+        "code": "654761",
+        "name": "Corretor Exemplo"
+      }
+    }
+  ]
+}
+```
+
+## **5.2. Campos da raiz**
+
+| **Campo** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| total | Total de apólices que atendem ao filtro (independente da paginação). | integer |
+| data | Lista de apólices da página atual. | array |
+| policyId | Identificador único da apólice na Justos (UUID). Use-o para deduplicar/atualizar do seu lado. | string |
+| previousPolicyId | `policyId` da apólice anterior, quando esta apólice é uma **renovação**. `null` em negócio novo. Preenchido nas renovações originadas no canal de corretor/multicálculo — portanto um valor preenchido confirma renovação, mas `null` não prova, por si só, que não houve apólice anterior fora desse canal. | string | null |
+| proposalId | Identificador interno da proposta que originou a apólice. Pode ser `null`. | integer | null |
+| insurerPolicyNumber | Número da apólice emitida (número da seguradora/SUSEP). `null` quando a apólice ainda não possui documento emitido (ex.: cancelada antes da emissão). Para correlacionar/atualizar do seu lado, use sempre o `policyId`, não este campo. | string | null |
+| policyPdfUrl | URL para download do **PDF da apólice/bilhete emitido** (o documento da apólice). URL **assinada e temporária — expira em 15 minutos**; baixe o arquivo no momento da consulta e não armazene a URL. `null` quando não há documento emitido. Em apólices **mensais**, corresponde ao bilhete do **ciclo mais recente**. | string | null |
+| endorsementPdfUrl | URL para download do **comprovante do último endosso processado** da apólice — documento distinto do `policyPdfUrl`, que sempre aponta para a apólice/bilhete. URL **assinada e temporária — expira em 15 minutos**, mesma regra do `policyPdfUrl`. `null` quando a apólice não tem endosso processado (ou quando o documento do endosso não está disponível). | string | null |
+| endorsementCount | Quantidade de endossos do documento vigente. `0` = sem endosso; em apólices **anuais**, `> 0` indica apólice endossada — nesse caso o comprovante do último endosso vem em `endorsementPdfUrl`. `null` quando não há documento emitido. | integer | null |
+| status | `ACTIVE` (em vigor) ou `INACTIVE` (encerrada/cancelada). | string |
+| bonusClass | Classe de bônus do segurado (0 a 10). Pode ser `null` quando não disponível. | integer | null |
+| cancellationDate | Data de cancelamento/encerramento. Preenchida apenas quando `status` = `INACTIVE` (corresponde ao fim de vigência); `null` para apólices ativas. | string | null |
+| policyType | `monthly` (mensal) ou `annual` (anual). | string |
+| validFrom | Início de vigência. | string (ISO 8601) |
+| validUntil | Fim de vigência. Em apólices **mensais**, que não têm fim de vigência contratual, corresponde ao **fim da cobertura do ciclo vigente** (o mesmo período do bilhete atual). | string | null |
+| emissionDate | Data de emissão da apólice. | string | null |
+| updatedAt | Data da última atualização. É o campo usado pelo filtro `updatedSince` e pela ordenação. | string (ISO 8601) |
+
+## **5.3. `insured` (segurado)**
+
+| **Campo** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| name | Nome completo (ou razão social) do segurado. | string | null |
+| cpfCnpj | CPF ou CNPJ do segurado. | string | null |
+| email | E-mail do segurado. | string | null |
+| phone | Telefone do segurado. | string | null |
+| birthday | Data de nascimento (quando PF). | string | null |
+| sex | Sexo do segurado (quando PF). | string | null |
+| address | Endereço do segurado: `cep`, `street`, `number`, `complement`, `city`, `state`. | objeto |
+
+## **5.4. `vehicle` (veículo)**
+
+| **Campo** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| plate | Placa. | string | null |
+| chassis | Chassi. | string | null |
+| renavam | RENAVAM. | string | null |
+| fipe | Código FIPE. | string | null |
+| brand | Marca. | string | null |
+| model | Modelo. | string | null |
+| year | Ano do modelo. | integer | null |
+| zeroKm | Indica se o veículo é 0km. | boolean | null |
+
+## **5.5. `coverages` (coberturas)**
+
+Lista das coberturas contratadas. Cada item:
+
+| **Campo** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| code | Código da cobertura na Justos. | integer | null |
+| name | Nome do risco/cobertura (ex.: Colisão, Roubo e Furto). | string |
+| slug | Identificador legível do risco (ex.: `colisao-e-desastres-naturais`). | string |
+| optionName | Nome da opção contratada para esse risco. | string |
+| optionSlug | Identificador legível da opção contratada. | string |
+| insuredAmount | Importância segurada (R$). Nas coberturas baseadas no valor de mercado do veículo (roubo/colisão/incêndio), corresponde ao valor FIPE multiplicado pelo percentual contratado. `null` quando não é possível determinar o valor. | number | null |
+| premium | Prêmio da cobertura (R$). | number |
+| deductible | Franquia (R$). `null` quando a cobertura não tem franquia. | number | null |
+
+## **5.6. `premium` e `commission`**
+
+| **Campo** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| premium.netPremium | Prêmio líquido total (R$). | number | null |
+| premium.grossPremium | Prêmio bruto total (R$). | number | null |
+| premium.iof | IOF total (R$). | number | null |
+| premium.totalPremium | Prêmio total cobrado (R$). | number | null |
+| commission.percentage | **Percentual de comissão contratado** para a apólice — a taxa trabalhada (ex.: `15`). Atenção: **não** é a razão entre `commission.amount` e `premium.grossPremium`; as duas divergem porque o prêmio bruto inclui IOF. Quando a cotação que originou a apólice não é mais resolvível, este campo cai na razão sobre o prêmio bruto. | number | null |
+| commission.amount | Valor total da comissão do corretor (R$). | number | null |
+
+## **5.7. `installments` (parcelas)**
+
+Lista das parcelas. Cada item:
+
+<aside>
+📅
+
+Em apólices **mensais** não existe parcelamento: cada item desta lista é a **cobrança de um ciclo mensal**, e `number` é o **número do ciclo** — não a parcela de um anual.
+
+</aside>
+
+| **Campo** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| number | Número da parcela. | integer |
+| status | Situação do pagamento: `PAID`, `PENDING`, `FAILED`, `CANCELLED` ou `REFUNDED`. | string | null |
+| dueDate | Data de vencimento. | string | null |
+| amount | Valor total da parcela (R$). | number | null |
+| premium | Prêmio líquido da parcela (R$). | number | null |
+| iof | IOF da parcela (R$). | number | null |
+| commission | Comissão referente à parcela (R$). | number | null |
+| paymentMethod | Forma de pagamento com que a parcela foi cobrada: `CARD` (cartão) ou `PIX`. `null` quando a cobrança não registra a forma de pagamento. **Não emitimos boleto** — estas são as duas únicas formas possíveis. | string | null |
+
+## **5.8. `broker` (corretor)**
+
+| **Campo** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| code | Código do corretor na Justos. | string | null |
+| name | Nome do corretor. | string | null |
+
+# **6. Considerações Finais**
+
+- Todos os valores monetários são em **reais (R$)**, com 2 casas decimais.
+- O **`policyPdfUrl`** e o **`endorsementPdfUrl`** são URLs assinadas e **expiram em 15 minutos** — baixe o PDF no momento da consulta e não armazene a URL; gere uma nova consulta quando precisar do arquivo novamente.
+- Use o **`policyId`** como chave estável para correlacionar/atualizar as apólices do seu lado entre varreduras.
+- Como o filtro é por `updatedAt`, mudanças de status (ex.: cancelamento) reaparecem na varredura — atualize o registro existente em vez de duplicar.
+- Utilize o ambiente de **staging** para desenvolvimento e testes antes de mover para produção.
+- Para dúvidas ou suporte, entre em contato conosco.
