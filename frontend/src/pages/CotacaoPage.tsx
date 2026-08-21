@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Tooltip } from "@/components/Tooltip";
 import { stripCPF } from "@/lib/utils";
 
 const STORAGE_KEY = "mk_cotacao_rascunho";
@@ -91,7 +92,32 @@ const step2AutoSchema = z.object({
   garagem: z.boolean().optional(),
 });
 
-const step2ResidenciaSchema = z.object({
+const step2MotoSchema = z.object({
+  cep_pernoite: z
+    .string()
+    .transform((v) => v.replace(/\D/g, ""))
+    .pipe(z.string().length(8, "CEP deve ter 8 dígitos")),
+  marca: z.string().min(1, "Obrigatório"),
+  modelo: z.string().min(1, "Obrigatório"),
+  ano_fabricacao: z
+    .string()
+    .transform(Number)
+    .pipe(z.number().int().min(1900).max(2100)),
+  ano_modelo: z
+    .string()
+    .transform(Number)
+    .pipe(z.number().int().min(1900).max(2100)),
+  cilindrada: z
+    .string()
+    .transform(Number)
+    .pipe(z.number().int().min(50).max(2500)),
+  categoria: z.string().min(1, "Obrigatório"),
+  combustivel: z.string().min(1, "Obrigatório"),
+  finalidade: z.string().min(1, "Obrigatório"),
+  garagem: z.boolean().optional(),
+});
+
+const step2ImovelSchema = z.object({
   cep: z
     .string()
     .transform((v) => v.replace(/\D/g, ""))
@@ -363,9 +389,11 @@ function ComparativoInline({
           {cotacao.mensagens[0] ??
             "A seguradora não pôde calcular o prêmio para este risco."}
         </p>
-        <Button variant="outline" size="sm" className="mt-4" onClick={onRecotar}>
-          Tentar novamente
-        </Button>
+        <Tooltip text="Reenvia os mesmos dados para a seguradora tentar calcular novamente">
+          <Button variant="outline" size="sm" className="mt-4" onClick={onRecotar}>
+            Tentar novamente
+          </Button>
+        </Tooltip>
       </div>
     );
   }
@@ -448,9 +476,11 @@ function ComparativoInline({
         {podeEmitir && (
           <Button onClick={onEmitir}>Transmitir proposta</Button>
         )}
-        <Button variant="outline" onClick={onRecotar}>
-          Recotar
-        </Button>
+        <Tooltip text="Refaz a cotação com os mesmos dados do risco, gerando um novo comparativo">
+          <Button variant="outline" onClick={onRecotar}>
+            Refazer cotação
+          </Button>
+        </Tooltip>
       </div>
     </div>
   );
@@ -729,10 +759,106 @@ function Step2Auto({
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 Residência
+// Step 2 Moto
 // ---------------------------------------------------------------------------
 
-function Step2Residencia({
+function Step2Moto({
+  defaultValues,
+  onBack,
+  onNext,
+}: {
+  defaultValues?: Step2Data;
+  onBack: () => void;
+  onNext: (data: Step2Data) => void;
+}) {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<z.infer<typeof step2MotoSchema>>({
+    resolver: zodResolver(step2MotoSchema),
+    defaultValues: defaultValues as z.infer<typeof step2MotoSchema>,
+  });
+
+  return (
+    <form onSubmit={handleSubmit(onNext)} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Marca" error={errors.marca?.message}>
+          <Input {...register("marca")} />
+        </Field>
+        <Field label="Modelo" error={errors.modelo?.message}>
+          <Input {...register("modelo")} />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <Field label="Ano fabricação" error={errors.ano_fabricacao?.message}>
+          <Input type="number" {...register("ano_fabricacao")} />
+        </Field>
+        <Field label="Ano modelo" error={errors.ano_modelo?.message}>
+          <Input type="number" {...register("ano_modelo")} />
+        </Field>
+        <Field label="Cilindrada (cc)" error={errors.cilindrada?.message}>
+          <Input type="number" placeholder="150" {...register("cilindrada")} />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Categoria" error={errors.categoria?.message}>
+          <Select {...register("categoria")}>
+            <option value="">—</option>
+            <option value="urbana">Urbana</option>
+            <option value="esportiva">Esportiva</option>
+            <option value="trail">Trail / Adventure</option>
+            <option value="custom">Custom / Touring</option>
+            <option value="scooter">Scooter</option>
+          </Select>
+        </Field>
+        <Field label="Combustível" error={errors.combustivel?.message}>
+          <Select {...register("combustivel")}>
+            <option value="">—</option>
+            <option value="gasolina">Gasolina</option>
+            <option value="flex">Flex</option>
+            <option value="eletrico">Elétrico</option>
+          </Select>
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="CEP de pernoite" error={errors.cep_pernoite?.message}>
+          <Input placeholder="00000-000" {...register("cep_pernoite")} />
+        </Field>
+        <Field label="Finalidade" error={errors.finalidade?.message}>
+          <Select {...register("finalidade")}>
+            <option value="">—</option>
+            <option value="pessoal">Pessoal</option>
+            <option value="comercial">Comercial / Delivery</option>
+          </Select>
+        </Field>
+      </div>
+
+      <div className="flex gap-4">
+        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input type="checkbox" {...register("garagem")} />
+          Tem garagem
+        </label>
+      </div>
+
+      <div className="pt-2 flex justify-between">
+        <Button type="button" variant="outline" onClick={onBack}>
+          ← Voltar
+        </Button>
+        <Button type="submit">Próximo →</Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step 2 Imóvel
+// ---------------------------------------------------------------------------
+
+function Step2Imovel({
   dominios,
   defaultValues,
   onBack,
@@ -750,9 +876,9 @@ function Step2Residencia({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<z.infer<typeof step2ResidenciaSchema>>({
-    resolver: zodResolver(step2ResidenciaSchema),
-    defaultValues: defaultValues as z.infer<typeof step2ResidenciaSchema>,
+  } = useForm<z.infer<typeof step2ImovelSchema>>({
+    resolver: zodResolver(step2ImovelSchema),
+    defaultValues: defaultValues as z.infer<typeof step2ImovelSchema>,
   });
 
   return (
@@ -815,7 +941,7 @@ function Step3({
   onBack: () => void;
   onNext: (data: Step3Data) => void;
 }) {
-  const tipo = ramo === "auto" ? "cobertura_auto" : "cobertura_residencia";
+  const tipo = ramo === "auto" || ramo === "moto" ? "cobertura_auto" : "cobertura_imovel";
   const coberturas = dominios.filter((d) => d.tipo === tipo);
 
   const {
@@ -1225,7 +1351,7 @@ export function CotacaoPage() {
       {/* Seletor de ramo — só no passo 1 */}
       {step === 1 && (
         <div className="mb-6 flex gap-3">
-          {["auto", "residencia"].map((r) => (
+          {(["auto", "moto", "imovel"] as const).map((r) => (
             <button
               key={r}
               type="button"
@@ -1236,7 +1362,7 @@ export function CotacaoPage() {
                   : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:border-blue-400"
               }`}
             >
-              {r === "auto" ? "Auto" : "Residência"}
+              {r === "auto" ? "Auto" : r === "moto" ? "Moto" : "Imóvel"}
             </button>
           ))}
         </div>
@@ -1281,8 +1407,16 @@ export function CotacaoPage() {
           />
         )}
 
-        {step === 2 && ramo === "residencia" && (
-          <Step2Residencia
+        {step === 2 && ramo === "moto" && (
+          <Step2Moto
+            defaultValues={step2Data}
+            onBack={() => setStep(1)}
+            onNext={handleStep2}
+          />
+        )}
+
+        {step === 2 && ramo === "imovel" && (
+          <Step2Imovel
             dominios={dominios}
             defaultValues={step2Data}
             onBack={() => setStep(1)}
