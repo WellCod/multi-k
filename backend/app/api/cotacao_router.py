@@ -18,7 +18,7 @@ router = APIRouter(prefix="/cotacoes", tags=["cotacoes"])
 
 
 class CriarCotacaoInput(BaseModel):
-    ramo: Literal["auto", "residencia"]
+    ramo: Literal["auto", "moto", "imovel"]
     dados: dict[str, Any]
     cliente_id: uuid.UUID | None = None
     versao_anterior_id: uuid.UUID | None = None
