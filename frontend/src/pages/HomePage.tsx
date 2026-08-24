@@ -12,6 +12,7 @@ import {
   type KpiCorretor,
   type KpiRamo,
 } from "@/lib/api";
+import { Tooltip } from "@/components/Tooltip";
 
 function fmtReal(v: string | null | undefined) {
   if (!v) return "—";
@@ -81,12 +82,14 @@ function SecaoRenovacoes({ items }: { items: ItemRenovacaoHome[] }) {
                   </span>
                 </td>
                 <td className="px-3 py-2">
-                  <button
-                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-                    onClick={() => navigate(`/cotacao?recotar=${r.cotacao_id}`)}
-                  >
-                    Renovar
-                  </button>
+                  <Tooltip text="Abre nova cotação pré-preenchida para renovação desta apólice" position="top">
+                    <button
+                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                      onClick={() => navigate(`/cotacao?recotar=${r.cotacao_id}`)}
+                    >
+                      Renovar
+                    </button>
+                  </Tooltip>
                 </td>
               </tr>
             ))}
@@ -149,12 +152,14 @@ function SecaoCotacoesAbandonadas({ items }: { items: ItemCotacaoAbandonada[] })
               <span className="capitalize font-medium text-gray-900 dark:text-white">{c.ramo}</span>
               <span className="text-gray-400 dark:text-gray-500 text-xs ml-2">{fmtDatetime(c.criado_em)}</span>
             </div>
-            <button
-              className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-              onClick={() => navigate(`/cotacao?recotar=${c.cotacao_id}`)}
-            >
-              Recotar
-            </button>
+            <Tooltip text="Retoma esta cotação incompleta para enviar à seguradora" position="top">
+              <button
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                onClick={() => navigate(`/cotacao?recotar=${c.cotacao_id}`)}
+              >
+                Continuar
+              </button>
+            </Tooltip>
           </div>
         ))}
       </div>
