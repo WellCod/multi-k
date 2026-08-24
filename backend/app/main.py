@@ -1,4 +1,4 @@
-"""Ponto de entrada da aplicação FastAPI."""
+﻿"""Ponto de entrada da aplicaÃ§Ã£o FastAPI."""
 
 import asyncio
 import contextlib
@@ -15,6 +15,7 @@ from app.api.cliente_router import router as cliente_router
 from app.api.comparativo_router import router as comparativo_router
 from app.api.cotacao_router import router as cotacao_router
 from app.api.dominio_router import router as dominio_router
+from app.api.fipe_router import router as fipe_router
 from app.api.health import router as health_router
 from app.api.home_router import router as home_router
 from app.api.proposta_router import router as proposta_router
@@ -50,7 +51,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="multi-K API",
-    description="Multicálculo e gestão de seguros",
+    description="MulticÃ¡lculo e gestÃ£o de seguros",
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -105,3 +106,5 @@ app.include_router(renovacao_router)
 app.include_router(dominio_router)
 app.include_router(home_router)
 app.include_router(relatorio_router)
+app.include_router(fipe_router)
+
