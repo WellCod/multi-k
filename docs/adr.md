@@ -443,3 +443,45 @@ Cor apenas onde carrega informação — status, alerta, divergência. Copy em v
 **A última linha é a perigosa:** errar qual nível de `Coverages` manda é errar prêmio. Pergunta aberta com a Yelum.
 
 **Nota.** O changelog mostra mudanças a cada poucos meses. Versão do documento fica versionada no repo, e testes de contrato com os payloads exatos dos PDFs são o que avisa quando mudar.
+
+---
+
+## ADR-033 — FIPE: Parallelum exclusivo (BrasilAPI descartada)
+
+**Status:** Aceita
+
+**Contexto.** O plano original era BrasilAPI como primária + Parallelum como fallback. Após implementação, descobrimos que a BrasilAPI FIPE só expõe `/marcas` e usa o campo `valor` em vez de `codigo` para o ID da marca — inconsistente com os outros endpoints. Não há `/modelos`, `/anos` nem `/preco` na BrasilAPI.
+
+**Decisão.** Parallelum exclusivo (`https://parallelum.com.br/fipe/api/v1/`). Sem fallback — a Parallelum já é o espelho oficial mais estável disponível.
+
+**Consequências.** Se a Parallelum cair, o formulário de cotação auto/moto fica degradado (FipeSelector mostra erro amigável, cotação ainda é possível se o corretor souber o código FIPE). Cache de 30 dias elimina 99% das chamadas em ambiente real.
+
+**Sinal de violação.** Reintroduzir BrasilAPI como primária. Chamar Parallelum sem passar pelo proxy backend (exporia CORS e eliminaria o cache).
+
+---
+
+## ADR-034 — FipeSelector: ComboBox inline em vez de select nativo
+
+**Status:** Aceita
+
+**Contexto.** A primeira versão usava um input de busca + `<select>` nativo abaixo, o que criava confusão: o usuário tinha que interagir com dois elementos distintos para fazer uma seleção.
+
+**Decisão.** ComboBox inline: um único botão que abre uma caixa de busca + lista filtrada sobreposta. Navegação por teclado (Enter, Esc, ↑↓). Fechamento ao clicar fora. Implementado sem biblioteca adicional.
+
+**Por quê.** O Select nativo não é estilizável de forma consistente entre browsers. O padrão de "botão trigger + lista inline" é mais previsível para o usuário e elimina a ambiguidade dos dois elementos. Custo: ~150 linhas de TSX, zero dependência nova.
+
+**Sinal de violação.** Instalar `react-select`, `downshift` ou similar — as dependências existentes são suficientes e o componente customizado é testável e acessível.
+
+---
+
+## ADR-035 — UX-SEC antes de Fase 5: qualidade antes de escala
+
+**Status:** Aceita
+
+**Contexto.** A Fase 5 (Yelum) está bloqueada por credencial. Enquanto aguarda, há duas opções: aguardar passivamente, ou investir na qualidade do funil existente.
+
+**Decisão.** A fase UX-SEC (auditoria 2026-08-24) é executada antes da Fase 5.
+
+**Por quê.** Os problemas identificados — typo em campo financeiro, sem validação de `dados_risco` no backend, race condition no polling — são tecnicamente simples mas de alto impacto quando o volume de cotações aumentar. Integrar a Yelum em cima de um funil com esses problemas multiplica a superfície de falha silenciosa. Qualidade do funil é pré-requisito para confiança nos dados de paridade (Fase 6).
+
+**Consequência.** Estimativa: 1 semana. Não atrasa Fase 5 porque o gate da Fase 5 (credencial) está fora do controle do time.
