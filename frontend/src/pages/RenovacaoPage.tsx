@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Renovacao } from "@/lib/api";
+import { Tooltip } from "@/components/Tooltip";
 
 const JANELA_CONFIG = {
   D30: { label: "≤ 30 dias", color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-700" },
@@ -203,12 +204,14 @@ export function RenovacaoPage() {
                             Ver cliente
                           </button>
                         )}
-                        <button
-                          className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-                          onClick={() => navigate(`/cotacao?recotar=${r.cotacao_id}`)}
-                        >
-                          Renovar
-                        </button>
+                        <Tooltip text="Abre nova cotação pré-preenchida com os dados desta apólice para renovação" position="top">
+                          <button
+                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                            onClick={() => navigate(`/cotacao?recotar=${r.cotacao_id}`)}
+                          >
+                            Renovar
+                          </button>
+                        </Tooltip>
                       </td>
                     </tr>
                   ))}
