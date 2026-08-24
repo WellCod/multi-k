@@ -79,7 +79,7 @@ def _proposta_out(p: Proposta) -> PropostaOut:
         n_parcelas=p.n_parcelas,
         valor_parcela=p.valor_parcela,
         comissao_parcela=p.comissao_parcela,
-        comissao_pct=p.commissao_pct,
+        comissao_pct=p.comissao_pct,
         inicio_vigencia=p.inicio_vigencia,
         transmitida_em=p.transmitida_em.isoformat(),
     )
@@ -172,7 +172,7 @@ async def transmitir(
         id=uuid.uuid4(),
         cotacao_id=cotacao_id,
         protocolo=resultado.protocolo,
-        commissao_pct=body.comissao_pct,
+        comissao_pct=body.comissao_pct,
         plano_pagamento=body.plano_pagamento,
         n_parcelas=body.n_parcelas,
         valor_parcela=valor_parcela,
