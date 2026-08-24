@@ -11,4 +11,8 @@
     @apply bg-gray-50 text-gray-900 font-sans antialiased;
     font-size: 14px; /* ferramenta densa — base menor que o padrão web */
   }
+
+  .dark body {
+    @apply bg-gray-900 text-gray-100;
+  }
 }

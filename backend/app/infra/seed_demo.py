@@ -75,7 +75,7 @@ _SOBRENOMES = [
     "Martins",
 ]
 
-# Veículos: (marca, modelo, combustivel)
+# Veículos auto: (marca, modelo, combustivel)
 _VEICULOS = [
     ("Chevrolet", "Onix", "FLEX"),
     ("Hyundai", "HB20", "FLEX"),
@@ -88,6 +88,22 @@ _VEICULOS = [
     ("Volkswagen", "Polo", "FLEX"),
     ("Volkswagen", "T-Cross", "FLEX"),
     ("Hyundai", "Creta", "FLEX"),
+]
+
+# Motos: (marca, modelo, cilindrada, categoria)
+_MOTOS = [
+    ("Honda", "CG 160", 160, "urbana"),
+    ("Honda", "CB 500F", 500, "esportiva"),
+    ("Honda", "Biz 125", 125, "urbana"),
+    ("Yamaha", "Fazer 250", 250, "urbana"),
+    ("Yamaha", "MT-03", 300, "esportiva"),
+    ("Yamaha", "Crosser 150", 150, "trail"),
+    ("Kawasaki", "Ninja 400", 400, "esportiva"),
+    ("Kawasaki", "Z400", 400, "esportiva"),
+    ("Shineray", "Phoenix 50", 50, "scooter"),
+    ("Dafra", "Speed 150", 150, "urbana"),
+    ("BMW", "G 310 R", 310, "esportiva"),
+    ("Royal Enfield", "Meteor 350", 350, "custom"),
 ]
 
 # CEPs região Campinas
@@ -162,9 +178,26 @@ def _dados_risco_auto() -> dict[str, Any]:
     }
 
 
-def _dados_risco_residencia() -> dict[str, Any]:
+def _dados_risco_moto() -> dict[str, Any]:
+    marca, modelo, cilindrada, categoria = random.choice(_MOTOS)
+    ano = random.randint(2015, 2024)
     return {
-        "ramo": "residencia",
+        "ramo": "moto",
+        "marca": marca,
+        "modelo": modelo,
+        "cilindrada": cilindrada,
+        "categoria": categoria,
+        "combustivel": "GASOLINA",
+        "ano_fabricacao": ano,
+        "ano_modelo": ano + 1,
+        "cep_pernoite": random.choice(_CEPS),
+        "finalidade": "pessoal",
+    }
+
+
+def _dados_risco_imovel() -> dict[str, Any]:
+    return {
+        "ramo": "imovel",
         "cep": random.choice(_CEPS),
         "tipo_imovel": random.choice(["casa", "apartamento"]),
         "tipo_construcao": "alvenaria",
@@ -176,7 +209,11 @@ def _premio_auto() -> Decimal:
     return _dec(random.uniform(1800, 4500))
 
 
-def _premio_residencia() -> Decimal:
+def _premio_moto() -> Decimal:
+    return _dec(random.uniform(600, 2200))
+
+
+def _premio_imovel() -> Decimal:
     return _dec(random.uniform(300, 900))
 
 
@@ -329,18 +366,20 @@ async def criar_demo(factory: async_sessionmaker[AsyncSession]) -> None:
             for cli in clientes_por_corretor[corretor.id]:
                 for _ in range(3):
                     status = next(status_iter)
-                    ramo = "auto" if random.random() < 0.70 else "residencia"
+                    ramo = random.choices(
+                        ["auto", "moto", "imovel"], weights=[60, 25, 15]
+                    )[0]
 
+                    tem_premio = status in ("sucesso", "restricao")
                     if ramo == "auto":
                         dados = _dados_risco_auto()
-                        premio = _premio_auto() if status == "sucesso" else None
-                        if status == "restricao":
-                            premio = _premio_auto()
+                        premio = _premio_auto() if tem_premio else None
+                    elif ramo == "moto":
+                        dados = _dados_risco_moto()
+                        premio = _premio_moto() if tem_premio else None
                     else:
-                        dados = _dados_risco_residencia()
-                        premio = _premio_residencia() if status == "sucesso" else None
-                        if status == "restricao":
-                            premio = _premio_residencia()
+                        dados = _dados_risco_imovel()
+                        premio = _premio_imovel() if tem_premio else None
 
                     # Cotações "aguardando" ficam paradas há pelo menos 3 dias
                     if status == "aguardando":
