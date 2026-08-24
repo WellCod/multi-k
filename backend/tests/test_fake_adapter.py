@@ -34,7 +34,7 @@ def test_fake_implementa_protocolo(fake: FakeSeguradora) -> None:
 def test_capacidades(fake: FakeSeguradora) -> None:
     cap = fake.capacidades()
     assert "auto" in cap.ramos
-    assert "residencia" in cap.ramos
+    assert "imovel" in cap.ramos
     assert len(cap.coberturas) > 0
 
 
