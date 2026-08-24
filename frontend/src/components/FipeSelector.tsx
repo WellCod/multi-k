@@ -23,10 +23,9 @@ interface Option {
 }
 
 function formatBRL(valor: string): string {
-  const clean = valor.replace(/[R$\s]/g, "").replace(",", ".");
-  const num = parseFloat(clean);
-  if (isNaN(num)) return valor;
-  return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  // Parallelum already returns Brazilian-formatted strings like "R$ 74.463,00".
+  // Re-parsing would corrupt the value (thousands dot gets treated as decimal).
+  return valor || "—";
 }
 
 function Skeleton() {
