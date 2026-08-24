@@ -14,294 +14,288 @@ Um prompt por fase. Cole inteiro no assistente junto com `docs/escopo.md` e `doc
 ## FASE 3 — Comparativo, PDF, gestão ✅ concluída
 ## FASE 4 — Dashboard, relatórios, seed ✅ concluída
 ## FASE JUSTOS — Adapter Justos ✅ concluído (aguarda credenciais)
+## FASE FIPE — Integração Tabela FIPE ✅ concluída
 
 ---
 
-## FASE FIPE — Integração Tabela FIPE
+## FASE UX-SEC — Qualidade e segurança do funil de cotação
 
-**Objetivo:** substituir campos manuais de veículo (marca/modelo/ano digitados)
-por seleção assistida via tabela FIPE oficial, com cache no backend para
-escalar sem depender do rate limit de APIs externas.
+**Objetivo:** corrigir problemas de validação, segurança e UX identificados na
+auditoria do funil `/cotacao` em 2026-08-24, antes de integrar novas seguradoras.
+Qualidade de funil antes de escala.
 
-**Por que agora:** o adapter Justos exige `codigo_fipe` obrigatório. Sem FIPE
-no form, nenhuma cotação Justos funciona em produção.
+**Branch:** `feat/ux-sec`  
+**Estimativa:** 1 semana
 
-### 1. BACKEND — proxy + cache
+### P0 — Crítico (atacar primeiro, quebra dados reais)
 
-Crie `backend/app/api/fipe_router.py` com 4 rotas:
+#### P0.1 — Typo `commissao_pct` no banco
 
 ```
-GET /fipe/marcas?tipo=carros|motos
-GET /fipe/modelos?tipo=carros&marca_id={codigo}
-GET /fipe/anos?tipo=carros&marca_id={codigo}&modelo_id={codigo}
-GET /fipe/preco?tipo=carros&marca_id={m}&modelo_id={m}&ano_id={a}
+Arquivo: backend/app/infra/models.py linha 212
+Problema: coluna se chama `commissao_pct` (duplo ss), todo o código Python e
+          frontend usa `comissao_pct` (um s). Comissões persistem no campo errado.
+
+Ação:
+1. Renomear coluna em models.py para `comissao_pct`
+2. Criar migration: backend/alembic/versions/003_fix_comissao_pct.py
+   ALTER TABLE proposta RENAME COLUMN commissao_pct TO comissao_pct;
+3. Verificar todos os arquivos que referenciam o nome do campo
+4. `make check` deve passar
 ```
 
-Cache em memória com TTL de 30 dias (FIPE atualiza mensalmente).
-Fonte primária: BrasilAPI (`https://brasilapi.com.br/api/fipe/`).
-Fallback: Parallelum (`https://parallelum.com.br/fipe/api/v1/`).
+#### P0.2 — `dados_risco` sem validação no backend
 
-Não exige autenticação para chamar — rotas públicas dentro do `/api`.
-Retorno sempre serializado como JSON limpo, sem expor campos desnecessários.
+```
+Arquivo: backend/app/api/cotacao_router.py
+Problema: CriarCotacaoInput aceita `dados: dict[str, Any]` sem schema.
+          Bypass via curl aceita qualquer payload — cotação criada com lixo.
 
-Estrutura de cache em memória:
-
-```python
-# infra/fipe_cache.py
-@dataclass
-class _Entry:
-    data: list[dict[str, str]]
-    expira_em: float  # monotonic
-
-_cache: dict[str, _Entry] = {}
-TTL = 30 * 24 * 3600  # 30 dias
+Ação:
+1. Criar schemas Pydantic em backend/app/domain/risco.py (ou cotacao_router.py):
+   - RiscoAutoInput: cep_pernoite, codigo_fipe, ano_modelo, finalidade (obrigatórios)
+   - RiscoMotoInput: cep_pernoite, codigo_fipe, cilindrada, categoria, finalidade
+   - RiscoImovelInput: cep, tipo_imovel, tipo_construcao, valor_imovel (Decimal, > 0)
+2. Usar Annotated + discriminator: ramo="auto" → RiscoAutoInput, etc.
+3. Campos extras são permitidos (seguradora pode precisar de campos adicionais)
+4. Testar com pytest: cotação com ramo="auto" sem codigo_fipe → 422
 ```
 
-### 2. FRONTEND — componente FipeSelector
+#### P0.3 — Comissão sem validação visual de range
 
-Crie `frontend/src/hooks/useFipe.ts`:
-- `useFipeMarcas(tipo)` — carrega marcas ao montar
-- `useFipeModelos(tipo, marcaId)` — carrega quando marcaId muda
-- `useFipeAnos(tipo, marcaId, modeloId)` — carrega quando modeloId muda
-- `useFipePreco(tipo, marcaId, modeloId, anoId)` — retorna codigo_fipe + valor
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (modal transmitir proposta)
+Problema: campo de comissão não valida visualmente range 1%–30%.
+          Usuário pode digitar 150% sem nenhum erro na tela.
 
-Crie `frontend/src/components/FipeSelector.tsx`:
-- Selects em cascata: Marca → Modelo → Ano
-- Ao selecionar Ano: exibe `codigo_fipe` (read-only) e `Valor FIPE` formatado em R$
-- Loading state em cada select (disabled + spinner)
-- Dark mode correto
-- Props: `tipo: "carros" | "motos"`, `onChange(fipe: FipeResult)`
-
-Atualize `CotacaoPage.tsx`:
-- Step 2 Auto: substitui campos `marca`, `modelo`, `ano_fabricacao`, `ano_modelo` pelo `FipeSelector`
-- Step 2 Moto: idem com `tipo="motos"`
-- Adicionar campo `placa` (opcional, string livre, máscara ABC-1234 / ABC1D23)
-- `codigo_fipe` e `valor_fipe` entram no `dados_risco` enviado ao backend
-- Manter `cep_pernoite`, `finalidade`, `blindado`, `garagem` como estão
-
-Atualize os schemas Zod (step2AutoSchema, step2MotoSchema):
-- Adicionar `codigo_fipe: z.string().min(1)`
-- Adicionar `placa: z.string().optional()`
-- Remover `marca`, `modelo` como campos livres (viram read-only preenchidos pelo selector)
-
-### 3. UX — diretrizes
-
-- Select de Marca vem com input de busca/filtro (há ~60 marcas de carros)
-- Selects dependentes ficam disabled até o anterior ser preenchido
-- Valor FIPE exibido em destaque perto do selector: "Valor FIPE: R$ 48.000"
-- Erro de API externa mostra mensagem amigável + opção de digitar manualmente
-- Skeleton loader enquanto carrega, não spinner mudo
-
-### 4. Schemas de dados
-
-Após a FIPE, `dados_risco` de uma cotação auto terá:
-```json
-{
-  "ramo": "auto",
-  "codigo_fipe": "004090-4",
-  "placa": "ABC1D23",
-  "cep_pernoite": "13013001",
-  "finalidade": "lazer",
-  "blindado": false,
-  "garagem": true,
-  "cpf": "...",
-  "nome": "...",
-  "sexo": "M",
-  "data_nascimento": "1990-01-15",
-  "ano_modelo": 2023,
-  "valor_fipe": "48000.00"
-}
+Ação:
+1. Adicionar validação no Zod schema da modal: comissao deve estar entre 0.01 e 0.30
+2. Mostrar mensagem de erro inline no campo
+3. Desabilitar botão "Confirmar" enquanto inválido
 ```
 
-**PRONTO QUANDO:** usuário seleciona Marca → Modelo → Ano e o formulário
-preenche `codigo_fipe` automaticamente. Cotação enviada ao backend inclui
-`codigo_fipe` no `dados_risco`. `make check` continua passando.
+### P1 — Alto
 
-**NÃO FAÇA:** autenticar o endpoint FIPE, criar tabela no banco para o cache
-(memória é suficiente no MVP), mudar nada nos adapters de seguradora.
+#### P1.1 — Race condition no polling
 
----
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (startPolling / stopPolling)
+Problema: dois cliques rápidos criam dois timers simultâneos;
+          setState pode ser chamado após unmount.
 
-<!-- original prompts preservados abaixo -->
+Ação:
+1. Antes de startPolling, chamar stopPolling (limpar timer anterior)
+2. Usar AbortController para cancelar requisição HTTP em andamento
+3. Adicionar flag `mounted` no useEffect que contém o polling:
+   return () => { mounted = false; stopPolling(); }
+4. Só chamar setCotacao se mounted === true
+```
 
-## FASE 0 — Setup local (referência)
+#### P1.2 — Vigência sem validação cruzada
 
-Stack: Python 3.12 + FastAPI + Postgres 16 + React 18 + Vite + TypeScript + Tailwind + shadcn/ui.
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (step4Schema)
+Problema: aceita fim_vigencia < inicio_vigencia sem nenhum erro.
 
-**PRONTO QUANDO:** `docker compose up` sobe, `GET /health` responde 200, `make check` passa, `npm run dev` abre a SPA.
+Ação frontend:
+  step4Schema: adicionar .refine() que valida:
+  - inicio_vigencia não pode ser mais de 30 dias no passado
+  - fim_vigencia deve ser > inicio_vigencia
+  - intervalo deve ser entre 1 mês e 13 meses (seguro anual com pequena margem)
 
----
+Ação backend:
+  Em proposta_router.py ao criar proposta, validar inicio < fim.
+  Retornar 422 com mensagem clara se inválido.
+```
 
-## FASE 1 — Fundação
+#### P1.3 — Erro de busca CPF silencioso
 
-Contexto: leia `docs/escopo.md`, seções 3 e 5.
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (searchByCpf, catch vazio)
+Problema: se API cair durante busca CPF, usuário avança sem saber.
 
-Implemente, nesta ordem:
+Ação:
+1. No catch, guardar estado: setSearchError("Não foi possível verificar o CPF")
+2. Exibir banner amarelo (warning, não bloqueador) abaixo do campo CPF
+3. Usuário ainda pode avançar — o erro é informativo, não bloqueador
+```
 
-1. **AUTENTICAÇÃO** — Sem cadastro público, sem reset self-service, sem SSO. Admin provisiona usuários. Argon2id para senha. Sessão em cookie httponly + secure + samesite=strict. Rate limit no login: 5 tentativas / 15 min por usuário e por IP. Dependency `get_current_user()` no FastAPI. Papéis: corretor, admin.
+#### P1.4 — `alert()` ao falhar criação de cotação
 
-2. **MODELO CANÔNICO** — Três camadas, Pydantic v2. `RiscoAuto` e `RiscoResidencia` agnósticos de seguradora. `Negocio` blob tipado por adapter. Ciclo: eventos imutáveis `CotacaoCriada`, `PropostaTransmitida`, `ApoliceEmitida`, `EndossoRegistrado`, `ParcelaGerada`, `ComissaoRegistrada`, `SinistroAberto`. TODO valor monetário é `Decimal`. `float` nunca toca dinheiro.
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (handleStep4 catch)
+Problema: alert() bloqueia UI e parece erro do browser.
 
-3. **TABELA DE DOMÍNIOS** — `dominio(cia, tipo, codigo, descricao, ativo, atualizado_em)`. Nenhum código de cobertura, profissão, estado civil ou plano de pagamento hardcoded.
+Ação:
+1. Criar componente <ErrorBanner message={} onRetry={} /> reutilizável
+2. Substituir alert() por setErrorMsg(err.message)
+3. Exibir ErrorBanner no step 5 abaixo do LoadingPanel
+4. Botão "Tentar novamente" no ErrorBanner que volta ao step 4
+```
 
-4. **PortaSeguradora + ADAPTER FAKE** — Interface conforme `docs/escopo.md §2`. O fake retorna dados plausíveis e simula latência de 8–15 segundos. Deve conseguir retornar os três estados: sucesso, restrição, erro.
+#### P1.5 — `valor_imovel` enviado como string mal formatada
 
-5. **LOGGING COM ALLOWLIST** — structlog configurado para logar APENAS campos explicitamente permitidos. Teste automatizado que falha se "cpf", "password", "client_secret", "access_token" aparecerem em qualquer sink.
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (step2ImovelSchema)
+Problema: transform atual faz v.replace(/\D/g, ".") — converte letras em ponto,
+          gerando strings malformadas como "300000.00" com formatação incorreta.
 
-6. **AUDITORIA** — Tabela append-only. Sem UPDATE, sem DELETE — garantido por permissão no Postgres. Registra: acesso a dado de cliente, revelação de PII, cotação, transmissão, login, falha de login, mudança de papel.
+Ação:
+1. Novo transform: remover tudo exceto dígitos e vírgula, tratar vírgula como decimal
+   z.string()
+     .transform(v => v.replace(/[^\d,]/g, "").replace(",", "."))
+     .pipe(z.coerce.number().positive("Valor deve ser maior que zero"))
+2. Exibir preview formatado em R$ abaixo do campo (read-only)
+```
 
-7. **RLS** — Policy no Postgres: corretor vê a própria carteira, admin vê tudo. Enforcement na camada de dados. Toda tabela de negócio tem `tenant_id NOT NULL`.
+#### P1.6 — Sem loading state durante criação de cotação
 
-**PRONTO QUANDO:** login funciona, um corretor não enxerga carteira de outro (teste automatizado), fake adapter retorna cotação pela interface, nenhum CPF aparece em log algum.
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (handleStep4)
+Problema: usuário clica "Solicitar cotação", nada acontece visivelmente até
+          o step 5 aparecer — parece travado.
 
-**NÃO FAÇA:** telas além do login, adapter da Yelum, PDF, dashboard, qualquer chamada HTTP externa.
+Ação:
+1. Adicionar estado: const [criando, setCriando] = useState(false)
+2. No handleStep4: setCriando(true) antes da chamada, false no finally
+3. Desabilitar botão "Solicitar cotação" enquanto criando === true
+4. Mostrar spinner no botão: <Spinner /> Criando cotação...
+```
 
----
+### P2 — Médio
 
-## FASE 2 — Cotação end-to-end
+#### P2.1 — PII em sessionStorage
 
-Contexto: `docs/escopo.md §6`, funil de cotação.
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (saveRascunho / clearRascunho)
+Problema: dados do veículo, CEP e dados FIPE persistem no sessionStorage
+          após o usuário sair sem completar.
 
-1. **ORQUESTRADOR** — Fan-out assíncrono sobre N adapters. Timeout por cia, resultado parcial exibido conforme chega, cancelamento pelo usuário. Fila em Postgres com SKIP LOCKED. Não use Celery nem Redis.
+Ação:
+1. Chamar clearRascunho() no handleCancelar (já existe? verificar)
+2. Chamar clearRascunho() no handleStep5 após cotação criada com sucesso
+3. Verificar se clearRascunho limpa toda a chave STORAGE_KEY — se não, corrigir
+```
 
-2. **CLIENTE E OBJETO** — Cadastro de cliente com busca por CPF via blind index (HMAC). Veículos e imóveis vinculados ao cliente, reutilizáveis entre cotações.
+#### P2.2 — `/cotacao?recotar=` sem cotação
 
-3. **FUNIL — 5 passos, Auto e Residência** — React Hook Form + Zod. Autosave a cada passo. Tab order correto, Enter avança. Campos de domínio populados da tabela `dominio`. `CommissionPct` visível apenas para admin.
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (useEffect recotar)
+Problema: URL com UUID inválido ou de outro usuário não dá feedback.
 
-4. **HISTÓRICO IMUTÁVEL** — Cotação nunca sofre UPDATE. Alteração gera nova versão com link para a anterior. Guarde `payloadOriginal` — request e response brutos do adapter, cifrados.
+Ação:
+1. Adicionar .catch() no api.cotacoes.get(recotar)
+2. setRecotar Error("Cotação não encontrada ou sem permissão de acesso")
+3. Exibir ErrorBanner no topo da página — não bloquear formulário vazio
+4. Botão "Fazer nova cotação" no banner que limpa o query param
+```
 
-5. **RECOTAR** — A partir de cotação existente, pré-preenchida.
+#### P2.3 — Labels de cobertura ilegíveis
 
-6. **TRÊS ESTADOS DE RESULTADO** — Sucesso, restrição e erro são estados distintos. Vistoria prévia aparece em destaque.
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (Step 3 — seleção de coberturas)
+Problema: checkboxes mostram códigos internos: CASCO, RCF, APP, VIDROS, etc.
 
-7. **ESTADO DE CARREGAMENTO** — "Consultando Yelum… 12s" com botão cancelar. Nunca spinner mudo.
+Ação:
+1. Criar mapa de labels em lib/dominios.ts:
+   const COBERTURA_LABELS: Record<string, string> = {
+     CASCO: "Colisão e danos",
+     RCF: "Responsabilidade civil",
+     APP: "Acidentes pessoais de passageiros",
+     VIDROS: "Vidros e retrovisores",
+     INCENDIO: "Incêndio e raio",
+     ROUBO: "Roubo e furto",
+     RESP_CIVIL: "Danos a terceiros",
+     DANOS_ELET: "Danos elétricos",
+     QUEBRA_VIDROS: "Quebra de vidros",
+   }
+2. Usar COBERTURA_LABELS[codigo] ?? codigo como label visível
+```
 
-**PRONTO QUANDO:** você cota Auto e Residência do início ao fim contra o fake, o histórico guarda tudo, recotar funciona, e fechar o browser no passo 3 não perde os passos 1 e 2.
+#### P2.4 — Responsividade mobile
 
-**NÃO FAÇA:** comparativo visual, PDF, transmissão de proposta, dashboard, adapter real.
+```
+Arquivos: múltiplos steps em CotacaoPage.tsx
+Problema: grid-cols-2 fixo sem breakpoint — campos estreitos em celular (320px).
 
----
+Ação:
+1. Substituir className="grid grid-cols-2 gap-4" por
+   className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+   em todos os grids do formulário
+2. Verificar FipeSelector em tela pequena — ComboBox com max-h-52 pode sair da tela
+3. Testar com DevTools em 375px (iPhone SE)
+```
 
-## FASE 3 — Comparativo, PDF, gestão
+#### P2.5 — Cleanup de timers no unmount
 
-1. **COMPARATIVO** — Franquias lado a lado, coberturas com LMI, parcelamentos. Densidade acima de decoração.
+```
+Arquivo: frontend/src/pages/CotacaoPage.tsx (startPolling)
+Problema: se componente desmonta durante polling (ex: navegação), timer continua.
 
-2. **PDF PARA O CLIENTE** — Comparativo com logo da Klubi. Quando a Yelum liberar, use a API de Impressão dela para cotação, proposta, apólice, parcelas e carta verde. NÃO construa gerador para esses.
+Ação: já coberto pelo P1.1 (AbortController + flag mounted)
+Verificar: stopPolling limpa pollRef.current com clearTimeout — confirmar.
+```
 
-3. **TIMELINE DO CLIENTE** — `Cotação → proposta → apólice → endosso → parcela → renovação → sinistro` em ordem, numa tela.
+### NÃO faça nesta fase
 
-4. **PROJEÇÕES DE GESTÃO** — Apólice, parcela e comissão como projeções sobre o stream de eventos. Comissão PREVISTA calculada. Campo separado para comissão RECEBIDA (vem do E-Retorno na Fase 7).
+- Não adicione nova seguradora (Fase 5)
+- Não mude o modelo de dados de cotação ou proposta além da correção do typo
+- Não implemente criptografia de PII (KMS é Fase 8)
+- Não mude a autenticação ou sessão
+- Não implemente validação de CEP via API externa (ViaCEP) — vai para Fase 5+
 
-5. **RENOVAÇÃO** — Janela D-60 / D-45 / D-30 com responsável atribuído.
+### Critério de pronto
 
-6. **TRANSMISSÃO DE PROPOSTA** — Implementada, disparada por humano com confirmação explícita.
-
-**PRONTO QUANDO:** comparativo gera PDF, timeline mostra a vida de um cliente, parcelas e comissão prevista aparecem corretas, transmissão funciona contra o fake.
-
-**NÃO FAÇA:** conciliação de comissão recebida, gestão de sinistro, dashboard.
-
----
-
-## FASE 4 — Dashboard, relatórios, seed — DEMO
-
-**Objetivo:** algo apresentável à diretoria. O critério não é funcionalidade, é PARECER REAL.
-
-1. **HOME POR PAPEL** — Corretor: fila de trabalho (renovações na janela, propostas paradas, parcelas vencendo, cotações abandonadas há 2+ dias). Admin/gestor: KPIs com comissão PRODUZIDA × RECEBIDA lado a lado.
-
-2. **RELATÓRIOS** — Produção por corretor, conversão, ticket médio, mix de carteira. Export CSV e XLSX.
-
-3. **SEED SINTÉTICO** — 3 corretores, ~40 clientes, ~120 cotações, ~60 apólices. Região Campinas/Indaiatuba-SP. Nomes brasileiros plausíveis. CPF válido pelo algoritmo mas inexistente. ZERO PII real.
-
-4. **MARCA D'ÁGUA DE DEMO** — Faixa discreta indicando dados simulados, visível em toda tela que mostra valor de prêmio.
-
-5. **DESIGN** — Ferramenta densa e neutra. NÃO use: creme + serif + terracota; dark + verde ácido; broadsheet com fios finos. São defaults de IA.
-
-**PRONTO QUANDO:** alguém de fora abre o sistema e não percebe que os dados são falsos até ler a marca d'água.
-
-**Depois:** demo para a diretoria + e-mail ao ponto focal da Yelum com as 12 perguntas do `docs/escopo.md §10`.
+- [ ] `make check` passa sem warnings
+- [ ] Migration `003` aplicada sem erro
+- [ ] Criar cotação auto sem `codigo_fipe` → backend retorna 422
+- [ ] Criar cotação com `fim_vigencia < inicio_vigencia` → erro inline
+- [ ] Dois cliques rápidos em "Solicitar" → apenas um polling ativo
+- [ ] Formulário legível em 375px
+- [ ] sessionStorage limpo após cancelar ou concluir
 
 ---
 
 ## FASE 5 — Adapter Yelum real
 
-**Gate: credencial de mock ou homologação.** Comece por Residência.
+*(aguarda credencial de homologação)*
 
-Contexto: leia `docs/escopo.md §4` inteiro antes de escrever qualquer código.
+**Objetivo:** integração com a API da Yelum para cotação de Residência (depois Auto).
 
-1. **AUTENTICAÇÃO** — Token é OPACO, não JWT. Cache em memória, `401` como expirado, reautentica e repete UMA vez. Os quatro segredos vêm do `SecretProvider`.
+**Gate de entrada:** credencial de mock ou homologação recebida do ponto focal Yelum.
 
-2. **ANTI-CORRUPTION LAYER** — Mapeia `RiscoResidencia → contrato Yelum` e `resposta → CotacaoCanonica`. Todo campo monetário vira `Decimal` na fronteira. Pydantic estrito: falhe alto em campo desconhecido ou faltante.
+**Restrição crítica:** código Yelum fica exclusivamente em `adapters/yelum/`. O CI bloqueia vazamento por grep em todo PR. O `test_arch.py` nunca deve ser modificado.
 
-3. **ENDPOINTS** — `POST /offer/v1/quote`, `PUT /offer/v1/quote/{id}`, `POST /offer/v1/proposal`. Base URL por ambiente, do `SecretProvider`.
-
-4. **RATE LIMIT E RESILIÊNCIA** — Circuit breaker, backoff exponencial. "Yelum fora" é estado normal.
-
-5. **TESTES DE CONTRATO** — respx com os payloads EXATOS dos PDFs. Rodam sem rede.
-
-6. **SINCRONIZAÇÃO DE DOMÍNIOS** — Job que popula a tabela `dominio` pela API de Domínios.
-
-**PONTOS AMBÍGUOS — confirme com a Yelum antes de assumir:** `CBE10` duplo, `AgencyCode` vs `CooperativeAgencyCode`, `DepartmentCode`/`EmployeeName`.
-
-**NÃO FAÇA:** transmissão automática, mudar nada fora de `adapters/yelum/`.
+Contexto completo: `docs/escopo.md §4` e `docs/escopo.md §10` (12 perguntas ao ponto focal).
 
 ---
 
 ## FASE 6 — Paridade
 
-**Gate: ≥99% de paridade exata em 200 cotações, sustentado 30 dias.**
+*(gate: ≥99% em 200 cotações, 30 dias)*
 
-1. **HARNESS DE RECONCILIAÇÃO** — Amostra diária. Tela para operador lançar valor do portal. Divergência > R$ 0,01 gera alerta com `payloadOriginal` anexado.
-
-2. **DIAGNÓSTICO AUTOMÁTICO** — Decomposição por cobertura, diff campo a campo, bisseção automática.
-
-3. **PAINEL DE DIVERGÊNCIA** — Taxa de paridade por dia, por produto, por faixa de prêmio.
-
-**NÃO FAÇA:** liberar para corretor antes do gate. Automatizar transmissão antes do gate.
+Implementar suite de paridade automática: robot que faz cotação pelo sistema e pelo portal da seguradora, compara prêmio centavo a centavo. Gate: 99% de match sustentado por 30 dias.
 
 ---
 
 ## FASE 7 — E-Retorno
 
-**Gate: Security Assessment assinado.**
+*(gate: Security Assessment assinado pela Yelum)*
 
-1. **INGESTÃO** — Job periódico. Cada movimento vira EVENTO — não UPDATE em projeção. Idempotência por identificador do movimento.
-
-2. **CONCILIAÇÃO DE COMISSÃO** — Prevista vs recebida. Tela de exceções, não relatório passivo.
-
-3. **SINISTRO READ-ONLY** — Exibição e alerta. Não construa gestão de sinistro.
+Implementar ingestão de movimentos via E-Retorno: emissões, endossos, parcelas, comissões, sinistros. Conciliação automática de comissão prevista vs recebida.
 
 ---
 
-## FASE 8 — Deploy GCP e endurecimento
+## FASE 8 — Deploy GCP
 
-**Precede a chave de produção.**
+*(gate: precede chave de produção)*
 
-Cloud Run + Cloud SQL (IP privado) + Secret Manager (CMEK) + KMS + Artifact Registry. Região `southamerica-east1`. IP fixo de saída via VPC egress + Cloud NAT. PII com envelope encryption. Backup com restore testado. Pentest externo antes de dado real de cliente.
+Cloud Run + Cloud SQL + Secret Manager + KMS. Envelope encryption para CPF/chassi/placa. Região `southamerica-east1`.
 
 ---
 
 ## FASE 9 — MCP para o bot
 
-**Só depois do gate de paridade.**
+*(gate: após paridade)*
 
-Ferramentas: `buscar_cliente`, `criar_ou_atualizar_risco`, `cotar`, `consultar_status`, `consultar_apolice/parcela/sinistro`.
-
-`CommissionPct` e `PromotionalDiscountVlr` NÃO são parâmetros de ferramenta. `transmitir()` NÃO é exposto. Toda cotação por MCP entra em fila de revisão.
-
----
-
-## Ordem de execução
-
-```
-Hoje         Fase 0  ✅
-Semana 1     Fase 1
-Semana 2     Fase 2
-Semana 3     Fase 3
-Semana 4     Fase 4  →  DEMO  →  e-mail ao ponto focal Yelum
-Em paralelo  Cadastro no portal do desenvolvedor da Porto
-Quando       Fase 5 → 6 → 7 → 8 → 9
-a chave
-chegar
-```
-
-Fases 0–4 não dependem de ninguém. Comece hoje.
+Expor multi-K como MCP server para bot interno da corretora. Ferramentas: `cotar(ramo, dados)`, `comparar(cotacao_id)`, `transmitir(cotacao_id, plano)`.
