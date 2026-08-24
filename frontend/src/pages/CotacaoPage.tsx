@@ -136,7 +136,8 @@ const step2ImovelSchema = z.object({
   valor_imovel: z
     .string()
     .transform((v) => v.replace(/\./g, "").replace(",", "."))
-    .pipe(z.string()),
+    .pipe(z.coerce.number().positive("Valor do imóvel deve ser maior que zero"))
+    .transform(String),
 });
 
 const step3Schema = z.object({
