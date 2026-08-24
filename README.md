@@ -6,6 +6,7 @@
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat&logo=postgresql&logoColor=white" />
   <img src="https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat&logo=github-actions&logoColor=white" />
   <img src="https://img.shields.io/badge/Fases_0--4-concluídas-22c55e?style=flat" />
+  <img src="https://img.shields.io/badge/FIPE-integrado-22c55e?style=flat" />
 </p>
 
 <h1 align="center">multi-K</h1>
@@ -25,7 +26,8 @@ Sistema desenvolvido do zero para uma corretora de seguros substituir planilhas 
 | Módulo | O que faz |
 |---|---|
 | **Multicálculo async** | Fan-out para N seguradoras com fila em Postgres (SKIP LOCKED), timeout por CIA, resultado parcial exibido conforme chega |
-| **Funil de cotação** | 5 passos (Auto e Residência), autosave por passo, recotar a partir de cotação anterior |
+| **Funil de cotação** | 5 passos (Auto, Moto e Imóvel), autosave por passo, recotar a partir de cotação anterior, finalidade Uber/Táxi |
+| **Tabela FIPE integrada** | Seleção Marca → Modelo → Ano com busca inline, valor FIPE em tempo real, proxy com cache 30 dias no backend |
 | **Comparativo inline** | Tabela com todas as seguradoras, prêmio, restrições, vistoria e botão "Transmitir" por resultado |
 | **Gestão de carteira** | Clientes, apólices, parcelas, comissão prevista, renovações por janela D-30/D-45/D-60 |
 | **Dashboard por papel** | Corretor: fila de trabalho. Admin: KPIs de produção, conversão e comissão |
@@ -169,6 +171,8 @@ O CI executa automaticamente em todo push e pull request. `gitleaks` bloqueia me
 | 2 | Cotação end-to-end | ✅ concluída | — |
 | 3 | Comparativo, PDF, gestão de carteira | ✅ concluída | — |
 | 4 | Dashboard, relatórios, seed de demonstração | ✅ concluída | — |
+| — | FIPE: proxy + FipeSelector combobox | ✅ concluída | — |
+| — | UX-SEC: qualidade e segurança do funil | 🔧 em andamento | — |
 | 5 | Adapter Yelum real (Auto + Residência) | ⏳ aguardando | Credencial de homologação |
 | 6 | Paridade ≥ 99% em 200 cotações | ⏳ aguardando | Gate da Fase 5 |
 | 7 | E-Retorno (comissão recebida, sinistro) | ⏳ aguardando | Security Assessment |
@@ -188,17 +192,20 @@ backend/
     adapters/
       base.py      # PortaSeguradora (Protocol) + tipos canônicos
       fake/        # adapter de desenvolvimento com latência simulada (8–15s)
+      justos/      # adapter Justos (ramo auto) — aguarda credenciais
       yelum/       # (fase 5) — único lugar onde código Yelum é permitido
-    api/           # rotas FastAPI
-    infra/         # secrets, logging, auditoria, db, worker
+    api/           # rotas FastAPI (cotacao, proposta, fipe, home, auth…)
+    infra/         # secrets, logging, auditoria, db, worker, fipe_cache
   tests/
     test_arch.py   # isolamento arquitetural — nunca remova
 frontend/
   src/
     pages/         # CotacaoPage, ClientesPage, HistoricoPage, RelatoriosPage…
-    components/    # Layout, DemoWatermark, ui/
+    components/    # FipeSelector, Layout, DemoWatermark, ui/
+    hooks/         # useFipe, useAuth
     lib/           # api.ts (cliente HTTP), auth.ts, utils.ts
 docs/
+  roadmap.md       # visão geral, estado atual, FASE UX-SEC detalhada
   adr.md           # Architecture Decision Records
   escopo.md        # escopo, requisitos e riscos
   prompts.md       # guia de desenvolvimento por fase
