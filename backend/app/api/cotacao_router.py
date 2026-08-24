@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,11 +17,63 @@ from app.infra.models import Cotacao, CotacaoJob, EventoDB
 router = APIRouter(prefix="/cotacoes", tags=["cotacoes"])
 
 
+# ---------------------------------------------------------------------------
+# Schemas de validação de dados_risco por ramo
+# ---------------------------------------------------------------------------
+
+
+class _RiscoAutoInput(BaseModel):
+    model_config = {"extra": "allow"}
+    codigo_fipe: str = Field(min_length=1)
+    cep_pernoite: str = Field(min_length=8, max_length=9)
+    finalidade: str = Field(min_length=1)
+
+
+class _RiscoMotoInput(BaseModel):
+    model_config = {"extra": "allow"}
+    codigo_fipe: str = Field(min_length=1)
+    cep_pernoite: str = Field(min_length=8, max_length=9)
+    cilindrada: int = Field(gt=0, le=2500)
+    categoria: str = Field(min_length=1)
+    finalidade: str = Field(min_length=1)
+
+
+class _RiscoImovelInput(BaseModel):
+    model_config = {"extra": "allow"}
+    cep: str = Field(min_length=8, max_length=9)
+    tipo_imovel: str = Field(min_length=1)
+    tipo_construcao: str = Field(min_length=1)
+
+
+_RISCO_SCHEMAS: dict[str, type[BaseModel]] = {
+    "auto": _RiscoAutoInput,
+    "moto": _RiscoMotoInput,
+    "imovel": _RiscoImovelInput,
+}
+
+
 class CriarCotacaoInput(BaseModel):
     ramo: Literal["auto", "moto", "imovel"]
     dados: dict[str, Any]
     cliente_id: uuid.UUID | None = None
     versao_anterior_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _validar_dados_risco(self) -> "CriarCotacaoInput":
+        schema = _RISCO_SCHEMAS.get(self.ramo)
+        if schema:
+            schema.model_validate(self.dados)
+        inicio = self.dados.get("inicio_vigencia")
+        fim = self.dados.get("fim_vigencia")
+        if (
+            inicio
+            and fim
+            and isinstance(inicio, str)
+            and isinstance(fim, str)
+            and fim <= inicio
+        ):
+            raise ValueError("fim_vigencia deve ser posterior a inicio_vigencia")
+        return self
 
 
 class CotacaoCriadaOut(BaseModel):

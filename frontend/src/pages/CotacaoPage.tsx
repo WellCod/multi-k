@@ -135,19 +135,34 @@ const step2ImovelSchema = z.object({
   tipo_construcao: z.string().min(1, "Obrigatório"),
   valor_imovel: z
     .string()
-    .transform((v) => v.replace(/\D/g, ".").replace(",", "."))
-    .pipe(z.string()),
+    .transform((v) => v.replace(/\./g, "").replace(",", "."))
+    .pipe(z.coerce.number().positive("Valor do imóvel deve ser maior que zero"))
+    .transform(String),
 });
 
 const step3Schema = z.object({
   coberturas: z.array(z.string()).min(1, "Selecione ao menos uma cobertura"),
 });
 
-const step4Schema = z.object({
-  plano_pagamento: z.string().min(1, "Selecione o plano"),
-  inicio_vigencia: z.string().min(1, "Data de início obrigatória"),
-  fim_vigencia: z.string().min(1, "Data de fim obrigatória"),
-});
+const step4Schema = z
+  .object({
+    plano_pagamento: z.string().min(1, "Selecione o plano"),
+    inicio_vigencia: z.string().min(1, "Data de início obrigatória"),
+    fim_vigencia: z.string().min(1, "Data de fim obrigatória"),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.inicio_vigencia &&
+      data.fim_vigencia &&
+      data.fim_vigencia <= data.inicio_vigencia
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Fim da vigência deve ser posterior ao início",
+        path: ["fim_vigencia"],
+      });
+    }
+  });
 
 type Step1Data = z.infer<typeof step1Schema>;
 type Step2Data = Record<string, unknown>;
@@ -235,9 +250,24 @@ function TransmitirModal({
   );
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [comissaoErr, setComissaoErr] = useState<string | null>(null);
+
+  const handleComissaoChange = (pct: number) => {
+    if (pct < 1 || pct > 30) {
+      setComissaoErr("Comissão deve estar entre 1% e 30%");
+    } else {
+      setComissaoErr(null);
+    }
+    setComissao((pct / 100).toFixed(4));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const pct = Number(comissao) * 100;
+    if (pct < 1 || pct > 30) {
+      setComissaoErr("Comissão deve estar entre 1% e 30%");
+      return;
+    }
     setLoading(true);
     setErr(null);
     try {
@@ -285,15 +315,14 @@ function TransmitirModal({
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">Comissão (%)</label>
             <input
               type="number"
-              step="0.01"
-              min="0.01"
-              max="100"
-              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              step="0.5"
+              min="1"
+              max="30"
+              className={`w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${comissaoErr ? "border-red-500 dark:border-red-500" : "border-gray-300 dark:border-gray-600"}`}
               value={Number(comissao) * 100}
-              onChange={(e) =>
-                setComissao((Number(e.target.value) / 100).toFixed(4))
-              }
+              onChange={(e) => handleComissaoChange(Number(e.target.value))}
             />
+            {comissaoErr && <p className="text-xs text-red-600 mt-1">{comissaoErr}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">Início vigência</label>
@@ -532,6 +561,7 @@ function Step1({
 }) {
   const [searching, setSearching] = useState(false);
   const [foundCliente, setFoundCliente] = useState<Cliente | null>(null);
+  const [cpfSearchError, setCpfSearchError] = useState<string | null>(null);
 
   const {
     register,
@@ -550,6 +580,7 @@ function Step1({
     const digits = stripCPF(cpf);
     if (digits.length !== 11) return;
     setSearching(true);
+    setCpfSearchError(null);
     try {
       const results = await api.clientes.busca(digits);
       if (results.length > 0) {
@@ -563,8 +594,10 @@ function Step1({
         if (c.data_nascimento) setValue("data_nascimento", c.data_nascimento);
         if (c.sexo) setValue("sexo", c.sexo as "M" | "F");
       }
-    } catch {
-      // not found — proceed with blank form
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.status >= 500) {
+        setCpfSearchError("Falha ao buscar cliente. Preencha os dados manualmente.");
+      }
     } finally {
       setSearching(false);
     }
@@ -604,8 +637,13 @@ function Step1({
       </Field>
       {searching && <p className="text-xs text-gray-500">Buscando cliente…</p>}
       {foundCliente && (
-        <p className="text-xs text-green-700 bg-green-50 rounded px-2 py-1">
+        <p className="text-xs text-green-700 bg-green-50 dark:bg-green-900/30 dark:text-green-400 rounded px-2 py-1">
           Cliente encontrado: {foundCliente.nome}
+        </p>
+      )}
+      {cpfSearchError && (
+        <p className="text-xs text-yellow-800 bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-700 rounded px-2 py-1">
+          {cpfSearchError}
         </p>
       )}
 
@@ -613,7 +651,7 @@ function Step1({
         <Input {...register("nome")} />
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="E-mail" error={errors.email?.message}>
           <Input type="email" {...register("email")} />
         </Field>
@@ -622,7 +660,7 @@ function Step1({
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Data de nascimento" error={errors.data_nascimento?.message}>
           <Input type="date" {...register("data_nascimento")} />
         </Field>
@@ -635,7 +673,7 @@ function Step1({
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Estado civil">
           <Select {...register("estado_civil")}>
             <option value="">—</option>
@@ -804,7 +842,7 @@ function Step2Moto({
         <Input placeholder="ABC-1234 ou ABC1D23" {...register("placa")} />
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Cilindrada (cc)" error={errors.cilindrada?.message}>
           <Input type="number" placeholder="150" {...register("cilindrada")} />
         </Field>
@@ -820,7 +858,7 @@ function Step2Moto({
         </Field>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="CEP de pernoite" error={errors.cep_pernoite?.message}>
           <Input placeholder="00000-000" {...register("cep_pernoite")} />
         </Field>
@@ -885,7 +923,7 @@ function Step2Imovel({
         <Input placeholder="00000-000" {...register("cep")} />
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Tipo de imóvel" error={errors.tipo_imovel?.message}>
           <Select {...register("tipo_imovel")}>
             <option value="">—</option>
@@ -963,8 +1001,8 @@ function Step3({
               {...register("coberturas")}
               className="rounded"
             />
-            <span className="font-medium">{d.codigo}</span>
-            <span className="text-gray-500">— {d.descricao}</span>
+            <span className="font-medium">{d.descricao}</span>
+            <span className="text-gray-400 text-xs">({d.codigo})</span>
           </label>
         ))}
       </div>
@@ -991,11 +1029,15 @@ function Step4({
   defaultValues,
   onBack,
   onNext,
+  submitting,
+  serverError,
 }: {
   dominios: Dominio[];
   defaultValues?: Step4Data;
   onBack: () => void;
   onNext: (data: Step4Data) => void;
+  submitting?: boolean;
+  serverError?: string | null;
 }) {
   const planos = dominios.filter(
     (d) => d.tipo === "plano_pagamento" || d.tipo === "parcelamento",
@@ -1044,7 +1086,7 @@ function Step4({
         </Select>
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Início da vigência" error={errors.inicio_vigencia?.message}>
           <Input type="date" {...register("inicio_vigencia")} />
         </Field>
@@ -1053,11 +1095,19 @@ function Step4({
         </Field>
       </div>
 
+      {serverError && (
+        <p className="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded px-3 py-2">
+          {serverError}
+        </p>
+      )}
+
       <div className="pt-2 flex justify-between">
-        <Button type="button" variant="outline" onClick={onBack}>
+        <Button type="button" variant="outline" onClick={onBack} disabled={submitting}>
           ← Voltar
         </Button>
-        <Button type="submit">Solicitar cotação →</Button>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Enviando…" : "Solicitar cotação →"}
+        </Button>
       </div>
     </form>
   );
@@ -1157,10 +1207,17 @@ export function CotacaoPage() {
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingSecRef = useRef(0);
 
+  // Criação de cotação
+  const [criando, setCriando] = useState(false);
+  const [cotacaoErrMsg, setCotacaoErrMsg] = useState<string | null>(null);
+
   // Comparativo + proposta state
   const [itensComparativo, setItensComparativo] = useState<ItemComparativo[]>([]);
   const [proposta, setProposta] = useState<Proposta | null>(null);
   const [showTransmitir, setShowTransmitir] = useState(false);
+
+  // Recotar error
+  const [recotarError, setRecotarError] = useState<string | null>(null);
 
   const recotar = searchParams.get("recotar");
 
@@ -1177,7 +1234,9 @@ export function CotacaoPage() {
       if (cancelled) return;
       setRamo(c.ramo);
       setStep2Data(c.dados_risco as Record<string, unknown>);
-    }).catch(() => {});
+    }).catch(() => {
+      if (!cancelled) setRecotarError("Não foi possível carregar os dados da cotação anterior.");
+    });
     return () => { cancelled = true; };
   }, [recotar]);
 
@@ -1219,6 +1278,7 @@ export function CotacaoPage() {
 
   const startPolling = useCallback(
     (id: string) => {
+      stopPolling();
       const start = Date.now();
       pollingSecRef.current = 0;
       setPollingSeconds(0);
@@ -1279,8 +1339,8 @@ export function CotacaoPage() {
 
   const handleStep4 = async (data: Step4Data) => {
     setStep4Data(data);
-    setStep(5);
-    persistRascunho({ step4: data, step: 5 });
+    setCotacaoErrMsg(null);
+    persistRascunho({ step4: data });
 
     const dados: Record<string, unknown> = {
       ...(step2Data ?? {}),
@@ -1302,6 +1362,7 @@ export function CotacaoPage() {
         : {}),
     };
 
+    setCriando(true);
     try {
       const created = await api.cotacoes.create({
         ramo,
@@ -1310,11 +1371,15 @@ export function CotacaoPage() {
         versao_anterior_id: recotar ?? undefined,
       });
       setCotacaoId(created.id);
+      setStep(5);
+      persistRascunho({ step: 5 });
       startPolling(created.id);
     } catch (err) {
-      if (err instanceof ApiError) {
-        alert(err.message);
-      }
+      setCotacaoErrMsg(
+        err instanceof ApiError ? err.message : "Erro ao solicitar cotação. Tente novamente."
+      );
+    } finally {
+      setCriando(false);
     }
   };
 
@@ -1335,6 +1400,7 @@ export function CotacaoPage() {
   const handleCancel = () => {
     setPollCancelled(true);
     stopPolling();
+    clearRascunho();
   };
 
   const handleNewCotacao = () => {
@@ -1354,6 +1420,12 @@ export function CotacaoPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {recotarError && (
+        <div className="mb-4 text-sm text-yellow-800 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded px-4 py-3">
+          {recotarError}
+        </div>
+      )}
+
       {/* Seletor de ramo — só no passo 1 */}
       {step === 1 && (
         <div className="mb-6 flex gap-3">
@@ -1446,6 +1518,8 @@ export function CotacaoPage() {
             defaultValues={step4Data}
             onBack={() => setStep(3)}
             onNext={handleStep4}
+            submitting={criando}
+            serverError={cotacaoErrMsg}
           />
         )}
 

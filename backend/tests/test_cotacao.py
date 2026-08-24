@@ -13,17 +13,18 @@ from app.infra.worker import processar_job
 from app.main import app
 from tests.conftest import criar_usuario
 
+_DADOS_AUTO_BASE = {"codigo_fipe": "001004-9", "finalidade": "pessoal"}
 _RISCO_AUTO = {
     "ramo": "auto",
-    "dados": {"cep_pernoite": "13010001"},
+    "dados": {**_DADOS_AUTO_BASE, "cep_pernoite": "13010001"},
 }
 _RISCO_AUTO_ERRO = {
     "ramo": "auto",
-    "dados": {"cep_pernoite": "13010099"},
+    "dados": {**_DADOS_AUTO_BASE, "cep_pernoite": "13010099"},
 }
 _RISCO_AUTO_RESTRICAO = {
     "ramo": "auto",
-    "dados": {"cep_pernoite": "13010088"},
+    "dados": {**_DADOS_AUTO_BASE, "cep_pernoite": "13010088"},
 }
 
 
