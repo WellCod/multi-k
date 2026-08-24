@@ -209,7 +209,7 @@ class Proposta(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     cotacao_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cotacoes.id"))
     protocolo: Mapped[str] = mapped_column(String(100))
-    commissao_pct: Mapped[Decimal] = mapped_column(Numeric(5, 4))
+    comissao_pct: Mapped[Decimal] = mapped_column(Numeric(5, 4))
     plano_pagamento: Mapped[str] = mapped_column(String(20))
     n_parcelas: Mapped[int] = mapped_column(Integer)
     valor_parcela: Mapped[Decimal] = mapped_column(Numeric(12, 2))
