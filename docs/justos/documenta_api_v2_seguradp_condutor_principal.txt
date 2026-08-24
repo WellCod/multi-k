@@ -1,0 +1,467 @@
+# Documentação da API Justos (v2 — Segurado / Condutor Principal)
+
+*Última atualização: 27/05/2026*
+
+<aside>
+ℹ️
+
+Esta é a **v2** da documentação, atualizada para a separação entre **segurado (insured)** e **condutor principal (main driver)**. A versão anterior continua disponível em **Documentação da API Justos**.
+
+</aside>
+
+# **1. Visão Geral**
+
+Esta documentação destina-se a parceiros que precisam integrar com a API da Justos para autenticação e geração de cotações de seguro. Ela descreve os passos necessários para a autenticação e como fazer requisições à API.
+
+### Fluxo de integração ponta a ponta
+
+A integração segue 6 chamadas, nesta ordem:
+
+1. **Autenticar** — `POST /brokers/auth/api-token` → retorna o token de autorização (válido por **60 minutos**), usado no header `Authorization` de todas as chamadas seguintes.
+2. **Criar a cotação** — `POST /brokers/quote` → retorna o `quote_id` e as coberturas disponíveis.
+3. **Simular preço** (opcional, repetível) — `POST /brokers/quote/{quote_id}/pricing` → calcula o valor de uma combinação de coberturas **sem persistir nada**.
+4. **Selecionar coberturas** — `PUT /brokers/quote/{quote_id}/coverages` → **persiste** a cobertura escolhida e o tipo de apólice na cotação.
+5. **Gerar a proposta** — `POST /brokers/quote/convert-formal-quote` → roda as validações de risco e formaliza a cotação.
+6. **Gerar o link** — `GET /brokers/quote/{quote_id}/checkout-link` → link para o cliente finalizar a contratação.
+
+<aside>
+🔑
+
+Da etapa 2 em diante, todas as chamadas usam o **mesmo identificador da cotação**. Ele é retornado como `quote_id` (a API também o devolve como `uuid` em alguns endpoints — é o mesmo valor) e aparece nas URLs como `{quote_id}`.
+
+</aside>
+
+```mermaid
+flowchart TD
+    A["POST /brokers/auth/api-token<br>token válido por 60 min"] --> B["POST /brokers/quote<br>retorna quote_id"]
+    B --> C["POST /brokers/quote/{quote_id}/pricing<br>simula preço (read-only, repetível)"]
+    C --> D["PUT /brokers/quote/{quote_id}/coverages<br>persiste a cobertura escolhida"]
+    D --> E["POST /brokers/quote/convert-formal-quote<br>gera proposta + valida risco"]
+    E --> F["GET /brokers/quote/{quote_id}/checkout-link<br>link para o cliente"]
+```
+
+## **2. URLs da API**
+
+- **Ambiente de Produção:** `https://api.justos.com.br`
+- **Ambiente de Staging:** `https://api.staging.justos.com.br`
+
+## **3. Autenticação**
+
+### **3.1. Gerando Chaves Públicas e Privadas**
+
+1. **Geração de Chaves:** Os parceiros devem começar gerando um par de chaves pública e privada usando os comandos:
+    
+    ```bash
+    openssl ecparam -name prime256v1 -genkey -noout -out private-key.pem
+    openssl ec -in private-key.pem -pubout -out public-key.pem
+    ```
+    
+2. **Compartilhamento da Chave Pública:** A chave pública (`public-key.pem`) deve ser compartilhada conosco.
+
+### **3.2. Gerando o JWT**
+
+1. **Criação de JWT:** Com a chave privada, o parceiro deve gerar um JWT (JSON Web Token) seguindo o exemplo abaixo:
+    
+    ```jsx
+    import * as fs from 'fs';
+    import * as jwt from 'jsonwebtoken';
+    
+    const privateKey = fs.readFileSync('private-key.pem');
+    
+    const now = Math.round(Date.now() / 1000);
+    const payload = {
+      iss: '<partner_name>', // Será fornecido por nós
+      aud: 'justos',
+      iat: now,
+      exp: now + 600, // 10min
+    };
+    
+    const token = jwt.sign(payload, privateKey, { algorithm: 'ES256' });
+    console.log(token);
+    ```
+    
+
+### **3.3. Obtendo o Token de Autorização**
+
+1. **Requisição de Token de Autorização:** O JWT gerado deve ser usado para solicitar o token de autorização:
+    
+    ```bash
+    curl --location 'https://api.justos.com.br/brokers/auth/api-token' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "token": "TOKEN_GERADO",
+        "brokerId": 1,
+        "cpf_cnpj": "40317530000182"
+    }'
+    ```
+    
+    - **Esperado na Request:** JWT gerado pelo parceiro, `brokerId` (fornecido por nós) e o `cpf_cnpj` da corretora.
+    - **Retorno:** JSON contendo o token de autorização (`{ "token": "..." }`).
+
+## **4. Criando uma Cotação**
+
+### **4.1. Enviando a Requisição de Cotação**
+
+Com o token de autorização, os parceiros podem solicitar a criação de uma cotação:
+
+```bash
+curl --location 'https://api.justos.com.br/brokers/quote' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer TOKEN_RETORNADO_DA_API' \
+--data-raw '{
+    "plate": "FHL4853",
+    "chassis": "999999999999999",
+    "insured": {
+        "cpf_cnpj": "12345678910",
+        "legal_name": "Teste Da Silva",
+        "social_name": "Teste",
+        "gender": "M",
+        "birth_date": "1998-08-04",
+        "cep": "05516020"
+    },
+    "main_driver": {
+        "cpf": "98765432100",
+        "legal_name": "João Souza",
+        "social_name": "João",
+        "gender": "M",
+        "birth_date": "1990-03-12",
+        "relationship": "child"
+    },
+    "vehicle_fipe_code": "023108-8",
+    "vehicle_model_year": "2013",
+    "vehicle_overnight_cep": "05516020",
+    "vehicle_use": "personal",
+    "is_zero_km": false,
+    "under_24": true,
+    "is_insured": false,
+    "previous_bonus": "0",
+    "broker_commission_percentage": 15,
+    "insurer_code": 5886,
+    "is_auction": false
+}'
+```
+
+- **Retorno:** JSON detalhando o `quote_id` e as coberturas disponíveis com suas respectivas opções.
+
+<aside>
+👥
+
+**Segurado x Condutor principal**
+
+- **`insured` (segurado):** pode ser Pessoa Física (CPF) ou Pessoa Jurídica (CNPJ). É quem consta no bilhete e é reportado à SUSEP, e é o titular da classe de bônus (CdB).
+- **`main_driver` (condutor principal):** é quem efetivamente dirige o veículo e cujos dados são usados na precificação. Quando o segurado é o próprio condutor principal (PF), o bloco `main_driver` pode ser omitido.
+- `insured.gender` e `insured.birth_date` aplicam-se quando o segurado é PF. Para PJ, `insured.legal_name` é a razão social.
+</aside>
+
+### Descrição dos Atributos:
+
+| **Atributo** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| plate | Placa do veículo, caso o veículo não tenha placa poderá ser enviado vazio | string |
+| chassis | Chassi do veículo, indicado para quando o veículo não tem placa | string |
+| insured.cpf_cnpj | CPF ou CNPJ do segurado | string |
+| `insured.legal_name` | Nome ou razão social do segurado | string |
+| `insured.social_name` | Nome social do segurado (opcional) | string |
+| insured.gender | Gênero do segurado quando PF (M para masculino e F para feminino) | string |
+| insured.birth_date | Data de nascimento do segurado quando PF | string |
+| insured.cep | CEP do segurado | string |
+| main_driver.cpf | CPF do condutor principal. Opcional quando o segurado é o condutor principal | string |
+| `main_driver.legal_name` | Nome do condutor principal. Opcional quando o segurado é o condutor principal | string |
+| `main_driver.social_name` | Nome social do condutor principal (opcional) | string |
+| main_driver.gender | Gênero do condutor principal (M/F). Opcional quando o segurado é o condutor principal | string |
+| main_driver.birth_date | Data de nascimento do condutor principal. Opcional quando o segurado é o condutor principal | string |
+| main_driver.relationship | Relação do condutor principal com o segurado. Valores: `spouse` (cônjuge), `parent` (pai/mãe), `child` (filho), `sibling` (irmão), `employee` (empregado), `business_partner` (sócio), `other` (outros). Opcional quando o segurado é o condutor principal | string |
+| vehicle_fipe_code | Código FIPE do veículo | string |
+| vehicle_model_year | Ano do modelo do veículo | string |
+| vehicle_overnight_cep | CEP de pernoite do veículo | string |
+| vehicle_use | Uso do veículo. Valores: `personal` (particular), `commercial` (comercial), `app_driver` (motorista de aplicativo), `taxi` (táxi) | string |
+| under_24 | Indica se existe algum outro condutor menor que 24 anos | boolean |
+| is_insured | Indica se o veículo já está segurado | boolean |
+| previous_bonus | Bônus anterior (string de 0 a 10) | string |
+| broker_commission_percentage | Porcentagem de comissão do corretor (10-25) | integer |
+| insurer_code | Código da seguradora (apenas em casos de renovação, deve ser um dos valores especificados na enumeração) | integer |
+| is_zero_km | Indica se o veículo é 0km | boolean |
+| is_auction | Indica se o veículo é de leilão (opcional) | boolean |
+
+### 4.2. Consultando Seguradoras Disponíveis
+
+Para obter a lista atualizada de seguradoras disponíveis e seus respectivos códigos, utilize o seguinte endpoint:
+
+```bash
+curl --location 'https://api.justos.com.br/brokers/insurer' \
+--header 'Authorization: Bearer TOKEN_RETORNADO_DA_API'
+```
+
+Retorno:
+
+```json
+[
+    { "code": 6467, "name": "Alfa Seguradora" },
+    { "code": 5177, "name": "Allianz Seguros" },
+    { "code": 2119, "name": "Aruana" },
+    { "code": 5355, "name": "Azul Seguros" }
+]
+```
+
+Este endpoint retorna a lista completa e atualizada de seguradoras disponíveis, incluindo seus códigos e nomes. Utilize o campo `code` como valor para o parâmetro `insurer_code` na requisição de cotação quando necessário (casos de renovação).
+
+### 4.3. Interpretação da Resposta
+
+A resposta inclui detalhes como `quote_id`, `fipe_price_percentage_covered`, uma lista de `coverages_available` com opções de cobertura, preços, franquias, descrições, e mais.
+
+Exemplo de retorno:
+
+```json
+{
+  "quote_id": "UUID_DA_COTACAO",
+  "coverages_available": {},
+  "fipe_price_percentage_covered": 100,
+  "commission": 15,
+  "coverages_selected": {},
+  "price": 0,
+  "plans": []
+}
+```
+
+### **4.4. Entendendo o Retorno da Cotação**
+
+O retorno da requisição de cotação inclui, entre outros dados, o objeto `coverages_available`. Este objeto contém uma série de `peril`s, que representam situações ou ações que podem ocorrer com o usuário ou o veículo, constituindo um problema para o usuário. Cada `peril` possui um conjunto de atributos e um array de `peril_option`s, que são opções oferecidas para mitigar o perigo representado pelo `peril`.
+
+### Estrutura de `coverages_available`
+
+- **peril**: Representa um risco ou situação problemática. Cada `peril` tem os seguintes atributos:
+    
+    
+    | **Atributo** | **Descrição** | **Tipo** |
+    | --- | --- | --- |
+    | name | Nome legível do peril (em português) | string |
+    | slug | ID de fácil leitura do peril. Usado no objeto `coverages_selected` no próximo passo. Exemplos de slugs incluem: `colisao-e-desastres-naturais`, `roubo-e-furto`, entre outros | string |
+    | description | Descrição do peril (em português) | string |
+    | mandatory | Indica se uma opção de peril (peril_option) deve ser selecionada obrigatoriamente para esse peril | boolean |
+    | peril_options | Opções oferecidas para mitigar o peril. O número de `peril_options` por peril pode variar | array de `peril_option` |
+- **peril_option**: Opções oferecidas para mitigar um peril específico. Cada `peril_option` possui um conjunto de atributos:
+    
+    
+    | **Atributo** | **Descrição** | **Tipo** |
+    | --- | --- | --- |
+    | slug | Identificador da opção de peril. Usado no objeto `coverages_selected` no próximo passo | string |
+    | name | Nome legível da opção de peril (em português) | string |
+    | description | Descrição da opção de peril (em português) | string |
+    | price | Preço para contratar essa opção de peril | float |
+    | deductible | Franquia da opção de peril (se não houver franquia, será 0) | float |
+    | coverage_amount | Até qual valor a opção de peril cobre. Se for 0, significa que cobrimos 100% do preço do veículo na tabela FIPE | float |
+    | used_parts | Indica se peças usadas podem ser utilizadas para o reparo | boolean |
+
+Essa modelagem detalhada ajuda os parceiros a entenderem exatamente quais coberturas estão disponíveis, suas opções, custos associados e condições, facilitando a escolha e personalização das coberturas de seguro para seus clientes.
+
+## **5. Simulando o Valor de uma Cotação (pricing)**
+
+<aside>
+🧮
+
+**Dois endpoints parecidos, propósitos diferentes** — ambos recebem `coverages_selected`:
+
+- **Simular preço** (esta seção, `POST .../pricing`): calcula quanto custaria uma combinação de coberturas. É **read-only**, pode ser chamado quantas vezes quiser e **não altera a cotação**.
+- **Selecionar coberturas** (seção 6, `PUT .../coverages`): **persiste** a cobertura escolhida e o tipo de apólice na cotação. É o passo que trava a escolha antes de gerar a proposta.
+</aside>
+
+Após receber o retorno de uma cotação, conforme descrito na seção 4.3, os parceiros podem simular o valor da mensalidade ao selecionar uma opção de cobertura (`peril_option`) para cada risco (`peril`) disponível. Este cálculo é feito somando os preços de cada `peril_option` selecionada.
+
+### **5.1. Selecionando Opções de Cobertura**
+
+1. **Revisar as Coberturas Disponíveis:** Inicialmente, é importante revisar o objeto `coverages_available` retornado pela API para entender todas as coberturas disponíveis e suas respectivas opções.
+2. **Escolher uma Opção por Cobertura:** Para cada `peril` listado em `coverages_available`, o parceiro deve escolher uma `peril_option`. A escolha deve levar em consideração o que melhor atende às necessidades do cliente, baseando-se em fatores como preço, franquia, valor de cobertura, e se peças usadas são aceitáveis.
+
+### **5.2. Calculando o Valor da Cotação (Mensal e Anual)**
+
+Para calcular o valor da cotação, tanto mensal quanto anual, você pode usar o endpoint de pricing que retorna o preço calculado para as opções de cobertura selecionadas.
+
+**Endpoint de Pricing**
+
+```bash
+curl --location 'https://api.justos.com.br/brokers/quote/{quote_id}/pricing' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer TOKEN_RETORNADO_DA_API' \
+--data-raw '{
+  "coverages_selected": {
+    "colisao-e-desastres-naturais": "franquia-5",
+    "danos-materiais": "material-40k",
+    "incendio": "fire-partial-loss",
+    "assistencia-24h": null,
+    "roubo-e-furto": "theft-total-loss",
+    "danos-corporais": "corporal-20k",
+    "morte-e-invalidez": null,
+    "danos-morais": null,
+    "backup-car": null,
+    "assistencia-vidros": null
+  }
+}'
+```
+
+**Resposta do Endpoint**
+
+```json
+{
+  "uuid": "UUID_DA_COTACAO",
+  "monthly": {
+    "total": 450.0,
+    "installments": [
+      {
+        "amount": 450.0,
+        "months": 1,
+        "discount": 0,
+        "total_amount": 450.0,
+        "payment_method": "credit_card",
+        "discount_percentage": 0,
+        "interest_rate": 0
+      }
+    ],
+    "coverages": {
+      "colisao-e-desastres-naturais": {
+        "price": 170.07,
+        "coverage_amount": 100000.0,
+        "deductible": 11092.35,
+        "option-slug": "franquia-15",
+        "price_breakdown": {
+          "tax_iof": 11.69,
+          "gross_premium": 158.38,
+          "broker_commission": 31.67
+        }
+      }
+    }
+  },
+  "annual": {
+    "total": 5400.0,
+    "installments": [
+      {
+        "amount": 450.0,
+        "months": 12,
+        "discount": 0,
+        "total_amount": 5400.0,
+        "payment_method": "credit_card",
+        "discount_percentage": 0,
+        "interest_rate": 0
+      }
+    ],
+    "coverages": {
+      "colisao-e-desastres-naturais": {
+        "price": 2040.84,
+        "coverage_amount": 100000.0,
+        "deductible": 11092.35,
+        "option-slug": "franquia-15",
+        "price_breakdown": {
+          "tax_iof": 2040.84,
+          "gross_premium": 1900.56,
+          "broker_commission": 367.35
+        }
+      }
+    }
+  }
+}
+```
+
+Este endpoint retorna:
+
+- O valor total mensal da cotação (`monthly.total`)
+- As opções de parcelamento mensal (`monthly.installments`)
+- O valor total anual da cotação (`annual.total`)
+- As opções de parcelamento anual (`annual.installments`)
+
+Este método garante que todas as regras de negócio e cálculos sejam aplicados corretamente pelo sistema da Justos.
+
+### **5.3. Considerações Finais**
+
+- É crucial selecionar pelo menos uma `peril_option` para cada `peril` marcado como obrigatório (`mandatory: true`).
+- O valor total da mensalidade reflete o custo de todas as coberturas selecionadas e serve como base para a proposta final ao cliente.
+
+## 6. Selecionando as coberturas
+
+Diferente da simulação da seção 5, este passo **persiste** a escolha na cotação. Após mostrar todas as coberturas disponíveis, o parceiro seleciona qual cobertura quer — o grupo de peril_options que o usuário irá contratar com a Justos.
+
+**Estrutura de coverages_selected**
+
+A maneira de enviar as coberturas é usando um objeto da seguinte forma:
+
+- cada chave de propriedade é um slug de `peril` (também é a chave para esse `peril` em `coverages_available`, da etapa anterior).
+- cada valor de propriedade é o slug peril_option selecionado ou nulo se o parceiro não quiser nenhuma peril_option para esse `peril`. Apenas `perils` com `mandatory == false` podem ter nulo em `coverages_selected` (por exemplo, roubo não pode ter nulo, porque em `coverages_available` ele tem `mandatory: true`)
+- O atributo `policy_type` nesse endpoint é opcional, ele pode ser utilizado para salvar a cotação como `annual` ou `monthly` para quando a cotação for aberta no portal já aparecer no valor certo. Por padrão atualmente ele irá salvar como `monthly` caso o valor não for informado
+
+Exemplo:
+
+```bash
+curl --location --request PUT 'https://api.justos.com.br/brokers/quote/{quote_id}/coverages' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer TOKEN_RETORNADO_DA_API' \
+--data-raw '{
+	"coverages_selected": {
+		"colisao-e-desastres-naturais": "franquia-5",
+		"danos-materiais": "material-40k",
+		"incendio": "fire-partial-loss",
+		"assistencia-24h": null,
+		"roubo-e-furto": "theft-total-loss",
+		"danos-corporais": "corporal-20k",
+		"morte-e-invalidez": null,
+		"danos-morais": null,
+		"backup-car": null,
+		"assistencia-vidros": null
+	},
+	"policy_type": "monthly"
+}'
+```
+
+## 7. Gerando uma proposta
+
+Este passo é crucial no processo de contratação do seguro, pois realiza uma série de validações de risco importantes antes de prosseguir com a contratação formal da apólice. A API verificará se existem restrições associadas ao veículo ou ao segurado. Uma resposta positiva neste passo permite que o processo continue para a etapa de contratação efetiva do seguro.
+
+**Corpo da Requisição (Request Body)**
+
+- quote_uuid: ID único da cotação a ser convertida.
+- email: Endereço de e-mail do segurado.
+- given_phone_number: Número de celular do segurado.
+- scheduling_date: caso o corretor queira programar o início de vigência para uma data futura
+- installments: o número de parcelas (obrigatório no caso de seguro anual)
+- policy_type: monthly ou annual (por padrão é monthly)
+- ci_code: código ci da apólice anterior (obrigatório nos casos de renovação)
+
+Exemplo de requisição
+
+```bash
+curl --location 'https://api.justos.com.br/brokers/quote/convert-formal-quote' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer TOKEN_RETORNADO_DA_API' \
+--data-raw '{
+    "quote_uuid": "id-unico-da-cotacao",
+    "email": "EMAIL DO SEGURADO",
+    "given_phone_number": "CELULAR DO SEGURADO",
+    "scheduling_date": null,
+    "policy_type": "annual"
+}'
+```
+
+## **8. Link para compartilhar com o cliente**
+
+Essa é a última etapa! Agora será necessário gerar o link que será compartilhado com o cliente final para finalizar a contratação.
+
+Exemplo de requisição
+
+```bash
+curl --location 'https://api.justos.com.br/brokers/quote/{quote_id}/checkout-link'
+```
+
+### A resposta desse endpoint é a seguinte:
+
+| **Atributo** | **Descrição** | **Tipo** |
+| --- | --- | --- |
+| app_download_url | Um deep link para fazer o download do aplicativo e finalizar a contratação por lá | string |
+| checkout_url | Um link para fazer a contratação pelo site da Justos | string |
+
+Nós recomendamos sempre compartilhar o app_download_url para que o cliente possa fazer a contratação direto pelo app, mas caso queira você também pode redirecionar o cliente direto para o site da Justos.
+
+## **9. Considerações Finais**
+
+- O `brokerID` e o `iss` são fornecidos após o parceiro compartilhar a chave pública.
+- Utilize o ambiente de staging para desenvolvimento e testes antes de mover para produção.
+
+---
+
+Esta documentação busca facilitar a integração dos parceiros com a API da Justos, oferecendo uma descrição passo a passo do processo de autenticação e como solicitar cotações. Para dúvidas adicionais ou suporte, entre em contato conosco.
