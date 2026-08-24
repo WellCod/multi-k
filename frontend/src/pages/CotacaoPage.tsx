@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Tooltip } from "@/components/Tooltip";
 import { stripCPF } from "@/lib/utils";
+import FipeSelector, { type FipeResult } from "@/components/FipeSelector";
 
 const STORAGE_KEY = "mk_cotacao_rascunho";
 const POLL_INTERVAL_MS = 2000;
@@ -76,17 +77,13 @@ const step2AutoSchema = z.object({
     .string()
     .transform((v) => v.replace(/\D/g, ""))
     .pipe(z.string().length(8, "CEP deve ter 8 dígitos")),
-  marca: z.string().min(1, "Obrigatório"),
-  modelo: z.string().min(1, "Obrigatório"),
-  ano_fabricacao: z
-    .string()
-    .transform(Number)
-    .pipe(z.number().int().min(1900).max(2100)),
-  ano_modelo: z
-    .string()
-    .transform(Number)
-    .pipe(z.number().int().min(1900).max(2100)),
-  combustivel: z.string().min(1, "Obrigatório"),
+  codigo_fipe: z.string().min(1, "Selecione o veículo na tabela FIPE"),
+  placa: z.string().optional(),
+  marca: z.string().optional(),
+  modelo: z.string().optional(),
+  ano_modelo: z.string().optional(),
+  combustivel: z.string().optional(),
+  valor_fipe: z.string().optional(),
   finalidade: z.string().min(1, "Obrigatório"),
   blindado: z.boolean().optional(),
   garagem: z.boolean().optional(),
@@ -97,22 +94,18 @@ const step2MotoSchema = z.object({
     .string()
     .transform((v) => v.replace(/\D/g, ""))
     .pipe(z.string().length(8, "CEP deve ter 8 dígitos")),
-  marca: z.string().min(1, "Obrigatório"),
-  modelo: z.string().min(1, "Obrigatório"),
-  ano_fabricacao: z
-    .string()
-    .transform(Number)
-    .pipe(z.number().int().min(1900).max(2100)),
-  ano_modelo: z
-    .string()
-    .transform(Number)
-    .pipe(z.number().int().min(1900).max(2100)),
+  codigo_fipe: z.string().min(1, "Selecione o veículo na tabela FIPE"),
+  placa: z.string().optional(),
+  marca: z.string().optional(),
+  modelo: z.string().optional(),
+  ano_modelo: z.string().optional(),
+  combustivel: z.string().optional(),
+  valor_fipe: z.string().optional(),
   cilindrada: z
     .string()
     .transform(Number)
     .pipe(z.number().int().min(50).max(2500)),
   categoria: z.string().min(1, "Obrigatório"),
-  combustivel: z.string().min(1, "Obrigatório"),
   finalidade: z.string().min(1, "Obrigatório"),
   garagem: z.boolean().optional(),
 });
@@ -685,64 +678,55 @@ function Step2Auto({
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<z.infer<typeof step2AutoSchema>>({
     resolver: zodResolver(step2AutoSchema),
     defaultValues: defaultValues as z.infer<typeof step2AutoSchema>,
   });
 
+  function handleFipe(fipe: FipeResult) {
+    setValue("codigo_fipe", fipe.codigo_fipe, { shouldValidate: true });
+    setValue("marca", fipe.marca);
+    setValue("modelo", fipe.modelo);
+    setValue("ano_modelo", fipe.ano_modelo);
+    setValue("combustivel", fipe.combustivel);
+    setValue("valor_fipe", fipe.valor_fipe);
+  }
+
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Marca" error={errors.marca?.message}>
-          <Input {...register("marca")} />
-        </Field>
-        <Field label="Modelo" error={errors.modelo?.message}>
-          <Input {...register("modelo")} />
-        </Field>
-      </div>
+      <FipeSelector
+        tipo="carros"
+        onChange={handleFipe}
+        error={errors.codigo_fipe?.message}
+      />
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Ano fabricação" error={errors.ano_fabricacao?.message}>
-          <Input type="number" {...register("ano_fabricacao")} />
-        </Field>
-        <Field label="Ano modelo" error={errors.ano_modelo?.message}>
-          <Input type="number" {...register("ano_modelo")} />
-        </Field>
-      </div>
+      <Field label="Placa (opcional)" error={undefined}>
+        <Input
+          placeholder="ABC-1234 ou ABC1D23"
+          {...register("placa")}
+        />
+      </Field>
 
       <Field label="CEP de pernoite" error={errors.cep_pernoite?.message}>
         <Input placeholder="00000-000" {...register("cep_pernoite")} />
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Combustível" error={errors.combustivel?.message}>
-          <Select {...register("combustivel")}>
-            <option value="">—</option>
-            {["gasolina", "etanol", "flex", "diesel", "eletrico", "gnv"].map(
-              (c) => (
-                <option key={c} value={c}>
-                  {c.charAt(0).toUpperCase() + c.slice(1)}
-                </option>
-              ),
-            )}
-          </Select>
-        </Field>
-        <Field label="Finalidade" error={errors.finalidade?.message}>
-          <Select {...register("finalidade")}>
-            <option value="">—</option>
-            <option value="pessoal">Pessoal</option>
-            <option value="comercial">Comercial</option>
-          </Select>
-        </Field>
-      </div>
+      <Field label="Finalidade" error={errors.finalidade?.message}>
+        <Select {...register("finalidade")}>
+          <option value="">—</option>
+          <option value="pessoal">Pessoal</option>
+          <option value="comercial">Comercial</option>
+        </Select>
+      </Field>
 
       <div className="flex gap-4">
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input type="checkbox" {...register("blindado")} />
           Blindado
         </label>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input type="checkbox" {...register("garagem")} />
           Tem garagem
         </label>
@@ -774,36 +758,38 @@ function Step2Moto({
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<z.infer<typeof step2MotoSchema>>({
     resolver: zodResolver(step2MotoSchema),
     defaultValues: defaultValues as z.infer<typeof step2MotoSchema>,
   });
 
+  function handleFipe(fipe: FipeResult) {
+    setValue("codigo_fipe", fipe.codigo_fipe, { shouldValidate: true });
+    setValue("marca", fipe.marca);
+    setValue("modelo", fipe.modelo);
+    setValue("ano_modelo", fipe.ano_modelo);
+    setValue("combustivel", fipe.combustivel);
+    setValue("valor_fipe", fipe.valor_fipe);
+  }
+
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Marca" error={errors.marca?.message}>
-          <Input {...register("marca")} />
-        </Field>
-        <Field label="Modelo" error={errors.modelo?.message}>
-          <Input {...register("modelo")} />
-        </Field>
-      </div>
+      <FipeSelector
+        tipo="motos"
+        onChange={handleFipe}
+        error={errors.codigo_fipe?.message}
+      />
 
-      <div className="grid grid-cols-3 gap-4">
-        <Field label="Ano fabricação" error={errors.ano_fabricacao?.message}>
-          <Input type="number" {...register("ano_fabricacao")} />
-        </Field>
-        <Field label="Ano modelo" error={errors.ano_modelo?.message}>
-          <Input type="number" {...register("ano_modelo")} />
-        </Field>
+      <Field label="Placa (opcional)" error={undefined}>
+        <Input placeholder="ABC-1234 ou ABC1D23" {...register("placa")} />
+      </Field>
+
+      <div className="grid grid-cols-2 gap-4">
         <Field label="Cilindrada (cc)" error={errors.cilindrada?.message}>
           <Input type="number" placeholder="150" {...register("cilindrada")} />
         </Field>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <Field label="Categoria" error={errors.categoria?.message}>
           <Select {...register("categoria")}>
             <option value="">—</option>
@@ -812,14 +798,6 @@ function Step2Moto({
             <option value="trail">Trail / Adventure</option>
             <option value="custom">Custom / Touring</option>
             <option value="scooter">Scooter</option>
-          </Select>
-        </Field>
-        <Field label="Combustível" error={errors.combustivel?.message}>
-          <Select {...register("combustivel")}>
-            <option value="">—</option>
-            <option value="gasolina">Gasolina</option>
-            <option value="flex">Flex</option>
-            <option value="eletrico">Elétrico</option>
           </Select>
         </Field>
       </div>
