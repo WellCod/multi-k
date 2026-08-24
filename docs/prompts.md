@@ -13,6 +13,112 @@ Um prompt por fase. Cole inteiro no assistente junto com `docs/escopo.md` e `doc
 ## FASE 2 — Cotação end-to-end ✅ concluída
 ## FASE 3 — Comparativo, PDF, gestão ✅ concluída
 ## FASE 4 — Dashboard, relatórios, seed ✅ concluída
+## FASE JUSTOS — Adapter Justos ✅ concluído (aguarda credenciais)
+
+---
+
+## FASE FIPE — Integração Tabela FIPE
+
+**Objetivo:** substituir campos manuais de veículo (marca/modelo/ano digitados)
+por seleção assistida via tabela FIPE oficial, com cache no backend para
+escalar sem depender do rate limit de APIs externas.
+
+**Por que agora:** o adapter Justos exige `codigo_fipe` obrigatório. Sem FIPE
+no form, nenhuma cotação Justos funciona em produção.
+
+### 1. BACKEND — proxy + cache
+
+Crie `backend/app/api/fipe_router.py` com 4 rotas:
+
+```
+GET /fipe/marcas?tipo=carros|motos
+GET /fipe/modelos?tipo=carros&marca_id={codigo}
+GET /fipe/anos?tipo=carros&marca_id={codigo}&modelo_id={codigo}
+GET /fipe/preco?tipo=carros&marca_id={m}&modelo_id={m}&ano_id={a}
+```
+
+Cache em memória com TTL de 30 dias (FIPE atualiza mensalmente).
+Fonte primária: BrasilAPI (`https://brasilapi.com.br/api/fipe/`).
+Fallback: Parallelum (`https://parallelum.com.br/fipe/api/v1/`).
+
+Não exige autenticação para chamar — rotas públicas dentro do `/api`.
+Retorno sempre serializado como JSON limpo, sem expor campos desnecessários.
+
+Estrutura de cache em memória:
+
+```python
+# infra/fipe_cache.py
+@dataclass
+class _Entry:
+    data: list[dict[str, str]]
+    expira_em: float  # monotonic
+
+_cache: dict[str, _Entry] = {}
+TTL = 30 * 24 * 3600  # 30 dias
+```
+
+### 2. FRONTEND — componente FipeSelector
+
+Crie `frontend/src/hooks/useFipe.ts`:
+- `useFipeMarcas(tipo)` — carrega marcas ao montar
+- `useFipeModelos(tipo, marcaId)` — carrega quando marcaId muda
+- `useFipeAnos(tipo, marcaId, modeloId)` — carrega quando modeloId muda
+- `useFipePreco(tipo, marcaId, modeloId, anoId)` — retorna codigo_fipe + valor
+
+Crie `frontend/src/components/FipeSelector.tsx`:
+- Selects em cascata: Marca → Modelo → Ano
+- Ao selecionar Ano: exibe `codigo_fipe` (read-only) e `Valor FIPE` formatado em R$
+- Loading state em cada select (disabled + spinner)
+- Dark mode correto
+- Props: `tipo: "carros" | "motos"`, `onChange(fipe: FipeResult)`
+
+Atualize `CotacaoPage.tsx`:
+- Step 2 Auto: substitui campos `marca`, `modelo`, `ano_fabricacao`, `ano_modelo` pelo `FipeSelector`
+- Step 2 Moto: idem com `tipo="motos"`
+- Adicionar campo `placa` (opcional, string livre, máscara ABC-1234 / ABC1D23)
+- `codigo_fipe` e `valor_fipe` entram no `dados_risco` enviado ao backend
+- Manter `cep_pernoite`, `finalidade`, `blindado`, `garagem` como estão
+
+Atualize os schemas Zod (step2AutoSchema, step2MotoSchema):
+- Adicionar `codigo_fipe: z.string().min(1)`
+- Adicionar `placa: z.string().optional()`
+- Remover `marca`, `modelo` como campos livres (viram read-only preenchidos pelo selector)
+
+### 3. UX — diretrizes
+
+- Select de Marca vem com input de busca/filtro (há ~60 marcas de carros)
+- Selects dependentes ficam disabled até o anterior ser preenchido
+- Valor FIPE exibido em destaque perto do selector: "Valor FIPE: R$ 48.000"
+- Erro de API externa mostra mensagem amigável + opção de digitar manualmente
+- Skeleton loader enquanto carrega, não spinner mudo
+
+### 4. Schemas de dados
+
+Após a FIPE, `dados_risco` de uma cotação auto terá:
+```json
+{
+  "ramo": "auto",
+  "codigo_fipe": "004090-4",
+  "placa": "ABC1D23",
+  "cep_pernoite": "13013001",
+  "finalidade": "lazer",
+  "blindado": false,
+  "garagem": true,
+  "cpf": "...",
+  "nome": "...",
+  "sexo": "M",
+  "data_nascimento": "1990-01-15",
+  "ano_modelo": 2023,
+  "valor_fipe": "48000.00"
+}
+```
+
+**PRONTO QUANDO:** usuário seleciona Marca → Modelo → Ano e o formulário
+preenche `codigo_fipe` automaticamente. Cotação enviada ao backend inclui
+`codigo_fipe` no `dados_risco`. `make check` continua passando.
+
+**NÃO FAÇA:** autenticar o endpoint FIPE, criar tabela no banco para o cache
+(memória é suficiente no MVP), mudar nada nos adapters de seguradora.
 
 ---
 
