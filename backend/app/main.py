@@ -1,4 +1,4 @@
-"""Ponto de entrada da aplicação FastAPI."""
+﻿"""Ponto de entrada da aplicaÃ§Ã£o FastAPI."""
 
 import asyncio
 import contextlib
@@ -51,7 +51,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="multi-K API",
-    description="Multicálculo e gestão de seguros",
+    description="MulticÃ¡lculo e gestÃ£o de seguros",
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -107,3 +107,4 @@ app.include_router(dominio_router)
 app.include_router(home_router)
 app.include_router(relatorio_router)
 app.include_router(fipe_router)
+
