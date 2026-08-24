@@ -120,14 +120,15 @@ async def preco(
     except Exception as exc:
         raise HTTPException(502, f"FIPE indisponível: {exc}") from exc
 
+    # Parallelum usa PascalCase: CodigoFipe, Valor, Marca, Modelo, AnoModelo, etc.
     result = {
-        "codigo_fipe": str(item.get("codigoFipe", "")),
-        "marca": str(item.get("marca", "")),
-        "modelo": str(item.get("modelo", item.get("name", ""))),
-        "ano_modelo": str(item.get("anoModelo", "")),
-        "combustivel": str(item.get("combustivel", item.get("fuel", ""))),
-        "valor": str(item.get("valor", item.get("price", ""))),
-        "mes_referencia": str(item.get("mesReferencia", "")),
+        "codigo_fipe": str(item.get("CodigoFipe", "")),
+        "marca": str(item.get("Marca", "")),
+        "modelo": str(item.get("Modelo", "")),
+        "ano_modelo": str(item.get("AnoModelo", "")),
+        "combustivel": str(item.get("Combustivel", "")),
+        "valor": str(item.get("Valor", "")),
+        "mes_referencia": str(item.get("MesReferencia", "")),
     }
 
     fipe_cache.set(chave, [result])
