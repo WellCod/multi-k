@@ -66,7 +66,23 @@ const step1Schema = z.object({
     .pipe(z.string().length(11, "CPF deve ter 11 dígitos")),
   email: z.string().email("E-mail inválido").optional().or(z.literal("")),
   telefone: z.string().optional(),
-  data_nascimento: z.string().optional(),
+  data_nascimento: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val) return true;
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return false;
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        if (d > hoje) return false;
+        const minDate = new Date();
+        minDate.setFullYear(minDate.getFullYear() - 100);
+        return d >= minDate;
+      },
+      { message: "Data inválida (deve ser entre hoje e 100 anos atrás)" }
+    ),
   sexo: z.enum(["M", "F", ""]).optional(),
   estado_civil: z.string().optional(),
   profissao: z.string().optional(),
@@ -607,7 +623,7 @@ function Step1({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Data de nascimento">
+        <Field label="Data de nascimento" error={errors.data_nascimento?.message}>
           <Input type="date" {...register("data_nascimento")} />
         </Field>
         <Field label="Sexo">
@@ -716,8 +732,10 @@ function Step2Auto({
       <Field label="Finalidade" error={errors.finalidade?.message}>
         <Select {...register("finalidade")}>
           <option value="">—</option>
-          <option value="pessoal">Pessoal</option>
+          <option value="pessoal">Pessoal / Lazer</option>
           <option value="comercial">Comercial</option>
+          <option value="app">Uber / App de transporte</option>
+          <option value="taxi">Táxi</option>
         </Select>
       </Field>
 
@@ -809,8 +827,10 @@ function Step2Moto({
         <Field label="Finalidade" error={errors.finalidade?.message}>
           <Select {...register("finalidade")}>
             <option value="">—</option>
-            <option value="pessoal">Pessoal</option>
+            <option value="pessoal">Pessoal / Lazer</option>
             <option value="comercial">Comercial / Delivery</option>
+            <option value="app">Uber / App de transporte</option>
+            <option value="taxi">Táxi</option>
           </Select>
         </Field>
       </div>

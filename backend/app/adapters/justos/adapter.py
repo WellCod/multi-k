@@ -74,6 +74,7 @@ def _mapear_finalidade(finalidade: str) -> str:
         "commercial": "commercial",
         "app": "app_driver",
         "app_driver": "app_driver",
+        "uber": "app_driver",
         "taxi": "taxi",
     }
     return mapa.get(finalidade.lower(), "personal")
