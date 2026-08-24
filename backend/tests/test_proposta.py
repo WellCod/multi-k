@@ -17,7 +17,14 @@ from app.infra.worker import processar_job
 from app.main import app
 from tests.conftest import criar_usuario
 
-_RISCO_AUTO = {"ramo": "auto", "dados": {"cep_pernoite": "13010001", "codigo_fipe": "001004-9", "finalidade": "pessoal"}}
+_RISCO_AUTO = {
+    "ramo": "auto",
+    "dados": {
+        "cep_pernoite": "13010001",
+        "codigo_fipe": "001004-9",
+        "finalidade": "pessoal",
+    },
+}
 
 _TRANSMITIR_BODY = {
     "plano_pagamento": "AVISTA",

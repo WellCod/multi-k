@@ -63,6 +63,16 @@ class CriarCotacaoInput(BaseModel):
         schema = _RISCO_SCHEMAS.get(self.ramo)
         if schema:
             schema.model_validate(self.dados)
+        inicio = self.dados.get("inicio_vigencia")
+        fim = self.dados.get("fim_vigencia")
+        if (
+            inicio
+            and fim
+            and isinstance(inicio, str)
+            and isinstance(fim, str)
+            and fim <= inicio
+        ):
+            raise ValueError("fim_vigencia deve ser posterior a inicio_vigencia")
         return self
 
 
