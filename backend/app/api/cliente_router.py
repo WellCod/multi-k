@@ -4,11 +4,12 @@ import uuid
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api._utils import get_or_404
 from app.api.deps import CurrentUser
 from app.infra import audit
 from app.infra.cpf import cpf_para_idx
@@ -158,22 +159,14 @@ def _imovel_out(i: Imovel) -> ImovelOut:
 
 
 async def _get_cliente_ou_404(
-    cliente_id: uuid.UUID,
-    usuario_id: uuid.UUID,
-    db: AsyncSession,
+    cliente_id: uuid.UUID, usuario_id: uuid.UUID, db: AsyncSession
 ) -> Cliente:
-    result = await db.execute(
+    stmt = (
         select(Cliente)
         .where(Cliente.id == cliente_id)
         .where(Cliente.usuario_id == usuario_id)
     )
-    c = result.scalar_one_or_none()
-    if c is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cliente não encontrado.",
-        )
-    return c
+    return await get_or_404(stmt, db, "Cliente não encontrado.")
 
 
 # ---------------------------------------------------------------------------
