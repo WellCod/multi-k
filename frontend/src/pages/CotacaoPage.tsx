@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Tooltip } from "@/components/Tooltip";
-import { stripCPF } from "@/lib/utils";
+import { formatBRL, stripCPF } from "@/lib/utils";
 import FipeSelector, { type FipeResult } from "@/components/FipeSelector";
 
 const STORAGE_KEY = "mk_cotacao_rascunho";
@@ -168,15 +168,6 @@ type Step1Data = z.infer<typeof step1Schema>;
 type Step2Data = Record<string, unknown>;
 type Step3Data = z.infer<typeof step3Schema>;
 type Step4Data = z.infer<typeof step4Schema>;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function fmtReal(v: string | null) {
-  if (!v) return "—";
-  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 
 // ---------------------------------------------------------------------------
 // Loading panel (polling)
@@ -402,7 +393,7 @@ function ComparativoInline({
           <span className="font-mono font-semibold">{proposta.protocolo}</span>
         </p>
         <p className="text-sm text-green-700 dark:text-green-400">
-          {proposta.n_parcelas}× de {fmtReal(proposta.valor_parcela)}
+          {proposta.n_parcelas}× de {formatBRL(proposta.valor_parcela)}
         </p>
         {cotacao.cliente_id && (
           <Button
@@ -473,7 +464,7 @@ function ComparativoInline({
               {itens.map((item, i) => (
                 <tr key={i} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-3 font-semibold uppercase">{item.cia}</td>
-                  <td className="px-4 py-3 font-mono">{fmtReal(item.premio_total)}</td>
+                  <td className="px-4 py-3 font-mono">{formatBRL(item.premio_total)}</td>
                   <td className="px-4 py-3">
                     {item.restricoes.length === 0 ? (
                       <span className="text-gray-400">—</span>
