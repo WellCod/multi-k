@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, type Cliente, type TimelineItem } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { formatBRL } from "@/lib/utils";
 
 function fmtData(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", {
@@ -11,11 +12,6 @@ function fmtData(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function fmtReal(v: string | null | undefined) {
-  if (!v) return "—";
-  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 const TIPO_CONFIG: Record<string, { label: string; dot: string }> = {
@@ -40,14 +36,14 @@ function TimelineCard({ item }: { item: TimelineItem }) {
           {item.tipo === "cotacao.criada" && (
             <>
               <p>Ramo: <span className="font-medium text-gray-800 dark:text-gray-200">{String(item.dados.ramo)}</span></p>
-              <p>Prêmio: <span className="font-medium text-gray-800 dark:text-gray-200">{fmtReal(item.dados.premio_total as string | null)}</span></p>
+              <p>Prêmio: <span className="font-medium text-gray-800 dark:text-gray-200">{formatBRL(item.dados.premio_total as string | null)}</span></p>
               <p>Status: <span className="font-medium text-gray-800 dark:text-gray-200">{String(item.dados.status)}</span></p>
             </>
           )}
           {item.tipo === "proposta.transmitida" && (
             <>
               <p>Protocolo: <span className="font-mono font-medium text-gray-800 dark:text-gray-200">{String(item.dados.protocolo)}</span></p>
-              <p>Parcelas: <span className="font-medium text-gray-800 dark:text-gray-200">{Number(item.dados.n_parcelas)}× de {fmtReal(item.dados.valor_parcela as string)}</span></p>
+              <p>Parcelas: <span className="font-medium text-gray-800 dark:text-gray-200">{Number(item.dados.n_parcelas)}× de {formatBRL(item.dados.valor_parcela as string)}</span></p>
             </>
           )}
         </div>

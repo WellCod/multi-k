@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Renovacao } from "@/lib/api";
 import { Tooltip } from "@/components/Tooltip";
+import { formatBRL, formatDate } from "@/lib/utils";
 
 const JANELA_CONFIG = {
   D30: { label: "≤ 30 dias", color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-700" },
@@ -92,14 +93,6 @@ const MOCK_RENOVACOES: Renovacao[] = [
   },
 ];
 
-function fmtReal(v: string | null) {
-  if (!v) return "—";
-  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function fmtDate(dt: string) {
-  return new Date(dt + "T12:00:00").toLocaleDateString("pt-BR");
-}
 
 function JanelaBadge({ janela }: { janela: "D30" | "D45" | "D60" }) {
   const cfg = JANELA_CONFIG[janela];
@@ -180,8 +173,8 @@ export function RenovacaoPage() {
                         {r.protocolo}
                       </td>
                       <td className="px-4 py-3 capitalize text-gray-900 dark:text-white">{r.ramo}</td>
-                      <td className="px-4 py-3 text-gray-900 dark:text-white">{fmtReal(r.premio_total)}</td>
-                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{fmtDate(r.fim_vigencia)}</td>
+                      <td className="px-4 py-3 text-gray-900 dark:text-white">{formatBRL(r.premio_total)}</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{formatDate(r.fim_vigencia)}</td>
                       <td className="px-4 py-3 font-semibold text-center">
                         <span
                           className={
