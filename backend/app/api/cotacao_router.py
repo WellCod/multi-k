@@ -4,11 +4,12 @@ import uuid
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api._utils import get_or_404
 from app.api.deps import CurrentUser
 from app.infra import audit
 from app.infra.db import get_db
@@ -119,22 +120,14 @@ def _cotacao_out(c: Cotacao) -> CotacaoOut:
 
 
 async def _get_cotacao_ou_404(
-    cotacao_id: uuid.UUID,
-    usuario_id: uuid.UUID,
-    db: AsyncSession,
+    cotacao_id: uuid.UUID, usuario_id: uuid.UUID, db: AsyncSession
 ) -> Cotacao:
-    result = await db.execute(
+    stmt = (
         select(Cotacao)
         .where(Cotacao.id == cotacao_id)
         .where(Cotacao.usuario_id == usuario_id)
     )
-    c = result.scalar_one_or_none()
-    if c is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cotação não encontrada.",
-        )
-    return c
+    return await get_or_404(stmt, db, "Cotação não encontrada.")
 
 
 @router.post("", response_model=CotacaoCriadaOut, status_code=202)

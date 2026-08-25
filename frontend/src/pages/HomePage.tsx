@@ -12,25 +12,8 @@ import {
   type KpiCorretor,
   type KpiRamo,
 } from "@/lib/api";
+import { formatBRL, formatDate, formatDatetime } from "@/lib/utils";
 import { Tooltip } from "@/components/Tooltip";
-
-function fmtReal(v: string | null | undefined) {
-  if (!v) return "—";
-  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function fmtDate(d: string) {
-  return new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
-}
-
-function fmtDatetime(d: string) {
-  return new Date(d).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Corretor — seções da fila de trabalho
@@ -66,8 +49,8 @@ function SecaoRenovacoes({ items }: { items: ItemRenovacaoHome[] }) {
                   {r.protocolo}
                 </td>
                 <td className="px-3 py-2 capitalize text-gray-900 dark:text-white">{r.ramo}</td>
-                <td className="px-3 py-2 text-gray-900 dark:text-white">{fmtReal(r.premio_total)}</td>
-                <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{fmtDate(r.fim_vigencia)}</td>
+                <td className="px-3 py-2 text-gray-900 dark:text-white">{formatBRL(r.premio_total)}</td>
+                <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{formatDate(r.fim_vigencia)}</td>
                 <td className="px-3 py-2 font-semibold text-center">
                   <span
                     className={
@@ -116,10 +99,10 @@ function SecaoPropostasParadas({ items }: { items: ItemPropostaParada[] }) {
           >
             <div>
               <span className="capitalize font-medium text-gray-900 dark:text-white">{p.ramo}</span>
-              <span className="text-gray-400 dark:text-gray-500 text-xs ml-2">{fmtDatetime(p.criado_em)}</span>
+              <span className="text-gray-400 dark:text-gray-500 text-xs ml-2">{formatDatetime(p.criado_em)}</span>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-gray-700 dark:text-gray-300">{fmtReal(p.premio_total)}</span>
+              <span className="text-gray-700 dark:text-gray-300">{formatBRL(p.premio_total)}</span>
               <button
                 className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                 onClick={() => navigate(`/cotacoes/${p.cotacao_id}/comparativo`)}
@@ -150,7 +133,7 @@ function SecaoCotacoesAbandonadas({ items }: { items: ItemCotacaoAbandonada[] })
           >
             <div>
               <span className="capitalize font-medium text-gray-900 dark:text-white">{c.ramo}</span>
-              <span className="text-gray-400 dark:text-gray-500 text-xs ml-2">{fmtDatetime(c.criado_em)}</span>
+              <span className="text-gray-400 dark:text-gray-500 text-xs ml-2">{formatDatetime(c.criado_em)}</span>
             </div>
             <Tooltip text="Retoma esta cotação incompleta para enviar à seguradora" position="top">
               <button
@@ -195,9 +178,9 @@ function SecaoParcelasVencendo({ items }: { items: ItemParcelaVencendo[] }) {
                   {p.protocolo}
                 </td>
                 <td className="px-3 py-2 text-gray-900 dark:text-white">{p.numero_parcela}ª</td>
-                <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{fmtDate(p.vencimento)}</td>
-                <td className="px-3 py-2 text-gray-900 dark:text-white">{fmtReal(p.valor)}</td>
-                <td className="px-3 py-2 text-green-700 dark:text-green-400">{fmtReal(p.comissao)}</td>
+                <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{formatDate(p.vencimento)}</td>
+                <td className="px-3 py-2 text-gray-900 dark:text-white">{formatBRL(p.valor)}</td>
+                <td className="px-3 py-2 text-green-700 dark:text-green-400">{formatBRL(p.comissao)}</td>
               </tr>
             ))}
           </tbody>
@@ -324,9 +307,9 @@ function HomeAdmin() {
         <KpiCard label="Segurados vigentes" value={data.segurados_vigentes} />
         <KpiCard label="Apólices vigentes" value={data.apolices_vigentes} />
         <KpiCard label="Cotações em andamento" value={data.cotacoes_em_andamento} />
-        <KpiCard label="Prêmio líquido" value={fmtReal(data.premio_liquido)} />
-        <KpiCard label="Comissão produzida" value={fmtReal(data.comissao_produzida)} />
-        <KpiCard label="Comissão recebida" value={fmtReal(data.comissao_recebida)} />
+        <KpiCard label="Prêmio líquido" value={formatBRL(data.premio_liquido)} />
+        <KpiCard label="Comissão produzida" value={formatBRL(data.comissao_produzida)} />
+        <KpiCard label="Comissão recebida" value={formatBRL(data.comissao_recebida)} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
