@@ -3,13 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api, type ItemComparativo, type Proposta, type Cotacao } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
+import { formatBRL } from "@/lib/utils";
 
 const PARCELAMENTOS = ["AVISTA", "2X", "3X", "6X", "10X"];
-
-function fmtReal(v: string | null) {
-  if (!v) return "—";
-  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 
 interface TransmitirModalProps {
   cotacaoId: string;
@@ -158,8 +154,8 @@ export function ComparativoPage() {
             Protocolo: <span className="font-mono font-semibold">{proposta.protocolo}</span>
           </p>
           <p className="text-sm text-green-700 dark:text-green-400">
-            {proposta.n_parcelas}× de {fmtReal(proposta.valor_parcela)} &nbsp;|&nbsp;
-            Comissão: {fmtReal(proposta.comissao_parcela)}/parcela
+            {proposta.n_parcelas}× de {formatBRL(proposta.valor_parcela)} &nbsp;|&nbsp;
+            Comissão: {formatBRL(proposta.comissao_parcela)}/parcela
           </p>
           <Button
             className="mt-3"
@@ -198,7 +194,7 @@ export function ComparativoPage() {
                     {item.cia}
                   </td>
                   <td className="px-4 py-3 font-mono text-gray-900 dark:text-white">
-                    {fmtReal(item.premio_total)}
+                    {formatBRL(item.premio_total)}
                   </td>
                   <td className="px-4 py-3">
                     {item.restricoes.length === 0 ? (

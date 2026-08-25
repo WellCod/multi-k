@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.auth.logout().catch(() => {});
-    sessionStorage.removeItem("mk_user");
+    sessionStorage.clear();
     setUser(null);
   }, []);
 
