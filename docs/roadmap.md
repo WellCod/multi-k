@@ -1,6 +1,6 @@
 # multi-K — Roadmap
 
-*Atualizado: 2026-08-24*
+*Atualizado: 2026-08-25*
 
 ---
 
@@ -14,7 +14,7 @@
 ✅ Fase 4      Dashboard, relatórios, seed demo
 ✅ Justos      Adapter Justos (aguarda credenciais)
 ✅ FIPE        Proxy Parallelum + FipeSelector combobox
-🔧 UX-SEC      Qualidade e segurança do funil de cotação   ← PRÓXIMA
+✅ UX-SEC      Qualidade e segurança do funil de cotação
 ⏳ Fase 5      Adapter Yelum (gate: credencial)
 ⏳ Fase 6      Paridade (gate: ≥99% em 200 cotações)
 ⏳ Fase 7      E-Retorno (gate: Security Assessment)
@@ -24,7 +24,7 @@
 
 ---
 
-## Estado atual (2026-08-24)
+## Estado atual (2026-08-25)
 
 ### O que está funcionando
 
@@ -35,65 +35,74 @@
 - Finalidade com opções Uber/App e Táxi
 - Validação de data de nascimento (não futura, até 100 anos)
 - Comparativo multi-seguradora, PDF, histórico imutável
-- Recotar a partir de cotação existente
+- Recotar a partir de cotação existente (com pré-preenchimento de dados_risco)
 - Dashboard por papel, renovações D-30/D-45/D-60
 - Relatórios (produção, funil, mix) com export CSV/XLSX
 - Seed sintético de demonstração (3 corretores, ~40 clientes, ~120 cotações)
 - Dark mode persistido
 - Adapter Justos implementado (ramo auto, aguarda credenciais)
+- **UX-SEC completa**: validações, loading states, race-fix, responsividade, segurança
 
 ### O que ainda não está em produção
 
 - Cotação Justos: faltam credenciais (`JUSTOS_PARTNER_NAME`, `JUSTOS_BROKER_ID`, chave EC)
 - Cotação Yelum: aguarda credencial de homologação
-- Issues de UX/segurança identificados na análise de 2026-08-24 (detalhados abaixo)
+- Payload `dados_risco` em claro no JSONB (planejado para Fase 8/KMS)
 
 ---
 
-## FASE UX-SEC — Qualidade e segurança do funil de cotação
+## FASE UX-SEC — concluída ✅
 
-**Estimativa:** 1 semana  
-**Branch:** `feat/ux-sec`  
-**Origem:** auditoria técnica de 2026-08-24 do `/cotacao`
+*Entregue em 2026-08-25*
 
-### P0 — Crítico (quebra dados reais)
+### P0 — Crítico ✅
 
-| # | Problema | Arquivo | Ação |
+| # | Problema | Arquivo | Status |
 |---|---|---|---|
-| P0.1 | Typo `commissao_pct` no banco (deveria ser `comissao_pct`) | `infra/models.py:212`, migration Alembic | Corrigir campo + migration `003_fix_commissao_pct.py` |
-| P0.2 | `dados_risco` aceita `dict[str, Any]` sem validação backend | `api/cotacao_router.py` | Criar schemas Pydantic `RiscoAutoInput`, `RiscoMotoInput`, `RiscoImovelInput` com discriminator por `ramo` |
-| P0.3 | Frontend permite comissão > 100% sem erro visual | `CotacaoPage.tsx` (modal transmitir) | Adicionar `min(0.01)` `max(0.30)` no input + mensagem de erro |
+| P0.1 | Typo `commissao_pct` → `comissao_pct` | `alembic/versions/004_fix_comissao_pct.py` | ✅ Migration criada |
+| P0.2 | `dados_risco` sem validação backend | `api/cotacao_router.py` — `_RISCO_SCHEMAS` + `model_validator` | ✅ Retorna 422 para dados inválidos |
+| P0.3 | Frontend: comissão > 100% sem erro | `CotacaoPage.tsx` — `TransmitirModal` | ✅ Validação 1–30% com mensagem inline |
 
-### P1 — Alto (UX e fluxo quebrado)
+### P1 — Alto ✅
 
-| # | Problema | Arquivo | Ação |
+| # | Problema | Arquivo | Status |
 |---|---|---|---|
-| P1.1 | Race condition: dois pollings simultâneos | `CotacaoPage.tsx` `startPolling` | Cancelar timer anterior antes de iniciar; usar `AbortController` para a requisição |
-| P1.2 | Vigência: `fim < início` aceito sem erro | `CotacaoPage.tsx` `step4Schema` + backend | Adicionar `.refine(fim > inicio)` no Zod; validar no backend ao criar proposta |
-| P1.3 | Erro busca CPF silencioso | `CotacaoPage.tsx` `searchByCpf` | Substituir `catch {}` por banner de erro inline "Não foi possível buscar o cliente" |
-| P1.4 | `alert()` ao falhar criação de cotação | `CotacaoPage.tsx` `handleStep4` | Substituir por `<ErrorBanner>` inline no step 5 |
-| P1.5 | `valor_imovel` enviado como string | `step2ImovelSchema` | Transform correto: remover pontos, trocar vírgula, parsear como Decimal; validar > 0 |
-| P1.6 | Sem loading state ao criar cotação | `CotacaoPage.tsx` `handleStep4` | Desabilitar botão e mostrar spinner entre step 4 → step 5 |
+| P1.1 | Race condition: dois pollings simultâneos | `CotacaoPage.tsx` `startPolling` | ✅ `stopPolling()` chamado no início |
+| P1.2 | Vigência: `fim < início` aceito | `step4Schema` + backend | ✅ `.superRefine` Zod + validação BE |
+| P1.3 | Erro busca CPF silencioso | `CotacaoPage.tsx` `searchByCpf` | ✅ Banner inline `cpfSearchError` |
+| P1.4 | `alert()` ao falhar cotação | `CotacaoPage.tsx` | ✅ `setCotacaoErrMsg` → `serverError` no Step4 |
+| P1.5 | `valor_imovel` enviado como string BRL | `step2ImovelSchema` | ✅ Transform: remove ponto, troca vírgula |
+| P1.6 | Sem loading state ao criar cotação | `CotacaoPage.tsx` | ✅ `criando` state, botão desabilitado, "Enviando…" |
 
-### P2 — Médio (segurança e qualidade)
+### P2 — Médio ✅
 
-| # | Problema | Arquivo | Ação |
+| # | Problema | Arquivo | Status |
 |---|---|---|---|
-| P2.1 | PII (placa, CEP, dados FIPE) em `sessionStorage` | `CotacaoPage.tsx` `saveRascunho` | Limpar `sessionStorage` ao cancelar, logout ou completar cotação |
-| P2.2 | `/cotacao?recotar=uuid-inválido` sem feedback | `CotacaoPage.tsx` useEffect recotar | Capturar erro, mostrar `<ErrorBanner>` "Cotação não encontrada ou sem permissão" |
-| P2.3 | Labels de cobertura: `CASCO`, `RCF`, `APP` | Step 3 cobertura | Mapa de labels legíveis: CASCO→"Colisão e danos", RCF→"Responsabilidade civil", etc. |
-| P2.4 | Grids 2-col sem breakpoint mobile | Múltiplos steps | Trocar `grid-cols-2` por `grid-cols-1 sm:grid-cols-2` |
-| P2.5 | Timer de polling não é limpo no unmount | `CotacaoPage.tsx` | Adicionar cleanup `return () => stopPolling()` no useEffect |
+| P2.1 | PII em `sessionStorage` após logout | `auth.tsx` | ✅ `sessionStorage.clear()` no logout |
+| P2.2 | `/cotacao?recotar=invalido` sem feedback | `CotacaoPage.tsx` | ✅ `recotarError` banner inline |
+| P2.3 | Labels de cobertura ilegíveis | Step 3 | ✅ Exibe `d.descricao` dos domínios + código em cinza |
+| P2.4 | Grids 2-col sem breakpoint mobile | Múltiplos steps | ✅ `grid-cols-1 sm:grid-cols-2` em todos os grids |
+| P2.5 | Timer de polling não limpo no unmount | `CotacaoPage.tsx` | ✅ `useEffect(() => () => clearTimeout(pollRef.current), [])` |
 
-### Critério de pronto
+### Auditoria de código (2026-08-25) ✅
 
-- [ ] `make check` passa com zero erros
-- [ ] `commissao_pct` corrigido no banco via migration
-- [ ] Criar cotação com `dados_risco` inválido retorna 422 (não 200)
-- [ ] Polling com dois cliques rápidos não gera estado inconsistente
-- [ ] `fim_vigencia < inicio_vigencia` rejeitado com mensagem clara
-- [ ] Formulário usável em mobile (320px)
-- [ ] sessionStorage limpo após cancelamento ou conclusão
+| # | Problema | Arquivo | Status |
+|---|---|---|---|
+| A2 | `cpf.py` sem warning ao usar chave dev-only | `infra/cpf.py` | ✅ `structlog.warning` quando chave padrão em uso |
+| D1 | `_get_*_ou_404` duplicado nos 3 routers | `api/_utils.py` | ✅ Helper genérico `get_or_404` extraído |
+| FS1 | sessionStorage não limpo no logout | `lib/auth.tsx` | ✅ `sessionStorage.clear()` no logout |
+| FD1 | `fmtReal`/`fmtDate` duplicadas no HomePage | `lib/utils.ts` + `pages/HomePage.tsx` | ✅ Consolidado em utils.ts + `formatDatetime` adicionado |
+| MK1 | `make test` não dropa DB anterior | `Makefile` | ✅ `DROP DATABASE IF EXISTS` antes do CREATE |
+
+### Critério de pronto — todos ✅
+
+- [x] `make check` passa com zero erros
+- [x] `commissao_pct` corrigido no banco via migration
+- [x] Criar cotação com `dados_risco` inválido retorna 422 (não 200)
+- [x] Polling com dois cliques rápidos não gera estado inconsistente
+- [x] `fim_vigencia < inicio_vigencia` rejeitado com mensagem clara
+- [x] Formulário usável em mobile (320px)
+- [x] sessionStorage limpo após cancelamento, logout ou conclusão
 
 ---
 
@@ -155,6 +164,11 @@ Ações humanas necessárias antes:
 
 Cloud Run + Cloud SQL + Secret Manager + KMS. Região `southamerica-east1`.
 
+Itens de segurança antes do deploy:
+- KMS para cifrar `payload_original` (PII em claro no JSONB até lá)
+- Rotação de `CPF_HMAC_KEY` com plano de migração de índices
+- `DEBUG=false` obrigatório em todos os ambientes de produção
+
 ---
 
 ## FASE 9 — MCP para o bot
@@ -174,3 +188,5 @@ Cloud Run + Cloud SQL + Secret Manager + KMS. Região `southamerica-east1`.
 | UX-SEC antes de Fase 5 | Não faz sentido integrar nova seguradora com funil quebrado; qualidade antes de escala |
 | `codigo_fipe` obrigatório no Justos | Exigência explícita da API Justos (`vehicle_fipe_code`) |
 | Adapter Justos antes de Yelum | Documentação Justos disponível; Yelum aguarda credencial |
+| `sessionStorage.clear()` no logout | Garante que todo PII (rascunho de cotação, dados de sessão) é apagado |
+| Helper genérico `get_or_404` em `api/_utils.py` | Elimina triplicação idêntica nos 3 routers; erro 404 padronizado |
