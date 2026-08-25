@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import PortaSeguradora, PropostaCanonica, RiscoCanonico
+from app.api._utils import get_or_404
 from app.api.deps import CurrentUser
 from app.infra import audit
 from app.infra.db import get_db
@@ -86,22 +87,14 @@ def _proposta_out(p: Proposta) -> PropostaOut:
 
 
 async def _get_proposta_ou_404(
-    proposta_id: uuid.UUID,
-    usuario_id: uuid.UUID,
-    db: AsyncSession,
+    proposta_id: uuid.UUID, usuario_id: uuid.UUID, db: AsyncSession
 ) -> Proposta:
-    result = await db.execute(
+    stmt = (
         select(Proposta)
         .where(Proposta.id == proposta_id)
         .where(Proposta.usuario_id == usuario_id)
     )
-    p = result.scalar_one_or_none()
-    if p is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Proposta não encontrada.",
-        )
-    return p
+    return await get_or_404(stmt, db, "Proposta não encontrada.")
 
 
 # ---------------------------------------------------------------------------
@@ -123,17 +116,12 @@ async def transmitir(
     adapter: AdapterDep,
 ) -> PropostaOut:
     """Transmite uma cotação aprovada para a seguradora e cria a proposta."""
-    result = await db.execute(
+    stmt = (
         select(Cotacao)
         .where(Cotacao.id == cotacao_id)
         .where(Cotacao.usuario_id == usuario.id)
     )
-    cotacao = result.scalar_one_or_none()
-    if cotacao is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cotação não encontrada.",
-        )
+    cotacao: Cotacao = await get_or_404(stmt, db, "Cotação não encontrada.")
     if cotacao.status not in ("sucesso", "restricao"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

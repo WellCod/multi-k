@@ -5,17 +5,13 @@ import {
   type MixOut,
   type ProducaoOut,
 } from "@/lib/api";
+import { formatBRL } from "@/lib/utils";
 
 const PERIODOS = [
   { label: "15 dias", value: 15 },
   { label: "30 dias", value: 30 },
   { label: "90 dias", value: 90 },
 ];
-
-function fmtReal(v: string | null | undefined) {
-  if (!v) return "—";
-  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 
 function fmtPct(v: string) {
   return `${(Number(v) * 100).toFixed(1)}%`;
@@ -72,9 +68,9 @@ function TabelaProducao({ dados }: { dados: ProducaoOut[] }) {
               <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{r.cotacoes}</td>
               <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{r.propostas}</td>
               <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{fmtPct(r.taxa_conversao)}</td>
-              <td className="px-3 py-2 text-right font-mono text-gray-900 dark:text-white">{fmtReal(r.premio_total)}</td>
+              <td className="px-3 py-2 text-right font-mono text-gray-900 dark:text-white">{formatBRL(r.premio_total)}</td>
               <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">
-                {fmtReal(r.comissao_prevista)}
+                {formatBRL(r.comissao_prevista)}
               </td>
             </tr>
           ))}
