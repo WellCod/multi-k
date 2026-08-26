@@ -141,6 +141,9 @@
 | C3 | Crítico | `ip_origem` gravada na sessão mas nunca comparada no re-uso | `infra/auth_service.py`, `api/deps.py` | ✅ Soft-check: warning no log quando IP muda |
 | B1 | Baixo | Adminer exposto em `0.0.0.0:8080` — acessível na rede local | `docker-compose.yml` | ✅ `127.0.0.1:8080:8080` |
 | B2 | Baixo | CORS sem proteção contra `*` em produção | `main.py` | ✅ RuntimeError no startup se `*` + `DEBUG=false` |
+| M3 | Médio | FIPE sem rate-limit nos endpoints públicos | `api/fipe_router.py` | ✅ 60 req/min por IP (sliding-window em memória) |
+| B3 | Baixo | Timeout explícito no cliente Justos | `adapters/justos/client.py` | ✅ Já implementado: 30 s auth, 60 s cotação |
+| A1 | Alto | `secure=False` no cookie fora de HTTPS | `api/auth_router.py` | ✅ `_SECURE_COOKIE = not _debug` — em produção sempre `True` |
 
 ### Itens planejados (Fase 8 / pré-produção)
 
@@ -148,13 +151,10 @@
 |---|---|---|---|---|
 | C1 | Crítico | `payload_original` em JSONB claro | `infra/models.py:188` | Fase 8 (KMS/AES-256-GCM) |
 | C2 | Crítico | `_DEV_KEY` HMAC do CPF usado se `DEBUG=true` | `infra/cpf.py:16` | Pré-produção (exigir `CPF_HMAC_KEY` sempre) |
-| A1 | Alto | `secure=False` no cookie quando `DEBUG=true` | `api/auth_router.py` | Pré-produção |
 | A2 | Alto | Sem token CSRF (mitigado por `SameSite=Strict`) | `main.py` + frontend | Fase 8 |
-| A3 | Alto | Rate-limit por IP sem estado distribuído | `infra/auth_service.py` | Fase 8 (Redis) |
-| M2 | Médio | JWT Justos sem validação de expiração | `adapters/justos/client.py` | Quando credenciais chegarem |
-| M3 | Médio | FIPE sem rate-limit nos endpoints públicos | `api/fipe_router.py` | Fase 8 |
+| A3 | Alto | Rate-limit por IP sem estado distribuído (em memória, não sobrevive restart) | `infra/auth_service.py` | Fase 8 (Redis) |
+| M2 | N/A | Token Justos é opaco (~28 chars), não JWT — expiração via TTL fixo (ADR-022) | `adapters/justos/client.py` | — |
 | M4 | Médio | `dados_negocio` sem schema na transmissão | `api/proposta_router.py` | Fase 5 |
-| B3 | Baixo | Sem timeout explícito no cliente Justos | `adapters/justos/client.py` | Fase 5 |
 | B4 | Baixo | Sem pin de versão máxima nas dependências | `pyproject.toml` | Fase 8 |
 
 ### Critério de pronto — todos ✅
@@ -164,6 +164,7 @@
 - [x] Audit log de falha de login com hash determinístico (SHA-256)
 - [x] Adminer acessível apenas em localhost
 - [x] CORS com `*` bloqueado em produção
+- [x] Endpoints FIPE com rate-limit 60 req/min por IP
 
 ---
 
