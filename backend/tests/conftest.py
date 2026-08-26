@@ -11,6 +11,7 @@ os.environ.setdefault(
     "postgresql+asyncpg://multik:multik_dev@localhost:5432/multik_test",
 )
 os.environ.setdefault("SECRET_KEY", "test-secret-key-only")
+os.environ.setdefault("CPF_HMAC_KEY", "test-cpf-hmac-key-only-not-for-production")  # noqa: S105
 # Worker desabilitado em testes — jobs processados manualmente via processar_job()
 os.environ.setdefault("DISABLE_WORKER", "1")
 # Desativa secure cookie para que o httpx (http://test) consiga enviar o cookie
