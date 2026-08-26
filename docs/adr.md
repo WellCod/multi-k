@@ -485,3 +485,53 @@ Cor apenas onde carrega informação — status, alerta, divergência. Copy em v
 **Por quê.** Os problemas identificados — typo em campo financeiro, sem validação de `dados_risco` no backend, race condition no polling — são tecnicamente simples mas de alto impacto quando o volume de cotações aumentar. Integrar a Yelum em cima de um funil com esses problemas multiplica a superfície de falha silenciosa. Qualidade do funil é pré-requisito para confiança nos dados de paridade (Fase 6).
 
 **Consequência.** Estimativa: 1 semana. Não atrasa Fase 5 porque o gate da Fase 5 (credencial) está fora do controle do time.
+
+---
+
+# Segurança
+
+## ADR-036 — IP binding de sessão: soft-check, não hard-reject
+
+**Status:** Aceita
+
+**Contexto.** A sessão grava `ip_origem` no momento do login. A questão é o que fazer quando o IP muda durante a sessão: rejeitar a requisição (hard) ou só registrar o evento (soft).
+
+**Decisão.** Soft-check: se `current_ip ≠ sessao.ip_origem`, emitir `WARNING session_ip_mismatch` no log estruturado. A sessão permanece válida.
+
+**Por quê.** Hard-reject derruba usuários legítimos em redes móveis (IP troca a cada handover de cell tower), VPNs (IP muda ao reconectar) e NAT assimétrico (saída por links diferentes). O benefício de segurança real é baixo: o cookie `httponly + SameSite=Strict` já previne XSS e CSRF, e session-hijacking via rede requer MitM em HTTPS, o que é improvável. O log basta para detectar anomalia pós-fato.
+
+**Revisar.** Se o produto migrar para contexto de alto risco (dados sensíveis de saúde, financeiro regulado), considerar hard-reject com janela de tolerância de IP.
+
+**Sinal de violação.** Remover o log e voltar ao estado "IP nunca comparado". Ou implementar hard-reject sem permitir que o dono revise o tradeoff primeiro.
+
+---
+
+## ADR-037 — Hash determinístico no audit log: SHA-256, não `hash()` builtin
+
+**Status:** Aceita
+
+**Contexto.** O audit log de falha de login gravava `hash(body.email)` — o `hash()` do Python. Esse hash (a) não é determinístico entre processos (Python randomiza por padrão via `PYTHONHASHSEED`), (b) é reversível por dicionário para strings curtas e (c) muda entre versões do Python.
+
+**Decisão.** `hashlib.sha256(email.encode()).hexdigest()` — determinístico, 256 bits, correlacionável entre processos e versões.
+
+**Por quê.** O objetivo do hash no audit é correlacionar tentativas do mesmo e-mail entre sessões de log sem armazenar o e-mail em claro. `hash()` não cumpre nenhum dos três requisitos acima. SHA-256 cumpre todos.
+
+**Nota sobre reversibilidade.** SHA-256 de e-mail é tecnicamente reversível por dicionário se o atacante souber o domínio. Aceitável aqui: o log é append-only com acesso restrito, e o ganho é correlação temporal, não anonimização forte. Para anonimização forte usar HMAC com chave rotacionável (como o CPF).
+
+**Sinal de violação.** Voltar para `hash()`. Usar `md5()`. Logar o e-mail em claro.
+
+---
+
+## ADR-038 — CORS wildcard bloqueado no startup em produção
+
+**Status:** Aceita
+
+**Contexto.** `CORS_ORIGINS` é lida de variável de ambiente. Se alguém configurar `*` (wildcard), a API passa a aceitar requisições cross-origin de qualquer domínio — incluindo cookies com `credentials: true` (o que o browser bloqueia, mas o risco existe se o comportamento mudar).
+
+**Decisão.** No startup do `main.py`, se `*` estiver em `CORS_ORIGINS` e `DEBUG=false`, o processo levanta `RuntimeError` e recusa iniciar.
+
+**Por quê.** Fail-fast no startup é mais seguro que silenciosamente aceitar uma configuração perigosa. O erro aparece no log de deploy, não em produção sob carga.
+
+**Consequência.** Em desenvolvimento (`DEBUG=true`) o wildcard ainda é aceito para facilitar o uso de `localhost:*` sem configuração.
+
+**Sinal de violação.** Remover o guard para "simplificar o deploy". Usar `CORS_ORIGINS=*` em produção.

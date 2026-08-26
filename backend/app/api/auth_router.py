@@ -1,3 +1,4 @@
+import hashlib
 from typing import Annotated
 from uuid import UUID
 
@@ -65,7 +66,7 @@ async def login(
         await audit.registrar(
             db,
             tipo="falha_login",
-            dados={"email_hash": hash(body.email)},
+            dados={"email_hash": hashlib.sha256(body.email.encode()).hexdigest()},
             ip_origem=ip,
         )
         await db.commit()
