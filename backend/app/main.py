@@ -60,6 +60,11 @@ app = FastAPI(
 
 _cors_origins_raw = get_optional_secret("CORS_ORIGINS", "http://localhost:5173")
 _cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
+_debug = get_optional_secret("DEBUG", "false").lower() in ("true", "1", "yes")
+if "*" in _cors_origins and not _debug:
+    raise RuntimeError(
+        "CORS_ORIGINS contém '*' em produção — defina origens explícitas."
+    )
 
 app.add_middleware(
     CORSMiddleware,

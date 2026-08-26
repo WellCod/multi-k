@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -8,6 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.models import Sessao, TentativaLogin, Usuario
+
+_log = logging.getLogger(__name__)
 
 _ph = PasswordHasher()
 
@@ -41,7 +44,9 @@ async def criar_sessao(db: AsyncSession, usuario_id: UUID, ip: str | None) -> UU
     return sessao_id
 
 
-async def buscar_sessao_valida(db: AsyncSession, sessao_id: UUID) -> Usuario | None:
+async def buscar_sessao_valida(
+    db: AsyncSession, sessao_id: UUID, current_ip: str | None = None
+) -> Usuario | None:
     agora = datetime.now(UTC)
     res = await db.execute(
         select(Sessao).where(Sessao.id == sessao_id).where(Sessao.expira_em > agora)
@@ -49,6 +54,13 @@ async def buscar_sessao_valida(db: AsyncSession, sessao_id: UUID) -> Usuario | N
     sessao = res.scalar_one_or_none()
     if sessao is None:
         return None
+    if current_ip and sessao.ip_origem and sessao.ip_origem != current_ip:
+        _log.warning(
+            "session_ip_mismatch sessao=%s stored=%s current=%s",
+            sessao_id,
+            sessao.ip_origem,
+            current_ip,
+        )
     res2 = await db.execute(
         select(Usuario)
         .where(Usuario.id == sessao.usuario_id)
