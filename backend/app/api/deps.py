@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,7 @@ from app.infra.models import Usuario
 
 
 async def get_current_user(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     sid: Annotated[str | None, Cookie()] = None,
 ) -> Usuario:
@@ -26,7 +27,8 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sessão inválida.",
         ) from err
-    usuario = await buscar_sessao_valida(db, sessao_id)
+    ip = request.client.host if request.client else None
+    usuario = await buscar_sessao_valida(db, sessao_id, ip)
     if usuario is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
