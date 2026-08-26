@@ -15,15 +15,24 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
-from app.infra import fipe_cache
+from app.infra import fipe_cache, rate_limit
 
 router = APIRouter(prefix="/fipe", tags=["fipe"])
 
 _PARALLELUM = "https://parallelum.com.br/fipe/api/v1"
 _TIPO = {"carros": "carros", "motos": "motos", "caminhoes": "caminhoes"}
 _TIMEOUT = httpx.Timeout(15.0)
+_FIPE_RATE_LIMIT = 60  # req/min por IP
+
+
+async def _check_rate(request: Request) -> None:
+    ip = request.client.host if request.client else "unknown"
+    if not await rate_limit.allow(f"fipe:{ip}", max_requests=_FIPE_RATE_LIMIT):
+        raise HTTPException(
+            status_code=429, detail="Rate limit excedido. Aguarde 1 minuto."
+        )
 
 
 async def _get(path: str) -> Any:
@@ -42,8 +51,10 @@ def _norm(items: list[Any]) -> list[dict[str, str]]:
 
 @router.get("/marcas")
 async def marcas(
+    request: Request,
     tipo: str = Query(default="carros", pattern="^(carros|motos|caminhoes)$"),
 ) -> list[dict[str, str]]:
+    await _check_rate(request)
     chave = f"marcas:{tipo}"
     cached = fipe_cache.get(chave)
     if cached is not None:
@@ -61,9 +72,11 @@ async def marcas(
 
 @router.get("/modelos")
 async def modelos(
+    request: Request,
     tipo: str = Query(default="carros", pattern="^(carros|motos|caminhoes)$"),
     marca_id: str = Query(),
 ) -> list[dict[str, str]]:
+    await _check_rate(request)
     chave = f"modelos:{tipo}:{marca_id}"
     cached = fipe_cache.get(chave)
     if cached is not None:
@@ -82,10 +95,12 @@ async def modelos(
 
 @router.get("/anos")
 async def anos(
+    request: Request,
     tipo: str = Query(default="carros", pattern="^(carros|motos|caminhoes)$"),
     marca_id: str = Query(),
     modelo_id: str = Query(),
 ) -> list[dict[str, str]]:
+    await _check_rate(request)
     chave = f"anos:{tipo}:{marca_id}:{modelo_id}"
     cached = fipe_cache.get(chave)
     if cached is not None:
@@ -103,11 +118,13 @@ async def anos(
 
 @router.get("/preco")
 async def preco(
+    request: Request,
     tipo: str = Query(default="carros", pattern="^(carros|motos|caminhoes)$"),
     marca_id: str = Query(),
     modelo_id: str = Query(),
     ano_id: str = Query(),
 ) -> dict[str, str]:
+    await _check_rate(request)
     chave = f"preco:{tipo}:{marca_id}:{modelo_id}:{ano_id}"
     cached = fipe_cache.get(chave)
     if cached is not None:
