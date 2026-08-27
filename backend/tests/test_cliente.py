@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.domain.auth import Papel
 from app.main import app
-from tests.conftest import criar_usuario
+from tests.conftest import CsrfAuth, criar_usuario
 
 _CPF_A = "12345678901"
 _CPF_B = "98765432100"
@@ -17,6 +17,7 @@ async def client() -> AsyncClient:
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:
+        c._auth = CsrfAuth(c.cookies)  # type: ignore[assignment]
         yield c
 
 

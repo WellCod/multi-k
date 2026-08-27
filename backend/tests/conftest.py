@@ -4,6 +4,7 @@ DATABASE_URL deve apontar para um Postgres de teste disponível.
 """
 
 import os
+from collections.abc import Generator
 
 # Define antes de qualquer import do app para que db.py use este URL.
 os.environ.setdefault(
@@ -20,6 +21,7 @@ os.environ.setdefault("DEBUG", "true")
 import uuid  # noqa: E402
 from collections.abc import AsyncGenerator  # noqa: E402
 
+import httpx  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
@@ -30,6 +32,24 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 )
 
 from app.domain.auth import TENANT_ID, Papel  # noqa: E402
+
+
+class CsrfAuth(httpx.Auth):
+    """Injeta X-CSRF-Token em requisições mutantes, lendo o cookie csrf_token."""
+
+    def __init__(self, cookies: httpx.Cookies) -> None:
+        self._cookies = cookies
+
+    def auth_flow(
+        self, request: httpx.Request
+    ) -> Generator[httpx.Request, httpx.Response, None]:
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            token = self._cookies.get("csrf_token")
+            if token:
+                request.headers["X-CSRF-Token"] = token
+        yield request
+
+
 from app.infra.auth_service import hash_senha  # noqa: E402
 from app.infra.models import Base, Usuario  # noqa: E402
 from app.infra.seed import seed_if_empty  # noqa: E402

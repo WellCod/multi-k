@@ -1,12 +1,13 @@
 """Rotas de proposta — transmissão, consulta e parcelas."""
 
+import json
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,6 +45,19 @@ class TransmitirInput(BaseModel):
     comissao_pct: Decimal = Field(gt=0, le=1)
     inicio_vigencia: date | None = None
     dados_negocio: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("dados_negocio")
+    @classmethod
+    def _validar_negocio(cls, v: dict[str, Any]) -> dict[str, Any]:
+        if len(v) > 50:
+            raise ValueError("dados_negocio excede 50 chaves")
+        try:
+            payload = json.dumps(v)
+        except (TypeError, ValueError) as e:
+            raise ValueError("dados_negocio contém valores não serializáveis") from e
+        if len(payload) > 10_000:
+            raise ValueError("dados_negocio excede 10 KB")
+        return v
 
 
 class PropostaOut(BaseModel):
