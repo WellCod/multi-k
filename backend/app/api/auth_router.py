@@ -1,4 +1,5 @@
 import hashlib
+import secrets
 from typing import Annotated
 from uuid import UUID
 
@@ -26,6 +27,7 @@ _SECURE_COOKIE = not _debug
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _COOKIE = "sid"
+_CSRF_COOKIE = "csrf_token"
 _MAX_AGE = 8 * 3600
 
 
@@ -94,6 +96,14 @@ async def login(
         secure=_SECURE_COOKIE,
         max_age=_MAX_AGE,
     )
+    response.set_cookie(
+        key=_CSRF_COOKIE,
+        value=secrets.token_hex(32),
+        httponly=False,  # JS precisa ler para enviar como header
+        samesite="strict",
+        secure=_SECURE_COOKIE,
+        max_age=_MAX_AGE,
+    )
     return LoginOutput(nome=usuario.nome, papel=usuario.papel)
 
 
@@ -111,4 +121,5 @@ async def logout(
         except ValueError:
             pass
     response.delete_cookie(_COOKIE)
+    response.delete_cookie(_CSRF_COOKIE)
     return {}
