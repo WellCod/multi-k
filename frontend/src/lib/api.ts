@@ -1,12 +1,26 @@
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
 
+const _CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function _getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const csrfHeaders: Record<string, string> = {};
+  if (_CSRF_METHODS.has(method)) {
+    const token = _getCsrfToken();
+    if (token) csrfHeaders["X-CSRF-Token"] = token;
+  }
+
   const res = await fetch(`${BASE}${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { "Content-Type": "application/json", ...csrfHeaders, ...init?.headers },
     ...init,
   });
 

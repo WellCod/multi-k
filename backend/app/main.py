@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import secrets
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -71,8 +72,33 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Cookie", "X-Request-ID"],
+    allow_headers=["Content-Type", "Cookie", "X-Request-ID", "X-CSRF-Token"],
 )
+
+
+_CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
+_CSRF_EXEMPT_PATHS = frozenset({"/auth/login", "/auth/logout"})
+
+
+@app.middleware("http")
+async def csrf_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    if (
+        request.method not in _CSRF_SAFE_METHODS
+        and request.url.path not in _CSRF_EXEMPT_PATHS
+        and request.cookies.get("sid")  # só requisições autenticadas
+    ):
+        csrf_cookie = request.cookies.get("csrf_token", "")
+        csrf_header = request.headers.get("X-CSRF-Token", "")
+        if not csrf_cookie or not secrets.compare_digest(csrf_cookie, csrf_header):
+            return Response(
+                content='{"detail":"CSRF token inválido ou ausente."}',
+                status_code=403,
+                media_type="application/json",
+            )
+    return await call_next(request)
 
 
 @app.middleware("http")

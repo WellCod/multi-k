@@ -148,15 +148,16 @@
 | C2 | Crítico | `_DEV_KEY` HMAC do CPF — fallback inseguro mesmo em DEBUG | `infra/cpf.py` | ✅ `CPF_HMAC_KEY` obrigatório sempre; testes usam fixture |
 | B4 | Baixo | Sem pin de versão máxima — upgrade major silencioso | `pyproject.toml` | ✅ Limites superiores adicionados em todas as dependências |
 
+| A2 | Alto | Sem token CSRF (mitigado por `SameSite=Strict`) | `main.py` + `auth_router.py` + `api.ts` | ✅ Double-submit cookie (middleware + cookie `csrf_token` + header `X-CSRF-Token`) |
+| M4 | Médio | `dados_negocio` sem schema na transmissão | `api/proposta_router.py` | ✅ Validator: max 50 chaves, max 10 KB JSON |
+
 ### Itens planejados (Fase 8 / pré-produção)
 
 | # | Severidade | Problema | Arquivo | Quando |
 |---|---|---|---|---|
 | C1 | Crítico | `payload_original` em JSONB claro | `infra/models.py:188` | Fase 8 (KMS/AES-256-GCM) |
-| A2 | Alto | Sem token CSRF (mitigado por `SameSite=Strict`) | `main.py` + frontend | Fase 8 |
 | A3 | Alto | Rate-limit por IP em memória (não sobrevive restart) | `infra/auth_service.py` | Fase 8 (Redis) |
 | M2 | N/A | Token Justos opaco (~28 chars), não JWT — expiração via TTL fixo (ADR-022) | `adapters/justos/client.py` | — |
-| M4 | Médio | `dados_negocio` sem schema na transmissão | `api/proposta_router.py` | Fase 5 |
 
 ### Critério de pronto — todos ✅
 
@@ -168,6 +169,8 @@
 - [x] Endpoints FIPE com rate-limit 60 req/min por IP
 - [x] `CPF_HMAC_KEY` obrigatório — sem fallback de chave hardcoded
 - [x] Dependências com limites de versão máxima (sem upgrade major silencioso)
+- [x] CSRF double-submit cookie em todas as rotas mutantes autenticadas
+- [x] `dados_negocio` limitado a 50 chaves e 10 KB
 
 ---
 
