@@ -48,6 +48,8 @@ class CsrfAuth(httpx.Auth):
             if token:
                 request.headers["X-CSRF-Token"] = token
         yield request
+
+
 from app.infra.auth_service import hash_senha  # noqa: E402
 from app.infra.models import Base, Usuario  # noqa: E402
 from app.infra.seed import seed_if_empty  # noqa: E402
