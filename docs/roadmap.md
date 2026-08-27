@@ -145,17 +145,18 @@
 | B3 | Baixo | Timeout explícito no cliente Justos | `adapters/justos/client.py` | ✅ Já implementado: 30 s auth, 60 s cotação |
 | A1 | Alto | `secure=False` no cookie fora de HTTPS | `api/auth_router.py` | ✅ `_SECURE_COOKIE = not _debug` — em produção sempre `True` |
 
+| C2 | Crítico | `_DEV_KEY` HMAC do CPF — fallback inseguro mesmo em DEBUG | `infra/cpf.py` | ✅ `CPF_HMAC_KEY` obrigatório sempre; testes usam fixture |
+| B4 | Baixo | Sem pin de versão máxima — upgrade major silencioso | `pyproject.toml` | ✅ Limites superiores adicionados em todas as dependências |
+
 ### Itens planejados (Fase 8 / pré-produção)
 
 | # | Severidade | Problema | Arquivo | Quando |
 |---|---|---|---|---|
 | C1 | Crítico | `payload_original` em JSONB claro | `infra/models.py:188` | Fase 8 (KMS/AES-256-GCM) |
-| C2 | Crítico | `_DEV_KEY` HMAC do CPF usado se `DEBUG=true` | `infra/cpf.py:16` | Pré-produção (exigir `CPF_HMAC_KEY` sempre) |
 | A2 | Alto | Sem token CSRF (mitigado por `SameSite=Strict`) | `main.py` + frontend | Fase 8 |
-| A3 | Alto | Rate-limit por IP sem estado distribuído (em memória, não sobrevive restart) | `infra/auth_service.py` | Fase 8 (Redis) |
-| M2 | N/A | Token Justos é opaco (~28 chars), não JWT — expiração via TTL fixo (ADR-022) | `adapters/justos/client.py` | — |
+| A3 | Alto | Rate-limit por IP em memória (não sobrevive restart) | `infra/auth_service.py` | Fase 8 (Redis) |
+| M2 | N/A | Token Justos opaco (~28 chars), não JWT — expiração via TTL fixo (ADR-022) | `adapters/justos/client.py` | — |
 | M4 | Médio | `dados_negocio` sem schema na transmissão | `api/proposta_router.py` | Fase 5 |
-| B4 | Baixo | Sem pin de versão máxima nas dependências | `pyproject.toml` | Fase 8 |
 
 ### Critério de pronto — todos ✅
 
@@ -165,6 +166,8 @@
 - [x] Adminer acessível apenas em localhost
 - [x] CORS com `*` bloqueado em produção
 - [x] Endpoints FIPE com rate-limit 60 req/min por IP
+- [x] `CPF_HMAC_KEY` obrigatório — sem fallback de chave hardcoded
+- [x] Dependências com limites de versão máxima (sem upgrade major silencioso)
 
 ---
 
