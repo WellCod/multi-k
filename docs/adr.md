@@ -535,3 +535,21 @@ Cor apenas onde carrega informação — status, alerta, divergência. Copy em v
 **Consequência.** Em desenvolvimento (`DEBUG=true`) o wildcard ainda é aceito para facilitar o uso de `localhost:*` sem configuração.
 
 **Sinal de violação.** Remover o guard para "simplificar o deploy". Usar `CORS_ORIGINS=*` em produção.
+
+---
+
+## ADR-039 — CSRF: double-submit cookie em vez de token síncrono
+
+**Status:** Aceita
+
+**Contexto.** O cookie de sessão já usa `SameSite=Strict`, que previne CSRF em todos os browsers modernos (>98% de market share). A questão é se vale adicionar um token CSRF como defesa em profundidade e, se sim, qual padrão usar.
+
+**Decisão.** Double-submit cookie: no login, um segundo cookie não-httponly `csrf_token` é gerado com `secrets.token_hex(32)`. O frontend lê-o via `document.cookie` e envia como `X-CSRF-Token` em cada requisição mutante (POST/PUT/PATCH/DELETE). O middleware em `main.py` compara os dois com `secrets.compare_digest` (tempo constante). Rotas `/auth/login` e `/auth/logout` são isentas.
+
+**Por quê double-submit e não token síncrono.** Token síncrono exige armazenamento server-side por sessão (banco ou Redis) e acesso à tabela de sessão em cada request — latência extra. Double-submit é stateless: o servidor compara cookie vs header, sem consulta adicional.
+
+**Por quê isentar logout.** Logout com CSRF inválido não faz sentido: o objetivo do logout é destruir a sessão comprometida. Bloquear o logout seria pior.
+
+**Limitação.** Double-submit exige que o atacante não consiga ler cookies do domínio. `SameSite=Strict + httponly` no cookie de sessão + `secure` em produção garantem isso. A proteção não funciona se o atacante tem XSS — mas XSS com `httponly` é outra camada.
+
+**Sinal de violação.** Remover o middleware de CSRF. Expor o `csrf_token` como campo na resposta JSON em vez de cookie. Fazer o cookie `csrf_token` httponly (JS não conseguiria lê-lo).
