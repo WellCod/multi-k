@@ -243,3 +243,11 @@ class CotacaoJob(Base):
         DateTime(timezone=True), default=None
     )
     tenant_id: Mapped[uuid.UUID] = mapped_column(default=lambda: TENANT_ID)
+    # Resultado por CIA (multi-CIA)
+    cotacao_id_cia: Mapped[str | None] = mapped_column(String(100), default=None)
+    premio_total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), default=None)
+    restricoes: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    mensagens: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    necessita_vistoria: Mapped[bool] = mapped_column(Boolean, default=False)
+    # sucesso | restricao | erro
+    status_resultado: Mapped[str | None] = mapped_column(String(20), default=None)
