@@ -622,3 +622,19 @@ Cor apenas onde carrega informação — status, alerta, divergência. Copy em v
 **Diferença do Yelum.** Justos usa JWT ES256 para autenticação (não client_credentials). O token da API é opaco (~28 chars) com TTL fixo de 60 min. Não há endpoint de renovação — expira e renova via nova chamada de auth.
 
 **Sinal de violação.** Importar `JustosSeguradora` diretamente em `worker.py`, `cotacao_router.py` ou qualquer módulo fora de `app/adapters/`.
+
+---
+
+## ADR-044 — payload_resposta por CIA em CotacaoJob
+
+**Status:** Aceita
+
+**Contexto.** O adapter Justos devolve em `ResultadoCotacao.payload_resposta` dados essenciais para a transmissão posterior: `coverages_selected`, `coverages_available`, `monthly_total`, `annual_total`. Sem persistir esse payload no job, a rota `transmitir` não consegue montar `dados_negocio` para a Justos — o campo `coverages_selected` seria perdido.
+
+**Decisão.** Adicionar `payload_resposta JSONB` à tabela `cotacao_jobs`. O worker persiste `resultado.payload_resposta` ao concluir cada job. A rota `transmitir` mescla em ordem crescente de precedência: `cotacao.payload_original` (legado) < `job.payload_resposta` (por CIA) < `body.dados_negocio` (overrides explícitos do usuário). O job é buscado para todas as CIAs, incluindo fake.
+
+**Por quê JSONB e não EncryptedJSON.** `payload_resposta` do job contém dados técnicos da seguradora (coverage codes, pricing), sem PII do segurado. `payload_original` da `Cotacao` é cifrado porque armazena o payload bruto completo, potencialmente com PII. Os dados do job não justificam a sobrecarga de criptografia.
+
+**Consequência.** O frontend não precisa repassar `coverages_selected` no TransmitirModal — o backend obtém do job. O usuário pode sobrescrever via `dados_negocio` se necessário (ex: trocar cobertura no momento da transmissão).
+
+**Sinal de violação.** Remover a lógica de merge triplo e exigir que o frontend sempre envie `coverages_selected` explicitamente.
