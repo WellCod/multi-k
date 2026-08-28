@@ -193,6 +193,7 @@ async def test_comparativo_estrutura_por_job(
     assert item["cia"] == "fake"
     assert item["status"] == "sucesso"
     assert item["premio_total"] == "1950.00"
+    assert item["annual_total"] is None  # fake adapter não retorna preço anual
     assert item["necessita_vistoria"] is False
     assert item["restricoes"] == []
     assert item["mensagens"] == []
