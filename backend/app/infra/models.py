@@ -251,3 +251,5 @@ class CotacaoJob(Base):
     necessita_vistoria: Mapped[bool] = mapped_column(Boolean, default=False)
     # sucesso | restricao | erro
     status_resultado: Mapped[str | None] = mapped_column(String(20), default=None)
+    # Payload bruto devolvido pelo adapter (ex: coverages_selected da Justos)
+    payload_resposta: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
