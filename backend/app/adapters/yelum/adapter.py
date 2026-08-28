@@ -1,9 +1,9 @@
 """Adapter Yelum (Grupo HDI Seguros) — implementa PortaSeguradora.
 
-Ramo suportado: residencia (produto 11030 — Residência Yelum).
+Ramo suportado: imovel (produto 11030 — Residência Yelum).
 Auto: aguarda documentação do ponto focal (§10 do escopo).
 
-Campos obrigatórios em dados_risco para ramo=residencia:
+Campos obrigatórios em dados_risco para ramo=imovel:
   - cpf              CPF do proponente (11 dígitos, sem pontuação)
   - nome             Nome completo
   - nascimento       "YYYY-MM-DD"
@@ -164,11 +164,11 @@ def _payload_proposta(
 
 
 class YelumSeguradora:
-    """Adapter para a API Yelum — ramo residencia (produto 11030)."""
+    """Adapter para a API Yelum — ramo imovel (produto 11030)."""
 
     def capacidades(self) -> Capacidades:
         return Capacidades(
-            ramos=["residencia"],
+            ramos=["imovel"],
             coberturas=[
                 "CBE10",  # Incêndio, Raio e Explosão (obrigatória)
                 "CBE20",  # Danos Elétricos
@@ -184,7 +184,7 @@ class YelumSeguradora:
         )
 
     async def cotar(self, r: RiscoCanonico) -> ResultadoCotacao:
-        if r.ramo != "residencia":
+        if r.ramo != "imovel":
             return ResultadoCotacao(
                 sucesso=False,
                 cotacao_id=None,
@@ -256,7 +256,7 @@ class YelumSeguradora:
         )
 
     async def recotar(self, id: str, r: RiscoCanonico) -> ResultadoCotacao:
-        if r.ramo != "residencia":
+        if r.ramo != "imovel":
             return ResultadoCotacao(
                 sucesso=False,
                 cotacao_id=None,
