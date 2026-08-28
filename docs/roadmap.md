@@ -1,6 +1,6 @@
 # multi-K — Roadmap
 
-*Atualizado: 2026-08-28*
+*Atualizado: 2026-08-28 (tarde)*
 
 ---
 
@@ -16,7 +16,7 @@
 ✅ FIPE        Proxy Parallelum + FipeSelector combobox
 ✅ UX-SEC      Qualidade e segurança do funil de cotação
 ✅ SEC         Endurecimento de segurança (auditoria 2026-08-26)
-🔨 Fase 5      Adapter Yelum (scaffold pronto; gate: credencial)
+🔨 Fase 5      Adapters Yelum + Justos (scaffold + docs; gate: credenciais)
 ⏳ Fase 6      Paridade (gate: ≥99% em 200 cotações)
 ⏳ Fase 7      E-Retorno (gate: Security Assessment)
 ⏳ Fase 8      Deploy GCP + endurecimento
@@ -185,7 +185,7 @@
 **Estimativa:** 3–5 semanas após receber credencial  
 **Produto inicial:** Residência (produto 11030); Auto aguarda documentação do ponto focal
 
-### Scaffold entregue (2026-08-28)
+### Scaffold + documentação entregues (2026-08-28)
 
 | Arquivo | Conteúdo |
 |---|---|
@@ -200,11 +200,31 @@
 - Chave de sucesso/erro: `Success` (sucesso) vs `Sucesso` (erro) — adapter aceita ambas
 - Retry único automático em 401 sem Redis
 
-**Para ativar quando a credencial chegar:**
+**Para ativar Yelum quando a credencial chegar:**
 1. Preencher no `.env`: `YELUM_CLIENT_ID`, `YELUM_CLIENT_SECRET`, `YELUM_USERNAME`, `YELUM_PASSWORD`
 2. Ajustar `YELUM_ENV=homologacao` (ou `producao`)
 3. Confirmar nomes de campos com a Collection Postman (ver `_payload_cotacao` em `adapter.py`)
-4. Adicionar `"yelum"` como opção no frontend (seletor de seguradoras)
+4. Yelum aparece automaticamente via `cias_para_ramo("imovel")` — zero código novo
+
+**Para ativar Justos quando as credenciais chegarem:**
+1. Preencher no `.env`: `JUSTOS_PARTNER_NAME`, `JUSTOS_BROKER_ID`, `JUSTOS_CPF_CNPJ`, `JUSTOS_PRIVATE_KEY`
+2. Ajustar `JUSTOS_ENV=production` (padrão: staging)
+3. Justos aparece automaticamente via `cias_para_ramo("auto")` — zero código novo
+
+### Melhorias entregues (2026-08-28 — pós-scaffold)
+
+| Item | Arquivo | Status |
+|---|---|---|
+| Proponente aninhado no Yelum adapter | `adapters/yelum/adapter.py` | ✅ |
+| cpf+telefone no bloco proponente (frontend) | `CotacaoPage.tsx` | ✅ |
+| Campos opcionais Yelum no Step2Imovel | `CotacaoPage.tsx` | ✅ |
+| `cobertura_imovel` CBE10-CBE80 no seed + migração 007 | `seed.py`, `007_cobertura_imovel_dominios.py` | ✅ |
+| Justos integrado ao `cias_para_ramo("auto")` | `adapters/registry.py` | ✅ |
+| Proponente aninhado no Justos adapter | `adapters/justos/adapter.py` | ✅ |
+| `ci_code` em renovações Justos | `adapters/justos/client.py` + `adapter.py` | ✅ |
+| Armazena fipe_price_percentage_covered, commission, plans | `adapters/justos/adapter.py` | ✅ |
+| 5 testes Justos adapter | `tests/test_justos_adapter.py` | ✅ |
+| Cobertura do comparativo por-job | `tests/test_proposta.py` | ✅ |
 
 Ações humanas necessárias:
 1. E-mail ao ponto focal Yelum com 12 perguntas (`docs/escopo.md §10`)
