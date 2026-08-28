@@ -114,7 +114,7 @@ async def test_cotar_sucesso() -> None:
         r.post(_QUOTE_URL).mock(return_value=Response(200, json=_RESP_COTACAO_SUCESSO))
 
         resultado = await YelumSeguradora().cotar(
-            RiscoCanonico(ramo="residencia", dados=_RISCO_RESIDENCIA)
+            RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA)
         )
 
     assert resultado.sucesso is True
@@ -131,7 +131,7 @@ async def test_cotar_necessita_vistoria() -> None:
         r.post(_QUOTE_URL).mock(return_value=Response(200, json=_RESP_COTACAO_VISTORIA))
 
         resultado = await YelumSeguradora().cotar(
-            RiscoCanonico(ramo="residencia", dados=_RISCO_RESIDENCIA)
+            RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA)
         )
 
     assert resultado.sucesso is True
@@ -147,7 +147,7 @@ async def test_cotar_recusada() -> None:
         r.post(_QUOTE_URL).mock(return_value=Response(200, json=_RESP_COTACAO_RECUSADA))
 
         resultado = await YelumSeguradora().cotar(
-            RiscoCanonico(ramo="residencia", dados=_RISCO_RESIDENCIA)
+            RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA)
         )
 
     assert resultado.sucesso is False
@@ -182,7 +182,7 @@ async def test_cotar_retry_em_401() -> None:
         r.post(_QUOTE_URL).mock(side_effect=_quote_side_effect)
 
         resultado = await YelumSeguradora().cotar(
-            RiscoCanonico(ramo="residencia", dados=_RISCO_RESIDENCIA)
+            RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA)
         )
 
     assert resultado.sucesso is True
@@ -200,7 +200,7 @@ async def test_recotar_usa_put() -> None:
 
         resultado = await YelumSeguradora().recotar(
             "YELUM-2026-001",
-            RiscoCanonico(ramo="residencia", dados=_RISCO_RESIDENCIA),
+            RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA),
         )
 
     assert resultado.sucesso is True
@@ -221,7 +221,7 @@ async def test_transmitir_sucesso() -> None:
         resultado = await YelumSeguradora().transmitir(
             PropostaCanonica(
                 cotacao_id="YELUM-2026-001",
-                risco=RiscoCanonico(ramo="residencia", dados=_RISCO_RESIDENCIA),
+                risco=RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA),
                 dados_negocio={
                     "BrokerCode": "001",
                     "BrokerBranchCode": "01",
