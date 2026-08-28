@@ -277,6 +277,7 @@ export interface TransmitirInput {
   comissao_pct: string;
   inicio_vigencia?: string;
   dados_negocio?: Record<string, unknown>;
+  cia?: string;
 }
 
 export interface Proposta {
