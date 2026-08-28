@@ -28,6 +28,7 @@ class ItemComparativoOut(BaseModel):
     cia: str
     cotacao_id_cia: str | None
     premio_total: Decimal | None
+    annual_total: Decimal | None
     restricoes: list[dict[str, str]]
     mensagens: list[str]
     necessita_vistoria: bool
@@ -53,6 +54,18 @@ async def _get_cotacao_ou_404(
     return c
 
 
+def _annual_total(job: CotacaoJob) -> Decimal | None:
+    """Extrai prêmio anual do payload_resposta do adapter, se disponível."""
+    payload = job.payload_resposta or {}
+    raw = payload.get("annual_total")
+    if raw is None:
+        return None
+    try:
+        return Decimal(str(raw)).quantize(Decimal("0.01"))
+    except Exception:
+        return None
+
+
 def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparativoOut]:
     """Monta a lista de resultados por cia para o comparativo."""
     concluidos = [j for j in jobs if j.status == "concluido"]
@@ -63,6 +76,7 @@ def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparati
             cia=j.cia,
             cotacao_id_cia=j.cotacao_id_cia,
             premio_total=j.premio_total,
+            annual_total=_annual_total(j),
             restricoes=[
                 {"codigo": r["codigo"], "mensagem": r["mensagem"]}
                 for r in (j.restricoes or [])
