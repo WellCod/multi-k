@@ -5,9 +5,10 @@ Revises: 004_fix_comissao_pct
 Create Date: 2026-08-28
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "005_encrypt_payload_original"
 down_revision = "004_fix_comissao_pct"
