@@ -58,31 +58,46 @@ _SEED: list[dict[str, str]] = [
         "codigo": "VIDROS",
         "descricao": "Vidros, faróis e retrovisores",
     },
-    # Coberturas — residência
+    # Coberturas — imóvel (CBE; alinhado com adapter de residência)
     {
-        "tipo": "cobertura_residencia",
-        "codigo": "INCENDIO",
-        "descricao": "Incêndio e explosão",
+        "tipo": "cobertura_imovel",
+        "codigo": "CBE10",
+        "descricao": "Incêndio, Raio e Explosão",
     },
     {
-        "tipo": "cobertura_residencia",
-        "codigo": "ROUBO",
-        "descricao": "Roubo e furto qualificado",
+        "tipo": "cobertura_imovel",
+        "codigo": "CBE20",
+        "descricao": "Danos Elétricos",
     },
     {
-        "tipo": "cobertura_residencia",
-        "codigo": "RESP_CIVIL",
-        "descricao": "Responsabilidade civil",
+        "tipo": "cobertura_imovel",
+        "codigo": "CBE30",
+        "descricao": "Roubo e Furto de Bens",
     },
     {
-        "tipo": "cobertura_residencia",
-        "codigo": "DANOS_ELET",
-        "descricao": "Danos elétricos",
+        "tipo": "cobertura_imovel",
+        "codigo": "CBE40",
+        "descricao": "Vendaval, Granizo e Queda de Aeronaves",
     },
     {
-        "tipo": "cobertura_residencia",
-        "codigo": "QUEBRA_VIDROS",
-        "descricao": "Quebra de vidros",
+        "tipo": "cobertura_imovel",
+        "codigo": "CBE50",
+        "descricao": "Responsabilidade Civil Familiar",
+    },
+    {
+        "tipo": "cobertura_imovel",
+        "codigo": "CBE60",
+        "descricao": "Quebra de Vidros",
+    },
+    {
+        "tipo": "cobertura_imovel",
+        "codigo": "CBE70",
+        "descricao": "Aluguel",
+    },
+    {
+        "tipo": "cobertura_imovel",
+        "codigo": "CBE80",
+        "descricao": "Desmoronamento",
     },
     # Franquias
     {"tipo": "franquia", "codigo": "REDUZIDA", "descricao": "Franquia reduzida"},
