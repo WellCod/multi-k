@@ -589,3 +589,36 @@ Cor apenas onde carrega informação — status, alerta, divergência. Copy em v
 **Consequência.** Cada nova seguradora é registrada somente em `registry.py`. Nenhuma lógica de roteamento de adapters precisa existir fora de `app/adapters/`.
 
 **Sinal de violação.** Importar `YelumSeguradora` diretamente em `worker.py` ou em qualquer módulo de `app/infra/`, `app/api/` ou `app/domain/`.
+
+---
+
+## ADR-042 — Proponente aninhado em dados_risco
+
+**Status:** Aceita
+
+**Contexto.** O frontend monta `dados_risco` com um bloco `proponente: { cpf, nome, sexo, data_nascimento, telefone, email, estado_civil, profissao }` aninhado, porque esses dados vêm do Step1 (cliente) enquanto os dados do veículo/imóvel vêm do Step2. Os adapters Yelum e Justos, porém, precisam desses campos "planos" (ex: `dados.cpf`, `dados.nome`).
+
+**Decisão.** Os adapters (_payload_cotacao de ambos) leem os campos em dois níveis: primeiro tentam a chave plana (`dados.get("cpf")`), depois a chave aninhada (`dados.get("proponente", {}).get("cpf")`). Chaves planas têm precedência para compatibilidade retroativa com testes e seed.
+
+**Por quê não normalizar no backend antes de chegar ao adapter.** Normalizar em `cotacao_router.py` ou `worker.py` violaria o princípio de que `app/api` e `app/infra` não conhecem lógica de seguradora. Cada adapter sabe o que precisa — mais resiliente a evolução independente.
+
+**Sinal de violação.** Colocar lógica de extração de `proponente` em `cotacao_router.py` ou `worker.py`.
+
+---
+
+## ADR-043 — Justos como segunda CIA para ramo auto
+
+**Status:** Aceita
+
+**Contexto.** A documentação da API Justos (v2, atualizada 2026-05-27) está disponível. A ativação segue o mesmo padrão de Yelum: configuração via env vars, sem código novo.
+
+**Decisão.** `cias_para_ramo("auto")` retorna `["fake", "justos"]` quando `JUSTOS_PARTNER_NAME` estiver configurado. A ativação é automática — zero código novo além de preencher `.env`.
+
+**Campos específicos do adapter Justos:**
+- `ci_code` em `dados_negocio.transmitir()` para renovações (obrigatório pela API em renovação)
+- `bonus_anterior` (0-10) no Step2Auto — impacta pricing
+- `insurer_code` opcional — filtra cotação para uma seguradora específica dentro da rede Justos
+
+**Diferença do Yelum.** Justos usa JWT ES256 para autenticação (não client_credentials). O token da API é opaco (~28 chars) com TTL fixo de 60 min. Não há endpoint de renovação — expira e renova via nova chamada de auth.
+
+**Sinal de violação.** Importar `JustosSeguradora` diretamente em `worker.py`, `cotacao_router.py` ou qualquer módulo fora de `app/adapters/`.
