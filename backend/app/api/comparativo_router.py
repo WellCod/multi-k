@@ -55,25 +55,23 @@ async def _get_cotacao_ou_404(
 
 def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparativoOut]:
     """Monta a lista de resultados por cia para o comparativo."""
-    cias_processadas = {j.cia for j in jobs if j.status == "concluido"}
-    if not cias_processadas:
+    concluidos = [j for j in jobs if j.status == "concluido"]
+    if not concluidos:
         return []
-
-    restricoes: list[dict[str, str]] = [
-        {"codigo": r["codigo"], "mensagem": r["mensagem"]}
-        for r in (cotacao.restricoes or [])
-    ]
     return [
         ItemComparativoOut(
-            cia=cia,
-            cotacao_id_cia=cotacao.cotacao_id_cia,
-            premio_total=cotacao.premio_total,
-            restricoes=restricoes,
-            mensagens=[str(m) for m in (cotacao.mensagens or [])],
-            necessita_vistoria=cotacao.necessita_vistoria,
-            status=cotacao.status,
+            cia=j.cia,
+            cotacao_id_cia=j.cotacao_id_cia,
+            premio_total=j.premio_total,
+            restricoes=[
+                {"codigo": r["codigo"], "mensagem": r["mensagem"]}
+                for r in (j.restricoes or [])
+            ],
+            mensagens=[str(m) for m in (j.mensagens or [])],
+            necessita_vistoria=j.necessita_vistoria,
+            status=j.status_resultado or "erro",
         )
-        for cia in cias_processadas
+        for j in concluidos
     ]
 
 
