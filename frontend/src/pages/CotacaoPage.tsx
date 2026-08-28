@@ -103,6 +103,9 @@ const step2AutoSchema = z.object({
   finalidade: z.string().min(1, "Obrigatório"),
   blindado: z.boolean().optional(),
   garagem: z.boolean().optional(),
+  zero_km: z.boolean().optional().default(false),
+  ja_segurado: z.boolean().optional().default(false),
+  bonus_anterior: z.coerce.number().int().min(0).max(10).optional().default(0),
 });
 
 const step2MotoSchema = z.object({
@@ -777,7 +780,7 @@ function Step2Auto({
         </Select>
       </Field>
 
-      <div className="flex gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input type="checkbox" {...register("blindado")} />
           Blindado
@@ -786,7 +789,25 @@ function Step2Auto({
           <input type="checkbox" {...register("garagem")} />
           Tem garagem
         </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input type="checkbox" {...register("zero_km")} />
+          0 km
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input type="checkbox" {...register("ja_segurado")} />
+          Já tem seguro
+        </label>
       </div>
+
+      <Field label="Bônus atual (0–10)" error={undefined}>
+        <Select {...register("bonus_anterior")}>
+          {Array.from({ length: 11 }, (_, i) => (
+            <option key={i} value={i}>
+              {i === 0 ? "0 — Sem bônus" : `${i}`}
+            </option>
+          ))}
+        </Select>
+      </Field>
 
       <div className="pt-2 flex justify-between">
         <Button type="button" variant="outline" onClick={onBack}>
