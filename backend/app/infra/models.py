@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.domain.auth import TENANT_ID
+from app.infra.encryption import EncryptedJSON
 
 
 def _utcnow() -> datetime:
@@ -185,8 +186,10 @@ class Cotacao(Base):
     restricoes: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     mensagens: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     necessita_vistoria: Mapped[bool] = mapped_column(Boolean, default=False)
-    # Payload bruto — cifrado em produção (FASE 8/KMS); armazenado em claro até lá
-    payload_original: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+    # Payload bruto — cifrado em repouso com AES-256-GCM (C1)
+    payload_original: Mapped[dict[str, Any] | None] = mapped_column(
+        EncryptedJSON, default=None
+    )
     versao_anterior_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("cotacoes.id"), default=None
     )

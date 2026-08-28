@@ -553,3 +553,23 @@ Cor apenas onde carrega informação — status, alerta, divergência. Copy em v
 **Limitação.** Double-submit exige que o atacante não consiga ler cookies do domínio. `SameSite=Strict + httponly` no cookie de sessão + `secure` em produção garantem isso. A proteção não funciona se o atacante tem XSS — mas XSS com `httponly` é outra camada.
 
 **Sinal de violação.** Remover o middleware de CSRF. Expor o `csrf_token` como campo na resposta JSON em vez de cookie. Fazer o cookie `csrf_token` httponly (JS não conseguiria lê-lo).
+
+---
+
+## ADR-040 — Criptografia de `payload_original`: AES-256-GCM via TypeDecorator
+
+**Status:** Aceita
+
+**Contexto.** O campo `Cotacao.payload_original` armazena a resposta bruta da seguradora, que pode conter dados sensíveis (prêmios, dados do segurado retornados pela API). Estava armazenado em JSONB claro — qualquer acesso direto ao banco expunha esses dados.
+
+**Decisão.** Criptografar em repouso usando AES-256-GCM. Implementado como `EncryptedJSON`, um `TypeDecorator` do SQLAlchemy que intercepta leituras e escritas de forma transparente. A coluna no banco passa a ser `TEXT` com formato `base64(nonce[12] + ciphertext+tag)`. O nonce é gerado aleatoriamente por registro (`os.urandom(12)`), garantindo que dois registros com o mesmo payload produzam ciphertexts distintos. A chave (`PAYLOAD_ENCRYPTION_KEY`) é lida via `get_optional_secret` — 32 bytes em hex (64 chars).
+
+**Por quê TypeDecorator e não hook de aplicação.** O TypeDecorator garante que a criptografia é aplicada em *todas* as escritas e leituras — inclusive bulk inserts e queries diretas via SQLAlchemy. Um hook na camada de rota poderia ser esquecido em novos endpoints. A abordagem é mais defensiva.
+
+**Por quê AES-256-GCM e não AES-CBC.** GCM fornece autenticação integrada (AEAD): qualquer adulteração do ciphertext no banco é detectada na descriptografia com `InvalidTag`. CBC exigiria um MAC separado (HMAC) para o mesmo nível de proteção.
+
+**Migração.** `005_encrypt_payload_original.py` nulifica os valores existentes (dados de desenvolvimento, sem produção ativa) e altera a coluna de JSONB para TEXT. O downgrade restaura o tipo sem dados.
+
+**Limitação.** A chave está na memória do processo. Em produção, a rotação de chave exige re-encriptação de todos os registros. Para Fase 8, integrar com GCP KMS (envelope encryption) resolve isso sem reescrita dos dados.
+
+**Sinal de violação.** Trocar `os.urandom(12)` por nonce fixo ou contador. Remover a verificação de comprimento da chave. Armazenar a chave em texto claro no código. Fazer o TypeDecorator retornar a string base64 sem descriptografar.
