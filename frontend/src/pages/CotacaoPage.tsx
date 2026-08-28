@@ -264,9 +264,13 @@ function TransmitirModal({
   const [vigencia, setVigencia] = useState(
     vigenciaInicio ?? new Date().toISOString().slice(0, 10),
   );
+  // Justos-specific: policy_type mensal/anual
+  const [policyType, setPolicyType] = useState<"monthly" | "annual">("monthly");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [comissaoErr, setComissaoErr] = useState<string | null>(null);
+
+  const isJustos = cia === "justos";
 
   const handleComissaoChange = (pct: number) => {
     if (pct < 1 || pct > 30) {
@@ -287,12 +291,16 @@ function TransmitirModal({
     setLoading(true);
     setErr(null);
     try {
+      const dadosNegocio = isJustos
+        ? { policy_type: policyType, ...(policyType === "annual" ? { installments: parcelas } : {}) }
+        : {};
       const proposta = await api.cotacoes.transmitir(cotacaoId, {
         plano_pagamento: plano,
         n_parcelas: parcelas,
         comissao_pct: comissao,
         inicio_vigencia: vigencia,
         cia,
+        dados_negocio: dadosNegocio,
       });
       onSuccess(proposta);
     } catch (e: unknown) {
@@ -307,6 +315,25 @@ function TransmitirModal({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
         <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Transmitir proposta</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isJustos && (
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">Tipo de pagamento</label>
+              <div className="flex gap-4">
+                {(["monthly", "annual"] as const).map((t) => (
+                  <label key={t} className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="policy_type"
+                      value={t}
+                      checked={policyType === t}
+                      onChange={() => setPolicyType(t)}
+                    />
+                    {t === "monthly" ? "Mensal" : "Anual"}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">Parcelamento</label>
             <select
@@ -477,8 +504,9 @@ function ComparativoInline({
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-left">
                 <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Seguradora</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Prêmio total</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Restrições</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Mensal</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Anual</th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Observações</th>
                 <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Vistoria</th>
                 <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Status</th>
                 <th className="px-4 py-2" />
@@ -489,20 +517,30 @@ function ComparativoInline({
                 <tr key={i} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-3 font-semibold uppercase">{item.cia}</td>
                   <td className="px-4 py-3 font-mono">{formatBRL(item.premio_total)}</td>
-                  <td className="px-4 py-3">
-                    {item.restricoes.length === 0 ? (
+                  <td className="px-4 py-3 font-mono text-gray-500 dark:text-gray-400">
+                    {item.annual_total ? formatBRL(item.annual_total) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                  </td>
+                  <td className="px-4 py-3 max-w-xs">
+                    {item.restricoes.length === 0 && item.mensagens.length === 0 ? (
                       <span className="text-gray-400">—</span>
                     ) : (
-                      item.restricoes.map((r) => (
-                        <span key={r.codigo} className="block text-xs text-yellow-700">
-                          {r.codigo}: {r.mensagem}
-                        </span>
-                      ))
+                      <>
+                        {item.restricoes.map((r) => (
+                          <span key={r.codigo} className="block text-xs text-yellow-700 dark:text-yellow-400">
+                            {r.codigo}: {r.mensagem}
+                          </span>
+                        ))}
+                        {item.mensagens.map((m, j) => (
+                          <span key={j} className="block text-xs text-blue-600 dark:text-blue-400">
+                            {m}
+                          </span>
+                        ))}
+                      </>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     {item.necessita_vistoria ? (
-                      <span className="text-yellow-700 text-xs font-medium">Sim</span>
+                      <span className="text-yellow-700 dark:text-yellow-400 text-xs font-medium">Sim</span>
                     ) : (
                       <span className="text-gray-400 text-xs">Não</span>
                     )}
@@ -1243,53 +1281,6 @@ const STEP_LABELS = [
   "Resultado",
 ];
 
-const MOCK_COMPARATIVO: ItemComparativo[] = [
-  {
-    cia: "Yelum",
-    cotacao_id_cia: "YLM-2026-001482",
-    premio_total: "2340.00",
-    restricoes: [],
-    mensagens: [],
-    necessita_vistoria: false,
-    status: "sucesso",
-  },
-  {
-    cia: "Porto Seguro",
-    cotacao_id_cia: "PRT-2026-008821",
-    premio_total: "2190.50",
-    restricoes: [{ codigo: "R02", mensagem: "Veículo com mais de 10 anos exige vistoria" }],
-    mensagens: [],
-    necessita_vistoria: true,
-    status: "restricao",
-  },
-  {
-    cia: "Tokio Marine",
-    cotacao_id_cia: null,
-    premio_total: null,
-    restricoes: [],
-    mensagens: ["Proposta não aceita para este perfil"],
-    necessita_vistoria: false,
-    status: "erro",
-  },
-  {
-    cia: "Bradesco Seguros",
-    cotacao_id_cia: null,
-    premio_total: null,
-    restricoes: [],
-    mensagens: [],
-    necessita_vistoria: false,
-    status: "processando",
-  },
-  {
-    cia: "Azul Seguros",
-    cotacao_id_cia: null,
-    premio_total: null,
-    restricoes: [],
-    mensagens: [],
-    necessita_vistoria: false,
-    status: "aguardando",
-  },
-];
 
 export function CotacaoPage() {
   const [searchParams] = useSearchParams();
@@ -1366,13 +1357,8 @@ export function CotacaoPage() {
     let cancelled = false;
     api.cotacoes
       .comparativo(cotacaoId)
-      .then((items) => {
-        if (cancelled) return;
-        const apenasAdapterFake =
-          items.length === 0 || items.every((i) => i.cia.toLowerCase() === "fake");
-        setItensComparativo(apenasAdapterFake ? MOCK_COMPARATIVO : items);
-      })
-      .catch(() => { if (!cancelled) setItensComparativo(MOCK_COMPARATIVO); });
+      .then((items) => { if (!cancelled) setItensComparativo(items); })
+      .catch(() => { if (!cancelled) setItensComparativo([]); });
     return () => { cancelled = true; };
   }, [cotacaoId, cotacao, polling]);
 

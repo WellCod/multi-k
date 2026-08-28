@@ -304,6 +304,7 @@ export interface ItemComparativo {
   cia: string;
   cotacao_id_cia: string | null;
   premio_total: string | null;
+  annual_total: string | null;
   restricoes: Restricao[];
   mensagens: string[];
   necessita_vistoria: boolean;
