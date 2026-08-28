@@ -71,6 +71,31 @@ _RESP_COTACAO_VISTORIA = {
     "MensagemInformativa": ["Imóvel requer inspeção antes da emissão."],
 }
 
+_RISCO_RESIDENCIA_ANINHADO: dict[str, object] = {
+    "proponente": {
+        "cpf": "12345678901",
+        "nome": "Maria Silva",
+        "data_nascimento": "1985-03-15",
+        "sexo": "F",
+        "estado_civil": "2",
+        "profissao": "100",
+        "email": "maria@example.com",
+        "telefone": "11999990000",
+    },
+    "cep": "01310100",
+    "tipo_imovel": "apartamento",
+    "tipo_construcao": "1",
+    "valor_imovel": "500000.00",
+    "valor_conteudo": "50000.00",
+    "alarme": True,
+    "cerca_eletrica": False,
+    "grades": True,
+    "inicio_vigencia": "2026-09-01",
+    "fim_vigencia": "2027-09-01",
+    "coberturas": ["CBE10", "CBE20"],
+    "comissao_pct": 20,
+}
+
 _RESP_COTACAO_RECUSADA = {
     "Success": False,
     "Messages": ["Risco não aceito para este CEP."],
@@ -233,3 +258,17 @@ async def test_transmitir_sucesso() -> None:
 
     assert resultado.sucesso is True
     assert resultado.protocolo == "PROP-2026-9999"
+
+
+async def test_cotar_proponente_aninhado() -> None:
+    """Aceita proponente aninhado (formato real do frontend)."""
+    with respx.mock as r:
+        _mock_auth(r)
+        r.post(_QUOTE_URL).mock(return_value=Response(200, json=_RESP_COTACAO_SUCESSO))
+
+        resultado = await YelumSeguradora().cotar(
+            RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA_ANINHADO)
+        )
+
+    assert resultado.sucesso is True
+    assert resultado.premio_total is not None

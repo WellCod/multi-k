@@ -83,17 +83,25 @@ def _tipo_imovel_yelum(tipo: str) -> str:
 def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
     """Monta o body do POST /quote a partir de dados_risco canônicos.
 
-    Nomes de campo baseados no exemplo da documentação Yelum (§4 do escopo).
-    Confirmar nomes exatos com a Collection Postman quando disponível.
+    Aceita tanto chaves planas como aninhadas sob 'proponente' (formato do
+    frontend). Chaves planas têm precedência para compatibilidade retroativa.
+    Nomes de campo Yelum confirmados com a Collection Postman (§4 do escopo).
     """
-    cpf = str(dados.get("cpf") or "")
-    nome = str(dados.get("nome") or "")
-    nascimento = str(dados.get("nascimento") or dados.get("data_nascimento") or "")
-    sexo = str(dados.get("sexo") or "")
-    estado_civil = str(dados.get("estado_civil") or "1")
-    profissao = str(dados.get("profissao") or "")
-    email = str(dados.get("email") or "")
-    telefone = str(dados.get("telefone") or "")
+    prop: dict[str, Any] = dados.get("proponente") or {}
+    cpf = str(dados.get("cpf") or prop.get("cpf") or "")
+    nome = str(dados.get("nome") or prop.get("nome") or "")
+    nascimento = str(
+        dados.get("nascimento")
+        or dados.get("data_nascimento")
+        or prop.get("nascimento")
+        or prop.get("data_nascimento")
+        or ""
+    )
+    sexo = str(dados.get("sexo") or prop.get("sexo") or "")
+    estado_civil = str(dados.get("estado_civil") or prop.get("estado_civil") or "1")
+    profissao = str(dados.get("profissao") or prop.get("profissao") or "")
+    email = str(dados.get("email") or prop.get("email") or "")
+    telefone = str(dados.get("telefone") or prop.get("telefone") or "")
     cep = str(dados.get("cep") or "")
     tipo_imovel = str(dados.get("tipo_imovel") or dados.get("tipo") or "casa")
     tipo_construcao = str(dados.get("tipo_construcao") or "1")
