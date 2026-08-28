@@ -71,6 +71,9 @@ async def processar_job(
             jb.mensagens = list(resultado.mensagens)
             jb.necessita_vistoria = resultado.necessita_vistoria
             jb.status_resultado = status_resultado
+            jb.payload_resposta = (
+                dict(resultado.payload_resposta) if resultado.payload_resposta else None
+            )
 
             # Check if all jobs for this cotacao are complete
             all_jobs = (
