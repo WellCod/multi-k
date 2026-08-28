@@ -260,9 +260,19 @@ class JustosSeguradora:
         """Seleciona coberturas, formaliza proposta e retorna link de checkout."""
         quote_id = p.cotacao_id
         dados: dict[str, Any] = dict(p.dados_negocio)
+        risco_dados: dict[str, Any] = dict(p.risco.dados)
+        prop: dict[str, Any] = risco_dados.get("proponente") or {}
 
-        email = str(dados.get("email") or "")
-        telefone = str(dados.get("telefone") or "")
+        # Preferência: dados_negocio; fallback: dados_risco.proponente
+        email = str(
+            dados.get("email") or prop.get("email") or risco_dados.get("email") or ""
+        )
+        telefone = str(
+            dados.get("telefone")
+            or prop.get("telefone")
+            or risco_dados.get("telefone")
+            or ""
+        )
         policy_type = str(dados.get("policy_type") or "monthly")
         installments_raw = dados.get("installments")
         installments: int | None = int(installments_raw) if installments_raw else None
