@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.registry import cias_para_ramo
 from app.api._utils import get_or_404
 from app.api.deps import CurrentUser
 from app.infra import audit
@@ -149,13 +150,15 @@ async def criar_cotacao(
     db.add(cotacao)
     await db.flush()
 
-    job = CotacaoJob(
-        id=uuid.uuid4(),
-        cotacao_id=cotacao.id,
-        cia="fake",
-        status="pendente",
-    )
-    db.add(job)
+    for cia in cias_para_ramo(body.ramo):
+        db.add(
+            CotacaoJob(
+                id=uuid.uuid4(),
+                cotacao_id=cotacao.id,
+                cia=cia,
+                status="pendente",
+            )
+        )
 
     db.add(
         EventoDB(
@@ -225,13 +228,15 @@ async def recotar(
     db.add(nova)
     await db.flush()
 
-    job = CotacaoJob(
-        id=uuid.uuid4(),
-        cotacao_id=nova.id,
-        cia="fake",
-        status="pendente",
-    )
-    db.add(job)
+    for cia in cias_para_ramo(nova.ramo):
+        db.add(
+            CotacaoJob(
+                id=uuid.uuid4(),
+                cotacao_id=nova.id,
+                cia=cia,
+                status="pendente",
+            )
+        )
 
     ip = request.client.host if request.client else None
     await audit.registrar(
