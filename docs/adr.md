@@ -573,3 +573,19 @@ Cor apenas onde carrega informação — status, alerta, divergência. Copy em v
 **Limitação.** A chave está na memória do processo. Em produção, a rotação de chave exige re-encriptação de todos os registros. Para Fase 8, integrar com GCP KMS (envelope encryption) resolve isso sem reescrita dos dados.
 
 **Sinal de violação.** Trocar `os.urandom(12)` por nonce fixo ou contador. Remover a verificação de comprimento da chave. Armazenar a chave em texto claro no código. Fazer o TypeDecorator retornar a string base64 sem descriptografar.
+
+---
+
+## ADR-041 — Adapter Yelum: registry fora do escopo de scan do test_arch.py
+
+**Status:** Aceita
+
+**Contexto.** O `test_arch.py` proíbe que qualquer símbolo Yelum (inclusive a string `"yelum"`) apareça nos diretórios `app/domain`, `app/api` e `app/infra`. O `app/infra/worker.py`, que era o registro de adapters, ficaria dentro do escopo de scan.
+
+**Decisão.** Criar `app/adapters/registry.py` como fábrica de adapters (`get_adapter(cia)`). Este arquivo fica em `app/adapters/`, que está fora dos diretórios escaneados pelo `test_arch.py`. O `worker.py` importa apenas `get_adapter` de `registry.py`, sem conter diretamente nenhum símbolo Yelum.
+
+**Por quê.** A regra de isolamento do test_arch.py é intencionalmente conservadora: proíbe até a string `"yelum"` em `app/infra/` para forçar que a camada anticorrupção seja respeitada. Mover a fábrica para `app/adapters/` mantém a regra sem precisar modificar o test_arch.py (que é explicitamente proibido de alterar).
+
+**Consequência.** Cada nova seguradora é registrada somente em `registry.py`. Nenhuma lógica de roteamento de adapters precisa existir fora de `app/adapters/`.
+
+**Sinal de violação.** Importar `YelumSeguradora` diretamente em `worker.py` ou em qualquer módulo de `app/infra/`, `app/api/` ou `app/domain/`.
