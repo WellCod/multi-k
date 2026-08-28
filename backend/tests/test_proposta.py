@@ -177,6 +177,28 @@ async def test_comparativo_json(
     assert "cia" in itens[0]
 
 
+async def test_comparativo_estrutura_por_job(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Comparativo retorna resultado por CotacaoJob com todos os campos esperados."""
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_comp2@test.com"
+    )
+    r = await client.get(f"/cotacoes/{cotacao_id}/comparativo")
+    assert r.status_code == 200
+    itens = r.json()
+    assert len(itens) == 1
+
+    item = itens[0]
+    assert item["cia"] == "fake"
+    assert item["status"] == "sucesso"
+    assert item["premio_total"] == "1950.00"
+    assert item["necessita_vistoria"] is False
+    assert item["restricoes"] == []
+    assert item["mensagens"] == []
+    assert item["cotacao_id_cia"] is not None
+
+
 async def test_comparativo_pdf(
     db: AsyncSession, client: AsyncClient, engine: AsyncEngine
 ) -> None:
