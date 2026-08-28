@@ -192,6 +192,40 @@ async def test_transmitir_sem_ci_code() -> None:
     assert "ci_code" not in captured[0]
 
 
+async def test_transmitir_email_de_risco_dados() -> None:
+    """email/telefone lidos de risco.dados.proponente quando ausentes de dados_negocio."""  # noqa: E501
+    captured: list[dict] = []
+
+    with respx.mock as r:
+        _mock_auth(r)
+        r.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
+
+        def _cap(request: respx.patterns.M) -> Response:  # type: ignore[name-defined]
+            import json
+
+            captured.append(json.loads(request.content))
+            return Response(200, json={})
+
+        r.post(_CONVERT_URL).mock(side_effect=_cap)
+        r.get(_CHECKOUT_URL).mock(return_value=Response(200, json=_RESP_CHECKOUT))
+
+        await JustosSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="Q-001",
+                risco=RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_ANINHADO),
+                dados_negocio={
+                    "coverages_selected": {
+                        "colisao-e-desastres-naturais": "colisao-franquia-20"
+                    }
+                },
+            )
+        )
+
+    assert len(captured) == 1
+    assert captured[0]["email"] == ""
+    assert captured[0]["given_phone_number"] == "11999990000"
+
+
 async def test_transmitir_com_ci_code() -> None:
     """ci_code obrigatório em renovações deve ser enviado ao converter_proposta."""
     captured: list[dict] = []
