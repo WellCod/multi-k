@@ -1342,6 +1342,8 @@ export function CotacaoPage() {
       ...(step1Data
         ? {
             proponente: {
+              cpf: step1Data.cpf,
+              telefone: step1Data.telefone,
               nome: step1Data.nome,
               email: step1Data.email,
               estado_civil: step1Data.estado_civil,
