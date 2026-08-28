@@ -1,6 +1,6 @@
 # multi-K — Roadmap
 
-*Atualizado: 2026-08-26*
+*Atualizado: 2026-08-28*
 
 ---
 
@@ -16,7 +16,7 @@
 ✅ FIPE        Proxy Parallelum + FipeSelector combobox
 ✅ UX-SEC      Qualidade e segurança do funil de cotação
 ✅ SEC         Endurecimento de segurança (auditoria 2026-08-26)
-⏳ Fase 5      Adapter Yelum (gate: credencial)
+🔨 Fase 5      Adapter Yelum (scaffold pronto; gate: credencial)
 ⏳ Fase 6      Paridade (gate: ≥99% em 200 cotações)
 ⏳ Fase 7      E-Retorno (gate: Security Assessment)
 ⏳ Fase 8      Deploy GCP + endurecimento
@@ -182,12 +182,31 @@
 ## FASE 5 — Adapter Yelum real
 
 **Gate:** credencial de mock ou homologação  
-**Estimativa:** 3–5 semanas  
-**Produto inicial:** Residência (depois Auto)
+**Estimativa:** 3–5 semanas após receber credencial  
+**Produto inicial:** Residência (produto 11030); Auto aguarda documentação do ponto focal
 
-Contexto: `docs/escopo.md §4` e `docs/prompts.md → FASE 5`
+### Scaffold entregue (2026-08-28)
 
-Ações humanas necessárias antes:
+| Arquivo | Conteúdo |
+|---|---|
+| `app/adapters/yelum/client.py` | HTTP client, auth form-encoded, cache token 1 h, retry em 401 |
+| `app/adapters/yelum/adapter.py` | `YelumSeguradora` — cotar/recotar/transmitir, quirks documentados |
+| `app/adapters/registry.py` | Fábrica `get_adapter(cia)` — fora do escopo de scan do test_arch |
+| `tests/test_yelum_adapter.py` | 7 testes com respx (sucesso, vistoria, recusa, retry 401) |
+
+**Quirks Yelum já tratados:**
+- Booleans como `"T"/"F"` (exceto `NeedInspectionRisk` que é bool real)
+- `TotalPremiumValue` é número no topo, string em `Installments`
+- Chave de sucesso/erro: `Success` (sucesso) vs `Sucesso` (erro) — adapter aceita ambas
+- Retry único automático em 401 sem Redis
+
+**Para ativar quando a credencial chegar:**
+1. Preencher no `.env`: `YELUM_CLIENT_ID`, `YELUM_CLIENT_SECRET`, `YELUM_USERNAME`, `YELUM_PASSWORD`
+2. Ajustar `YELUM_ENV=homologacao` (ou `producao`)
+3. Confirmar nomes de campos com a Collection Postman (ver `_payload_cotacao` em `adapter.py`)
+4. Adicionar `"yelum"` como opção no frontend (seletor de seguradoras)
+
+Ações humanas necessárias:
 1. E-mail ao ponto focal Yelum com 12 perguntas (`docs/escopo.md §10`)
 2. Cadastro no Portal do Desenvolvedor Yelum
 3. NDA (se exigido para homologação)

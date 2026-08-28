@@ -13,9 +13,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.adapters.base import PortaSeguradora, RiscoCanonico
-from app.adapters.fake.adapter import FakeSeguradora
-from app.adapters.justos.adapter import JustosSeguradora
+from app.adapters.base import RiscoCanonico
+from app.adapters.registry import get_adapter
 from app.infra.models import Cotacao, CotacaoJob
 
 logger = logging.getLogger(__name__)
@@ -25,14 +24,6 @@ _POLL_INTERVAL = 1.0
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
-
-
-def get_adapter(cia: str) -> PortaSeguradora:
-    if cia == "fake":
-        return FakeSeguradora()
-    if cia == "justos":
-        return JustosSeguradora()
-    raise ValueError(f"Adapter desconhecido: {cia}")
 
 
 async def processar_job(
