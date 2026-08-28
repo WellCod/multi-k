@@ -234,6 +234,7 @@ const PARCELAMENTOS = ["AVISTA", "2X", "3X", "6X", "10X"];
 
 interface TransmitirModalProps {
   cotacaoId: string;
+  cia?: string;
   vigenciaInicio?: string;
   onClose: () => void;
   onSuccess: (p: Proposta) => void;
@@ -241,6 +242,7 @@ interface TransmitirModalProps {
 
 function TransmitirModal({
   cotacaoId,
+  cia = "fake",
   vigenciaInicio,
   onClose,
   onSuccess,
@@ -279,6 +281,7 @@ function TransmitirModal({
         n_parcelas: parcelas,
         comissao_pct: comissao,
         inicio_vigencia: vigencia,
+        cia,
       });
       onSuccess(proposta);
     } catch (e: unknown) {
@@ -381,7 +384,7 @@ interface ComparativoInlineProps {
   cotacaoId: string;
   itens: ItemComparativo[];
   proposta: Proposta | null;
-  onEmitir: () => void;
+  onEmitir: (cia: string) => void;
   onRecotar: () => void;
 }
 
@@ -439,9 +442,6 @@ function ComparativoInline({
     );
   }
 
-  const podeEmitir =
-    cotacao.status === "sucesso" || cotacao.status === "restricao";
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -470,6 +470,7 @@ function ComparativoInline({
                 <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Restrições</th>
                 <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Vistoria</th>
                 <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Status</th>
+                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -498,6 +499,17 @@ function ComparativoInline({
                   <td className="px-4 py-3">
                     <StatusBadge status={item.status} />
                   </td>
+                  <td className="px-4 py-3">
+                    {(item.status === "sucesso" || item.status === "restricao") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onEmitir(item.cia)}
+                      >
+                        Emitir
+                      </Button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -514,9 +526,6 @@ function ComparativoInline({
         >
           Baixar PDF
         </a>
-        {podeEmitir && (
-          <Button onClick={onEmitir}>Transmitir proposta</Button>
-        )}
         <Tooltip text="Refaz a cotação com os mesmos dados do risco, gerando um novo comparativo">
           <Button variant="outline" onClick={onRecotar}>
             Refazer cotação
@@ -1259,6 +1268,7 @@ export function CotacaoPage() {
   const [itensComparativo, setItensComparativo] = useState<ItemComparativo[]>([]);
   const [proposta, setProposta] = useState<Proposta | null>(null);
   const [showTransmitir, setShowTransmitir] = useState(false);
+  const [transmitirCia, setTransmitirCia] = useState("fake");
 
   // Recotar error
   const [recotarError, setRecotarError] = useState<string | null>(null);
@@ -1596,7 +1606,7 @@ export function CotacaoPage() {
                 cotacaoId={cotacaoId!}
                 itens={itensComparativo}
                 proposta={proposta}
-                onEmitir={() => setShowTransmitir(true)}
+                onEmitir={(cia) => { setTransmitirCia(cia); setShowTransmitir(true); }}
                 onRecotar={handleRecotar}
               />
             )}
@@ -1617,6 +1627,7 @@ export function CotacaoPage() {
       {showTransmitir && cotacaoId && (
         <TransmitirModal
           cotacaoId={cotacaoId}
+          cia={transmitirCia}
           vigenciaInicio={step4Data?.inicio_vigencia}
           onClose={() => setShowTransmitir(false)}
           onSuccess={(p) => {
