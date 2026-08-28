@@ -1,6 +1,6 @@
 # multi-K — Roadmap
 
-*Atualizado: 2026-08-28 (tarde)*
+*Atualizado: 2026-08-28 (noite)*
 
 ---
 
@@ -225,6 +225,8 @@
 | Armazena fipe_price_percentage_covered, commission, plans | `adapters/justos/adapter.py` | ✅ |
 | 5 testes Justos adapter | `tests/test_justos_adapter.py` | ✅ |
 | Cobertura do comparativo por-job | `tests/test_proposta.py` | ✅ |
+| Transmissão multi-CIA — per-row Emitir + adapter routing | `proposta_router.py`, `CotacaoPage.tsx`, `api.ts` | ✅ |
+| `payload_resposta` por CIA em `CotacaoJob` (migration 008) | `models.py`, `worker.py`, `proposta_router.py` | ✅ |
 
 Ações humanas necessárias:
 1. E-mail ao ponto focal Yelum com 12 perguntas (`docs/escopo.md §10`)
