@@ -32,6 +32,12 @@ class _TokenCache:
 _cache = _TokenCache()
 
 
+def _invalida_cache() -> None:
+    """Zera o cache de token (uso exclusivo em testes)."""
+    _cache.token = ""
+    _cache.expira_em = 0.0
+
+
 def _base_url() -> str:
     env = get_optional_secret("JUSTOS_ENV", "staging")
     return _BASE_PROD if env == "production" else _BASE_STAGING
@@ -130,6 +136,7 @@ async def converter_proposta(
     policy_type: str = "monthly",
     installments: int | None = None,
     scheduling_date: str | None = None,
+    ci_code: str | None = None,
 ) -> dict[str, Any]:
     """POST /brokers/quote/convert-formal-quote — formaliza proposta."""
     token = await _obter_token()
@@ -142,6 +149,8 @@ async def converter_proposta(
     }
     if installments is not None:
         body["installments"] = installments
+    if ci_code is not None:
+        body["ci_code"] = ci_code
     async with httpx.AsyncClient() as c:
         resp = await c.post(
             f"{_base_url()}/brokers/quote/convert-formal-quote",

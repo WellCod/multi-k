@@ -3,13 +3,15 @@
 Ramo suportado: auto (veículos).
 
 Campos obrigatórios em dados_risco para ramo=auto:
-  - cpf            CPF do segurado (11 dígitos, sem pontuação)
-  - nome           Nome completo do segurado
-  - sexo           "M" ou "F"
-  - data_nascimento "YYYY-MM-DD"
+  - cpf / proponente.cpf          CPF do segurado (11 dígitos, sem pontuação)
+  - nome / proponente.nome        Nome completo do segurado
+  - sexo / proponente.sexo        "M" ou "F"
+  - data_nascimento / proponente.data_nascimento  "YYYY-MM-DD"
   - cep_pernoite   CEP de pernoite do veículo (8 dígitos)
   - codigo_fipe    Código FIPE do veículo (ex: "023108-8")
   - ano_modelo     Ano modelo do veículo (int ou string)
+
+Aceita tanto chaves planas quanto aninhadas sob 'proponente' (formato frontend).
 
 Campos opcionais:
   - placa, chassi, zero_km, ja_segurado, bonus_anterior (0-10),
@@ -19,9 +21,14 @@ Campos opcionais:
 
 Campos obrigatórios em dados_negocio para transmitir():
   - email              E-mail do segurado
-  - telefone           Celular do segurado
+  - telefone           Celular do segurado (ou via proponente.telefone)
   - coverages_selected  Dict peril→peril_option (do payload_resposta da cotação)
   - policy_type        "monthly" ou "annual" (default: "monthly")
+
+Campos opcionais em dados_negocio:
+  - ci_code           Código CI da apólice anterior (obrigatório em renovações)
+  - installments      Número de parcelas (obrigatório para annual)
+  - scheduling_date   Data de início de vigência futura
 """
 
 from __future__ import annotations
@@ -86,11 +93,22 @@ def _nome_social(nome_completo: str) -> str:
 
 
 def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
-    """Mapeia dados_risco canônicos → payload da API Justos v2."""
-    cpf = str(dados.get("cpf") or "")
-    nome = str(dados.get("nome") or "")
-    sexo = str(dados.get("sexo") or "")
-    nascimento = str(dados.get("data_nascimento") or "")
+    """Mapeia dados_risco canônicos → payload da API Justos v2.
+
+    Aceita chaves planas ou aninhadas sob 'proponente' (formato do frontend).
+    Chaves planas têm precedência para compatibilidade retroativa.
+    """
+    prop: dict[str, Any] = dados.get("proponente") or {}
+    cpf = str(dados.get("cpf") or prop.get("cpf") or "")
+    nome = str(dados.get("nome") or prop.get("nome") or "")
+    sexo = str(dados.get("sexo") or prop.get("sexo") or "")
+    nascimento = str(
+        dados.get("data_nascimento")
+        or prop.get("data_nascimento")
+        or dados.get("nascimento")
+        or prop.get("nascimento")
+        or ""
+    )
     cep = str(dados.get("cep_pernoite") or dados.get("cep") or "")
     codigo_fipe = str(dados.get("codigo_fipe") or dados.get("fipe_codigo") or "")
     ano_modelo = str(dados.get("ano_modelo") or "")
@@ -225,6 +243,12 @@ class JustosSeguradora:
                 "monthly_total": monthly_total,
                 "annual_total": annual_total,
                 "info": info_text,
+                # Campos extras do retorno da cotação (úteis para a UI)
+                "fipe_price_percentage_covered": cotacao_resp.get(
+                    "fipe_price_percentage_covered"
+                ),
+                "commission": cotacao_resp.get("commission"),
+                "plans": cotacao_resp.get("plans", []),
             },
         )
 
@@ -246,6 +270,7 @@ class JustosSeguradora:
         scheduling_date: str | None = (
             str(scheduling_date_raw) if scheduling_date_raw else None
         )
+        ci_code: str | None = str(dados["ci_code"]) if dados.get("ci_code") else None
         coverages_selected: dict[str, Any] = dict(dados.get("coverages_selected") or {})
 
         if not coverages_selected:
@@ -266,6 +291,7 @@ class JustosSeguradora:
                 policy_type=policy_type,
                 installments=installments,
                 scheduling_date=scheduling_date,
+                ci_code=ci_code,
             )
             links = await client.obter_checkout_link(quote_id)
         except httpx.HTTPStatusError as exc:
