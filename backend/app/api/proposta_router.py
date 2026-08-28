@@ -17,7 +17,7 @@ from app.api._utils import get_or_404
 from app.api.deps import CurrentUser
 from app.infra import audit
 from app.infra.db import get_db
-from app.infra.models import Cotacao, EventoDB, Proposta
+from app.infra.models import Cotacao, CotacaoJob, EventoDB, Proposta
 
 router = APIRouter(tags=["propostas"])
 
@@ -45,6 +45,7 @@ class TransmitirInput(BaseModel):
     comissao_pct: Decimal = Field(gt=0, le=1)
     inicio_vigencia: date | None = None
     dados_negocio: dict[str, Any] = Field(default_factory=dict)
+    cia: str = "fake"
 
     @field_validator("dados_negocio")
     @classmethod
@@ -127,7 +128,7 @@ async def transmitir(
     request: Request,
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-    adapter: AdapterDep,
+    _default_adapter: AdapterDep,
 ) -> PropostaOut:
     """Transmite uma cotação aprovada para a seguradora e cria a proposta."""
     stmt = (
@@ -147,6 +148,26 @@ async def transmitir(
             detail="Cotação sem prêmio calculado.",
         )
 
+    # _default_adapter é usado apenas para "fake" (sobrescrito nos testes).
+    # CIAs reais usam get_adapter(cia) e buscam o cotacao_id_cia do job.
+    if body.cia == "fake":
+        adapter: PortaSeguradora = _default_adapter
+        cia_cotacao_id = str(cotacao.cotacao_id_cia or cotacao_id)
+    else:
+        adapter = get_adapter(body.cia)
+        job_r = await db.execute(
+            select(CotacaoJob)
+            .where(CotacaoJob.cotacao_id == cotacao_id)
+            .where(CotacaoJob.cia == body.cia)
+            .where(CotacaoJob.status == "concluido")
+        )
+        job = job_r.scalar_one_or_none()
+        cia_cotacao_id = str(
+            (job.cotacao_id_cia if job else None)
+            or cotacao.cotacao_id_cia
+            or cotacao_id
+        )
+
     risco = RiscoCanonico(ramo=cotacao.ramo, dados=dict(cotacao.dados_risco))
     # Mescla payload_original (ex: coverages_selected da Justos) sob dados_negocio
     # do body — o body tem precedência para sobrescrever valores se necessário
@@ -155,7 +176,7 @@ async def transmitir(
         **dict(body.dados_negocio),
     }
     proposta_canonica = PropostaCanonica(
-        cotacao_id=str(cotacao.cotacao_id_cia or cotacao_id),
+        cotacao_id=cia_cotacao_id,
         risco=risco,
         dados_negocio=merged_negocio,
     )
