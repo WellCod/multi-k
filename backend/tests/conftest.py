@@ -13,6 +13,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault("SECRET_KEY", "test-secret-key-only")
 os.environ.setdefault("CPF_HMAC_KEY", "test-cpf-hmac-key-only-not-for-production")  # noqa: S105
+os.environ.setdefault("PAYLOAD_ENCRYPTION_KEY", "0" * 64)  # 32 zero-bytes — tests only
 # Worker desabilitado em testes — jobs processados manualmente via processar_job()
 os.environ.setdefault("DISABLE_WORKER", "1")
 # Desativa secure cookie para que o httpx (http://test) consiga enviar o cookie
