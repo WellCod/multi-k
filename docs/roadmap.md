@@ -151,11 +151,16 @@
 | A2 | Alto | Sem token CSRF (mitigado por `SameSite=Strict`) | `main.py` + `auth_router.py` + `api.ts` | ✅ Double-submit cookie (middleware + cookie `csrf_token` + header `X-CSRF-Token`) |
 | M4 | Médio | `dados_negocio` sem schema na transmissão | `api/proposta_router.py` | ✅ Validator: max 50 chaves, max 10 KB JSON |
 
+### C1 — concluído ✅
+
+| # | Severidade | Problema | Arquivo | Status |
+|---|---|---|---|---|
+| C1 | Crítico | `payload_original` em JSONB claro | `infra/models.py`, `infra/encryption.py` | ✅ AES-256-GCM via TypeDecorator; chave via PAYLOAD_ENCRYPTION_KEY |
+
 ### Itens planejados (Fase 8 / pré-produção)
 
 | # | Severidade | Problema | Arquivo | Quando |
 |---|---|---|---|---|
-| C1 | Crítico | `payload_original` em JSONB claro | `infra/models.py:188` | Fase 8 (KMS/AES-256-GCM) |
 | A3 | Alto | Rate-limit por IP em memória (não sobrevive restart) | `infra/auth_service.py` | Fase 8 (Redis) |
 | M2 | N/A | Token Justos opaco (~28 chars), não JWT — expiração via TTL fixo (ADR-022) | `adapters/justos/client.py` | — |
 
