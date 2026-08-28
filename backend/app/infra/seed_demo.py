@@ -17,7 +17,7 @@ from app.domain.auth import TENANT_ID
 from app.infra.auth_service import hash_senha
 from app.infra.cpf import cpf_para_idx
 from app.infra.cpf_gen import gerar_cpf
-from app.infra.models import Cliente, Cotacao, Proposta, Usuario
+from app.infra.models import Cliente, Cotacao, CotacaoJob, Proposta, Usuario
 
 # ---------------------------------------------------------------------------
 # Listas de nomes
@@ -413,6 +413,34 @@ async def criar_demo(factory: async_sessionmaker[AsyncSession]) -> None:
                         criado_em=criado_em,
                     )
                     db.add(cot)
+
+                    # Job sintético para que o comparativo tenha dados
+                    if status in ("sucesso", "restricao", "erro"):
+                        job_status_resultado = (
+                            "restricao"
+                            if status == "restricao"
+                            else "sucesso"
+                            if status == "sucesso"
+                            else "erro"
+                        )
+                        db.add(
+                            CotacaoJob(
+                                id=uuid.uuid4(),
+                                cotacao_id=cot.id,
+                                cia="fake",
+                                status="concluido",
+                                tentativas=1,
+                                criado_em=criado_em,
+                                processado_em=criado_em,
+                                cotacao_id_cia=cot.cotacao_id_cia,
+                                premio_total=cot.premio_total,
+                                restricoes=list(cot.restricoes or []),
+                                mensagens=list(cot.mensagens or []),
+                                necessita_vistoria=cot.necessita_vistoria,
+                                status_resultado=job_status_resultado,
+                                tenant_id=TENANT_ID,
+                            )
+                        )
 
                     if status in ("sucesso", "restricao"):
                         cotacoes_sucesso.append((cot, corretor.id))
