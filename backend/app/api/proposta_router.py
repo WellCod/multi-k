@@ -150,18 +150,23 @@ async def transmitir(
 
     # _default_adapter é usado apenas para "fake" (sobrescrito nos testes).
     # CIAs reais usam get_adapter(cia) e buscam o cotacao_id_cia do job.
+    job_r = await db.execute(
+        select(CotacaoJob)
+        .where(CotacaoJob.cotacao_id == cotacao_id)
+        .where(CotacaoJob.cia == body.cia)
+        .where(CotacaoJob.status == "concluido")
+    )
+    job = job_r.scalar_one_or_none()
+
     if body.cia == "fake":
         adapter: PortaSeguradora = _default_adapter
-        cia_cotacao_id = str(cotacao.cotacao_id_cia or cotacao_id)
+        cia_cotacao_id = str(
+            (job.cotacao_id_cia if job else None)
+            or cotacao.cotacao_id_cia
+            or cotacao_id
+        )
     else:
         adapter = get_adapter(body.cia)
-        job_r = await db.execute(
-            select(CotacaoJob)
-            .where(CotacaoJob.cotacao_id == cotacao_id)
-            .where(CotacaoJob.cia == body.cia)
-            .where(CotacaoJob.status == "concluido")
-        )
-        job = job_r.scalar_one_or_none()
         cia_cotacao_id = str(
             (job.cotacao_id_cia if job else None)
             or cotacao.cotacao_id_cia
@@ -169,10 +174,14 @@ async def transmitir(
         )
 
     risco = RiscoCanonico(ramo=cotacao.ramo, dados=dict(cotacao.dados_risco))
-    # Mescla payload_original (ex: coverages_selected da Justos) sob dados_negocio
-    # do body — o body tem precedência para sobrescrever valores se necessário
+    # Ordem de precedência: payload_original (legado) < job.payload_resposta
+    # (por CIA) < body.dados_negocio (overrides explícitos do usuário).
+    # Garante que coverages_selected da Justos chegue ao adapter mesmo sem
+    # o frontend repassar o campo manualmente.
+    job_payload = dict(job.payload_resposta) if job and job.payload_resposta else {}
     merged_negocio: dict[str, Any] = {
         **dict(cotacao.payload_original or {}),
+        **job_payload,
         **dict(body.dados_negocio),
     }
     proposta_canonica = PropostaCanonica(
