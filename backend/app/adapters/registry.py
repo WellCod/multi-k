@@ -25,8 +25,14 @@ def _yelum_configurado() -> bool:
     return bool(get_optional_secret("YELUM_CLIENT_ID"))
 
 
+def _justos_configurado() -> bool:
+    return bool(get_optional_secret("JUSTOS_PARTNER_NAME"))
+
+
 def cias_para_ramo(ramo: str) -> list[str]:
     cias: list[str] = ["fake"]
+    if ramo == "auto" and _justos_configurado():
+        cias.append("justos")
     if ramo == "imovel" and _yelum_configurado():
         cias.append("yelum")
     return cias
