@@ -138,6 +138,15 @@ const step2ImovelSchema = z.object({
     .transform((v) => v.replace(/\./g, "").replace(",", "."))
     .pipe(z.coerce.number().positive("Valor do imóvel deve ser maior que zero"))
     .transform(String),
+  valor_conteudo: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.replace(/\./g, "").replace(",", ".") : "0"))
+    .pipe(z.coerce.number().min(0))
+    .transform(String),
+  alarme: z.boolean().optional().default(false),
+  cerca_eletrica: z.boolean().optional().default(false),
+  grades: z.boolean().optional().default(false),
 });
 
 const step3Schema = z.object({
@@ -937,9 +946,32 @@ function Step2Imovel({
         </Field>
       </div>
 
-      <Field label="Valor do imóvel (R$)" error={errors.valor_imovel?.message}>
-        <Input placeholder="300000,00" {...register("valor_imovel")} />
-      </Field>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Valor do imóvel (R$)" error={errors.valor_imovel?.message}>
+          <Input placeholder="300000,00" {...register("valor_imovel")} />
+        </Field>
+        <Field
+          label="Valor do conteúdo (R$)"
+          error={errors.valor_conteudo?.message}
+        >
+          <Input placeholder="0,00 (opcional)" {...register("valor_conteudo")} />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" {...register("alarme")} />
+          Alarme
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" {...register("cerca_eletrica")} />
+          Cerca elétrica
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" {...register("grades")} />
+          Grades
+        </label>
+      </div>
 
       <div className="pt-2 flex justify-between">
         <Button type="button" variant="outline" onClick={onBack}>
