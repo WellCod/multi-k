@@ -12,12 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import PortaSeguradora, PropostaCanonica, RiscoCanonico
+from app.adapters.registry import get_adapter
 from app.api._utils import get_or_404
 from app.api.deps import CurrentUser
 from app.infra import audit
 from app.infra.db import get_db
 from app.infra.models import Cotacao, EventoDB, Proposta
-from app.infra.worker import get_adapter
 
 router = APIRouter(tags=["propostas"])
 
