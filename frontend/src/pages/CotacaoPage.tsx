@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useId } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -106,6 +106,17 @@ const step2AutoSchema = z.object({
   zero_km: z.boolean().optional().default(false),
   ja_segurado: z.boolean().optional().default(false),
   bonus_anterior: z.coerce.number().int().min(0).max(10).optional().default(0),
+  // Condutor principal (Justos main_driver) — opcional
+  condutor_diferente: z.boolean().optional().default(false),
+  condutor_cpf: z
+    .string()
+    .transform((v) => v.replace(/\D/g, ""))
+    .pipe(z.string().length(11, "CPF deve ter 11 dígitos").or(z.literal("")))
+    .optional(),
+  condutor_nome: z.string().optional(),
+  condutor_sexo: z.enum(["M", "F", ""]).optional(),
+  condutor_nascimento: z.string().optional(),
+  condutor_parentesco: z.string().optional(),
 });
 
 const step2MotoSchema = z.object({
@@ -741,15 +752,19 @@ function Step2Auto({
   onBack: () => void;
   onNext: (data: Step2Data) => void;
 }) {
+  const condutorId = useId();
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<z.infer<typeof step2AutoSchema>>({
     resolver: zodResolver(step2AutoSchema),
     defaultValues: defaultValues as z.infer<typeof step2AutoSchema>,
   });
+
+  const condutorDiferente = watch("condutor_diferente");
 
   function handleFipe(fipe: FipeResult) {
     setValue("codigo_fipe", fipe.codigo_fipe, { shouldValidate: true });
@@ -817,6 +832,56 @@ function Step2Auto({
           ))}
         </Select>
       </Field>
+
+      {/* Condutor principal */}
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+        <label
+          htmlFor={condutorId}
+          className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+        >
+          <input
+            id={condutorId}
+            type="checkbox"
+            {...register("condutor_diferente")}
+          />
+          Condutor principal diferente do segurado
+        </label>
+
+        {condutorDiferente && (
+          <div className="space-y-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="CPF do condutor" error={errors.condutor_cpf?.message}>
+                <Input placeholder="000.000.000-00" {...register("condutor_cpf")} />
+              </Field>
+              <Field label="Nome completo">
+                <Input {...register("condutor_nome")} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Field label="Sexo">
+                <Select {...register("condutor_sexo")}>
+                  <option value="">—</option>
+                  <option value="M">Masculino</option>
+                  <option value="F">Feminino</option>
+                </Select>
+              </Field>
+              <Field label="Nascimento">
+                <Input type="date" {...register("condutor_nascimento")} />
+              </Field>
+              <Field label="Parentesco">
+                <Select {...register("condutor_parentesco")}>
+                  <option value="">—</option>
+                  <option value="conjuge">Cônjuge</option>
+                  <option value="filho">Filho(a)</option>
+                  <option value="pai">Pai / Mãe</option>
+                  <option value="irmao">Irmão(ã)</option>
+                  <option value="outro">Outro</option>
+                </Select>
+              </Field>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="pt-2 flex justify-between">
         <Button type="button" variant="outline" onClick={onBack}>
@@ -1396,8 +1461,21 @@ export function CotacaoPage() {
     setCotacaoErrMsg(null);
     persistRascunho({ step4: data });
 
+    // Remove UI-only flag e campos do condutor quando não há condutor diferente
+    const step2Limpo = { ...(step2Data ?? {}) };
+    if (!step2Limpo.condutor_diferente) {
+      delete step2Limpo.condutor_diferente;
+      delete step2Limpo.condutor_cpf;
+      delete step2Limpo.condutor_nome;
+      delete step2Limpo.condutor_sexo;
+      delete step2Limpo.condutor_nascimento;
+      delete step2Limpo.condutor_parentesco;
+    } else {
+      delete step2Limpo.condutor_diferente;
+    }
+
     const dados: Record<string, unknown> = {
-      ...(step2Data ?? {}),
+      ...step2Limpo,
       coberturas: step3Data?.coberturas ?? [],
       plano_pagamento: data.plano_pagamento,
       inicio_vigencia: data.inicio_vigencia,
