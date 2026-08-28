@@ -31,7 +31,7 @@ async def processar_job(
     cotacao_id: uuid.UUID,
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Executa uma cotação: chama o adapter e persiste o resultado."""
+    """Executa uma cotação: chama o adapter e persiste o resultado no job."""
     async with factory() as db:
         cot_r = await db.execute(select(Cotacao).where(Cotacao.id == cotacao_id))
         cotacao = cot_r.scalar_one_or_none()
@@ -50,48 +50,124 @@ async def processar_job(
         resultado = await adapter.cotar(risco)
 
         if resultado.sucesso and resultado.restricoes:
-            status_final = "restricao"
+            status_resultado = "restricao"
         elif resultado.sucesso:
-            status_final = "sucesso"
+            status_resultado = "sucesso"
         else:
-            status_final = "erro"
+            status_resultado = "erro"
 
         async with factory() as db, db.begin():
-            cot = (
-                await db.execute(select(Cotacao).where(Cotacao.id == cotacao_id))
-            ).scalar_one()
-            cot.status = status_final
-            cot.cotacao_id_cia = resultado.cotacao_id
-            cot.premio_total = resultado.premio_total
-            cot.restricoes = [
-                {"codigo": r.codigo, "mensagem": r.mensagem}
-                for r in resultado.restricoes
-            ]
-            cot.mensagens = list(resultado.mensagens)
-            cot.necessita_vistoria = resultado.necessita_vistoria
-            cot.payload_original = dict(resultado.payload_resposta)
-
             jb = (
                 await db.execute(select(CotacaoJob).where(CotacaoJob.id == job_id))
             ).scalar_one()
             jb.status = "concluido"
             jb.processado_em = _utcnow()
+            jb.cotacao_id_cia = resultado.cotacao_id
+            jb.premio_total = resultado.premio_total
+            jb.restricoes = [
+                {"codigo": r.codigo, "mensagem": r.mensagem}
+                for r in resultado.restricoes
+            ]
+            jb.mensagens = list(resultado.mensagens)
+            jb.necessita_vistoria = resultado.necessita_vistoria
+            jb.status_resultado = status_resultado
+
+            # Check if all jobs for this cotacao are complete
+            all_jobs = (
+                (
+                    await db.execute(
+                        select(CotacaoJob).where(CotacaoJob.cotacao_id == cotacao_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            pending = [j for j in all_jobs if j.status not in ("concluido", "erro")]
+            if not pending:
+                # All done — compute best cotacao status
+                resultados = [
+                    j.status_resultado for j in all_jobs if j.status == "concluido"
+                ]
+                if "sucesso" in resultados:
+                    cotacao_status = "sucesso"
+                elif "restricao" in resultados:
+                    cotacao_status = "restricao"
+                else:
+                    cotacao_status = "erro"
+
+                cot = (
+                    await db.execute(select(Cotacao).where(Cotacao.id == cotacao_id))
+                ).scalar_one()
+                cot.status = cotacao_status
+
+                # For backwards-compat: store the "best" job's result on cotacao
+                best_job = next(
+                    (j for j in all_jobs if j.status_resultado == cotacao_status),
+                    None,
+                )
+                if best_job:
+                    cot.cotacao_id_cia = best_job.cotacao_id_cia
+                    cot.premio_total = best_job.premio_total
+                    cot.restricoes = best_job.restricoes
+                    cot.mensagens = best_job.mensagens
+                    cot.necessita_vistoria = best_job.necessita_vistoria
 
     except Exception:
         logger.exception("Erro ao processar job %s", job_id)
         async with factory() as db, db.begin():
-            err_cot = (
-                await db.execute(select(Cotacao).where(Cotacao.id == cotacao_id))
-            ).scalar_one_or_none()
-            if err_cot is not None:
-                err_cot.status = "erro"
-
             err_jb = (
                 await db.execute(select(CotacaoJob).where(CotacaoJob.id == job_id))
             ).scalar_one_or_none()
             if err_jb is not None:
                 err_jb.status = "erro"
                 err_jb.processado_em = _utcnow()
+
+            # Check if all jobs are done after marking this one as erro
+            all_jobs_err = (
+                (
+                    await db.execute(
+                        select(CotacaoJob).where(CotacaoJob.cotacao_id == cotacao_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            pending_err = [
+                j for j in all_jobs_err if j.status not in ("concluido", "erro")
+            ]
+            if not pending_err:
+                resultados_err = [
+                    j.status_resultado for j in all_jobs_err if j.status == "concluido"
+                ]
+                if "sucesso" in resultados_err:
+                    cotacao_status_err = "sucesso"
+                elif "restricao" in resultados_err:
+                    cotacao_status_err = "restricao"
+                else:
+                    cotacao_status_err = "erro"
+
+                err_cot = (
+                    await db.execute(select(Cotacao).where(Cotacao.id == cotacao_id))
+                ).scalar_one_or_none()
+                if err_cot is not None:
+                    err_cot.status = cotacao_status_err
+
+                    best_job_err = next(
+                        (
+                            j
+                            for j in all_jobs_err
+                            if j.status_resultado == cotacao_status_err
+                        ),
+                        None,
+                    )
+                    if best_job_err:
+                        err_cot.cotacao_id_cia = best_job_err.cotacao_id_cia
+                        err_cot.premio_total = best_job_err.premio_total
+                        err_cot.restricoes = best_job_err.restricoes
+                        err_cot.mensagens = best_job_err.mensagens
+                        err_cot.necessita_vistoria = best_job_err.necessita_vistoria
 
 
 async def _safe_processar(
