@@ -100,12 +100,9 @@ class CotacaoOut(BaseModel):
     proposta_id: uuid.UUID | None = None
 
 
-def _cotacao_out(
-    c: Cotacao, proposta_id: uuid.UUID | None = None
-) -> CotacaoOut:
+def _cotacao_out(c: Cotacao, proposta_id: uuid.UUID | None = None) -> CotacaoOut:
     restricoes: list[dict[str, str]] = [
-        {"codigo": r["codigo"], "mensagem": r["mensagem"]}
-        for r in (c.restricoes or [])
+        {"codigo": r["codigo"], "mensagem": r["mensagem"]} for r in (c.restricoes or [])
     ]
     mensagens: list[str] = [str(m) for m in (c.mensagens or [])]
     return CotacaoOut(

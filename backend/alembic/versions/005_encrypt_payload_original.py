@@ -1,7 +1,7 @@
 """encrypt payload_original with AES-256-GCM (C1)
 
 Revision ID: 005_encrypt_payload_original
-Revises: 004_fix_comissao_pct
+Revises: 004
 Create Date: 2026-08-28
 """
 
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 from alembic import op
 
 revision = "005_encrypt_payload_original"
-down_revision = "004_fix_comissao_pct"
+down_revision = "004"
 branch_labels = None
 depends_on = None
 

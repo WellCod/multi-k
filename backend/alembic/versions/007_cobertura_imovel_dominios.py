@@ -29,10 +29,9 @@ _ANTIGOS = ["INCENDIO", "ROUBO", "RESP_CIVIL", "DANOS_ELET", "QUEBRA_VIDROS"]
 
 
 def upgrade() -> None:
+    op.create_unique_constraint("uq_dominio_tipo_codigo", "dominio", ["tipo", "codigo"])
     conn = op.get_bind()
-    # Remove registros antigos de cobertura_residencia
     conn.execute(sa.text("DELETE FROM dominio WHERE tipo = 'cobertura_residencia'"))
-    # Insere novos registros cobertura_imovel (CBE)
     for codigo, descricao in _NOVOS:
         conn.execute(
             sa.text(
@@ -65,3 +64,4 @@ def downgrade() -> None:
             ),
             {"codigo": codigo, "descricao": descricao},
         )
+    op.drop_constraint("uq_dominio_tipo_codigo", "dominio", type_="unique")
