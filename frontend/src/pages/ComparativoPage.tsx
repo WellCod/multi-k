@@ -187,6 +187,9 @@ export function ComparativoPage() {
       .then(([c, comp]) => {
         setCotacao(c);
         setItens(comp);
+        if (c.proposta_id) {
+          api.propostas.get(c.proposta_id).then(setProposta).catch(() => undefined);
+        }
       })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Erro"))
       .finally(() => setLoading(false));
