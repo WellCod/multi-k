@@ -1252,9 +1252,9 @@ function Step4({
       </div>
 
       {serverError && (
-        <p className="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded px-3 py-2">
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
           {serverError}
-        </p>
+        </div>
       )}
 
       <div className="pt-2 flex justify-between">
@@ -1330,11 +1330,23 @@ export function CotacaoPage() {
   const [recotarError, setRecotarError] = useState<string | null>(null);
 
   const recotar = searchParams.get("recotar");
+  const clienteParam = searchParams.get("cliente");
 
   // Carrega domínios
   useEffect(() => {
     api.dominios.list().then(setDominios).catch(() => {});
   }, []);
+
+  // Se cliente param, começa nova cotação pré-vinculada (descarta rascunho anterior)
+  useEffect(() => {
+    if (!clienteParam) return;
+    clearRascunho();
+    setStep(1);
+    setStep2Data(undefined);
+    setStep3Data(undefined);
+    setStep4Data(undefined);
+    setClienteId(clienteParam);
+  }, [clienteParam]);
 
   // Se recotar param, pré-preenche dados do risco
   useEffect(() => {
@@ -1344,6 +1356,7 @@ export function CotacaoPage() {
       if (cancelled) return;
       setRamo(c.ramo);
       setStep2Data(c.dados_risco as Record<string, unknown>);
+      if (c.cliente_id) setClienteId(c.cliente_id);
     }).catch(() => {
       if (!cancelled) setRecotarError("Não foi possível carregar os dados da cotação anterior.");
     });
@@ -1503,18 +1516,9 @@ export function CotacaoPage() {
     }
   };
 
-  const handleRecotar = async () => {
+  const handleRecotar = () => {
     if (!cotacaoId) return;
-    try {
-      const created = await api.cotacoes.recotar(cotacaoId);
-      setCotacaoId(created.id);
-      setCotacao(null);
-      setItensComparativo([]);
-      navigate(`/cotacao?recotar=${cotacaoId}`);
-      setStep(1);
-    } catch {
-      // ignore
-    }
+    navigate(`/cotacao?recotar=${cotacaoId}`);
   };
 
   const handleCancel = () => {

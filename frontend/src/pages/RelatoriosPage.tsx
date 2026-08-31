@@ -5,6 +5,7 @@ import {
   type MixOut,
   type ProducaoOut,
 } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { formatBRL } from "@/lib/utils";
 
 const PERIODOS = [
@@ -141,6 +142,8 @@ function Mix({ dados }: { dados: MixOut[] }) {
 }
 
 export function RelatoriosPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.papel === "admin";
   const [periodo, setPeriodo] = useState(30);
   const [producao, setProducao] = useState<ProducaoOut[] | null>(null);
   const [funil, setFunil] = useState<FunilOut | null>(null);
@@ -151,19 +154,27 @@ export function RelatoriosPage() {
   useEffect(() => {
     setLoading(true);
     setErr(null);
-    Promise.all([
-      api.relatorios.producao(periodo),
-      api.relatorios.funil(periodo),
-      api.relatorios.mix(periodo),
-    ])
-      .then(([p, f, m]) => {
-        setProducao(p);
-        setFunil(f);
-        setMix(m);
-      })
+    const requests = isAdmin
+      ? Promise.all([
+          api.relatorios.producao(periodo),
+          api.relatorios.funil(periodo),
+          api.relatorios.mix(periodo),
+        ]).then(([p, f, m]) => {
+          setProducao(p);
+          setFunil(f);
+          setMix(m);
+        })
+      : Promise.all([
+          api.relatorios.funil(periodo),
+          api.relatorios.mix(periodo),
+        ]).then(([f, m]) => {
+          setFunil(f);
+          setMix(m);
+        });
+    requests
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Erro"))
       .finally(() => setLoading(false));
-  }, [periodo]);
+  }, [periodo, isAdmin]);
 
   return (
     <div className="space-y-6">
@@ -187,32 +198,38 @@ export function RelatoriosPage() {
       </div>
 
       {loading && <p className="text-sm text-gray-500 dark:text-gray-400">Carregando…</p>}
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && (
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+          {err}
+        </div>
+      )}
 
       {!loading && !err && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                Produção por corretor
-              </h2>
-              <div className="flex gap-2">
-                <a
-                  href={api.relatorios.exportUrl("producao", periodo, "csv")}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  CSV
-                </a>
-                <a
-                  href={api.relatorios.exportUrl("producao", periodo, "xlsx")}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  XLSX
-                </a>
+          {isAdmin && (
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                  Produção por corretor
+                </h2>
+                <div className="flex gap-2">
+                  <a
+                    href={api.relatorios.exportUrl("producao", periodo, "csv")}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    CSV
+                  </a>
+                  <a
+                    href={api.relatorios.exportUrl("producao", periodo, "xlsx")}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    XLSX
+                  </a>
+                </div>
               </div>
+              {producao && <TabelaProducao dados={producao} />}
             </div>
-            {producao && <TabelaProducao dados={producao} />}
-          </div>
+          )}
 
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">

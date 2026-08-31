@@ -14,7 +14,7 @@ from app.api._utils import get_or_404
 from app.api.deps import CurrentUser
 from app.infra import audit
 from app.infra.db import get_db
-from app.infra.models import Cotacao, CotacaoJob, EventoDB
+from app.infra.models import Cotacao, CotacaoJob, EventoDB, Proposta
 
 router = APIRouter(prefix="/cotacoes", tags=["cotacoes"])
 
@@ -97,11 +97,15 @@ class CotacaoOut(BaseModel):
     versao_anterior_id: uuid.UUID | None
     criado_em: str
     dados_risco: dict[str, Any]
+    proposta_id: uuid.UUID | None = None
 
 
-def _cotacao_out(c: Cotacao) -> CotacaoOut:
+def _cotacao_out(
+    c: Cotacao, proposta_id: uuid.UUID | None = None
+) -> CotacaoOut:
     restricoes: list[dict[str, str]] = [
-        {"codigo": r["codigo"], "mensagem": r["mensagem"]} for r in (c.restricoes or [])
+        {"codigo": r["codigo"], "mensagem": r["mensagem"]}
+        for r in (c.restricoes or [])
     ]
     mensagens: list[str] = [str(m) for m in (c.mensagens or [])]
     return CotacaoOut(
@@ -117,6 +121,7 @@ def _cotacao_out(c: Cotacao) -> CotacaoOut:
         versao_anterior_id=c.versao_anterior_id,
         criado_em=c.criado_em.isoformat(),
         dados_risco=c.dados_risco,
+        proposta_id=proposta_id,
     )
 
 
@@ -190,7 +195,14 @@ async def obter_cotacao(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CotacaoOut:
     c = await _get_cotacao_ou_404(cotacao_id, usuario.id, db)
-    return _cotacao_out(c)
+    p_row = await db.execute(
+        select(Proposta.id)
+        .where(Proposta.cotacao_id == cotacao_id)
+        .order_by(Proposta.transmitida_em.desc())
+        .limit(1)
+    )
+    proposta_id: uuid.UUID | None = p_row.scalar_one_or_none()
+    return _cotacao_out(c, proposta_id)
 
 
 @router.get("", response_model=list[CotacaoOut])
@@ -203,7 +215,18 @@ async def listar_cotacoes(
         .where(Cotacao.usuario_id == usuario.id)
         .order_by(Cotacao.criado_em.desc())
     )
-    return [_cotacao_out(c) for c in result.scalars().all()]
+    cotacoes = list(result.scalars().all())
+    proposta_map: dict[uuid.UUID, uuid.UUID] = {}
+    if cotacoes:
+        ids = [c.id for c in cotacoes]
+        p_rows = await db.execute(
+            select(Proposta.cotacao_id, Proposta.id)
+            .where(Proposta.cotacao_id.in_(ids))
+            .distinct(Proposta.cotacao_id)
+            .order_by(Proposta.cotacao_id, Proposta.transmitida_em.desc())
+        )
+        proposta_map = {row[0]: row[1] for row in p_rows}
+    return [_cotacao_out(c, proposta_map.get(c.id)) for c in cotacoes]
 
 
 @router.post("/{cotacao_id}/recotar", response_model=CotacaoCriadaOut, status_code=202)
