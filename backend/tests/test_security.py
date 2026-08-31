@@ -192,9 +192,8 @@ async def test_rate_limit_janela_expirada_permite_novamente() -> None:
 def test_encrypted_json_roundtrip() -> None:
     """Encrypt→decrypt deve devolver o mesmo objeto."""
     import os
-    os.environ.setdefault(
-        "PAYLOAD_ENCRYPTION_KEY", "0" * 64
-    )
+
+    os.environ.setdefault("PAYLOAD_ENCRYPTION_KEY", "0" * 64)
     from app.infra.encryption import EncryptedJSON
 
     col = EncryptedJSON()
