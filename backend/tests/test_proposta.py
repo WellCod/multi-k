@@ -221,6 +221,29 @@ async def test_renovacoes_vazio(
     assert r.json() == []
 
 
+async def test_cotacao_expoe_proposta_id(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """CotacaoOut.proposta_id é None antes de transmitir e preenchido depois."""
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_pid@test.com"
+    )
+
+    r_antes = await client.get(f"/cotacoes/{cotacao_id}")
+    assert r_antes.status_code == 200
+    assert r_antes.json()["proposta_id"] is None
+
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir", json=_TRANSMITIR_BODY
+    )
+    assert r_tx.status_code == 201
+    proposta_id = r_tx.json()["id"]
+
+    r_depois = await client.get(f"/cotacoes/{cotacao_id}")
+    assert r_depois.status_code == 200
+    assert r_depois.json()["proposta_id"] == proposta_id
+
+
 @pytest.mark.parametrize("sem_auth", [True])
 async def test_transmitir_sem_auth(
     client: AsyncClient, engine: AsyncEngine, sem_auth: bool
