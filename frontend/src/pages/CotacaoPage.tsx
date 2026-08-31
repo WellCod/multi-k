@@ -1356,6 +1356,7 @@ export function CotacaoPage() {
       if (cancelled) return;
       setRamo(c.ramo);
       setStep2Data(c.dados_risco as Record<string, unknown>);
+      if (c.cliente_id) setClienteId(c.cliente_id);
     }).catch(() => {
       if (!cancelled) setRecotarError("Não foi possível carregar os dados da cotação anterior.");
     });
