@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type Cliente } from "@/lib/api";
+import { api, type Cliente, type ClienteInput } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/Pagination";
@@ -11,6 +11,117 @@ function fmtData(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
+function NovoClienteModal({
+  onSave,
+  onClose,
+}: {
+  onSave: (c: Cliente) => void;
+  onClose: () => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const cpfDigits = cpf.replace(/\D/g, "");
+  const cpfValid = cpfDigits.length === 11;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cpfValid) return;
+    setSaving(true);
+    setErr(null);
+    const body: ClienteInput = { nome: nome.trim(), cpf: cpfDigits };
+    if (email.trim()) body.email = email.trim();
+    if (telefone.trim()) body.telefone = telefone.trim();
+    try {
+      const created = await api.clientes.create(body);
+      onSave(created);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Erro ao criar cliente");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Novo cliente</h2>
+
+        {err && (
+          <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-400">
+            {err}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">Nome *</label>
+            <Input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Nome completo"
+              required
+              className="mt-0.5"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">CPF *</label>
+            <Input
+              value={cpf}
+              onChange={(e) => setCpf(e.target.value)}
+              placeholder="000.000.000-00"
+              maxLength={14}
+              className="mt-0.5"
+            />
+            {cpf && !cpfValid && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">CPF deve ter 11 dígitos</p>
+            )}
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">E-mail</label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="cliente@exemplo.com"
+              className="mt-0.5"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">Telefone</label>
+            <Input
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              placeholder="(11) 90000-0000"
+              className="mt-0.5"
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end pt-1">
+            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={saving || !nome.trim() || !cpfValid}
+            >
+              {saving ? "Criando…" : "Criar cliente"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function ClientesPage() {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -18,6 +129,7 @@ export function ClientesPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(1);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     api.clientes
@@ -48,6 +160,16 @@ export function ClientesPage() {
 
   return (
     <div className="space-y-4">
+      {showModal && (
+        <NovoClienteModal
+          onSave={(created) => {
+            setClientes((prev) => [created, ...prev]);
+            setShowModal(false);
+          }}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -60,9 +182,14 @@ export function ClientesPage() {
             </p>
           )}
         </div>
-        <Button size="sm" onClick={() => navigate("/cotacao")}>
-          Nova cotação
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowModal(true)}>
+            Novo cliente
+          </Button>
+          <Button size="sm" onClick={() => navigate("/cotacao")}>
+            Nova cotação
+          </Button>
+        </div>
       </div>
 
       <Input
