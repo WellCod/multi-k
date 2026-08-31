@@ -269,6 +269,7 @@ export interface Cotacao {
   versao_anterior_id: string | null;
   criado_em: string;
   dados_risco: Record<string, unknown>;
+  proposta_id: string | null;
 }
 
 export interface TransmitirInput {
