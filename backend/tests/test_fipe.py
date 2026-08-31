@@ -100,9 +100,7 @@ async def test_fipe_modelos_retorna_lista(client: AsyncClient) -> None:
 async def test_fipe_anos_retorna_lista(client: AsyncClient) -> None:
     """GET /fipe/anos deve retornar lista de anos do modelo."""
     respx.get(f"{_PARALLELUM}/carros/marcas/59/modelos/5993/anos").mock(
-        return_value=Response(
-            200, json=[{"codigo": "2022-1", "nome": "2022 Gasolina"}]
-        )
+        return_value=Response(200, json=[{"codigo": "2022-1", "nome": "2022 Gasolina"}])
     )
     r = await client.get(
         "/fipe/anos", params={"tipo": "carros", "marca_id": "59", "modelo_id": "5993"}
@@ -119,9 +117,7 @@ async def test_fipe_anos_retorna_lista(client: AsyncClient) -> None:
 @respx.mock
 async def test_fipe_preco_retorna_item(client: AsyncClient) -> None:
     """GET /fipe/preco deve retornar dict com campos normalizados."""
-    respx.get(
-        f"{_PARALLELUM}/carros/marcas/59/modelos/5993/anos/2022-1"
-    ).mock(
+    respx.get(f"{_PARALLELUM}/carros/marcas/59/modelos/5993/anos/2022-1").mock(
         return_value=Response(
             200,
             json={
