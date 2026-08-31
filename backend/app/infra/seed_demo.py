@@ -17,7 +17,15 @@ from app.domain.auth import TENANT_ID
 from app.infra.auth_service import hash_senha
 from app.infra.cpf import cpf_para_idx
 from app.infra.cpf_gen import gerar_cpf
-from app.infra.models import Cliente, Cotacao, CotacaoJob, Proposta, Usuario
+from app.infra.models import (
+    Cliente,
+    Cotacao,
+    CotacaoJob,
+    Imovel,
+    Proposta,
+    Usuario,
+    Veiculo,
+)
 
 # ---------------------------------------------------------------------------
 # Listas de nomes
@@ -347,6 +355,42 @@ async def criar_demo(factory: async_sessionmaker[AsyncSession]) -> None:
                 db.add(cli)
                 clientes_por_corretor[corretor.id].append(cli)
                 idx_global += 1
+
+        await db.flush()
+
+        # ------------------------------------------------------------------
+        # Cria veículos e imóveis registrados (~60% / ~25% dos clientes)
+        # ------------------------------------------------------------------
+        todos_clientes = [c for lst in clientes_por_corretor.values() for c in lst]
+        for cli in todos_clientes:
+            if random.random() < 0.60:
+                marca, modelo, comb = random.choice(_VEICULOS)
+                ano = random.randint(2015, 2024)
+                db.add(
+                    Veiculo(
+                        id=uuid.uuid4(),
+                        cliente_id=cli.id,
+                        marca=marca,
+                        modelo=modelo,
+                        ano_fabricacao=ano,
+                        ano_modelo=ano + 1,
+                        combustivel=comb,
+                        finalidade="lazer",
+                        cep_pernoite=random.choice(_CEPS),
+                        tenant_id=TENANT_ID,
+                    )
+                )
+            if random.random() < 0.25:
+                db.add(
+                    Imovel(
+                        id=uuid.uuid4(),
+                        cliente_id=cli.id,
+                        cep=random.choice(_CEPS),
+                        tipo_imovel=random.choice(["casa", "apartamento"]),
+                        tipo_construcao="alvenaria",
+                        tenant_id=TENANT_ID,
+                    )
+                )
 
         await db.flush()
 
