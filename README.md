@@ -28,12 +28,14 @@ Sistema desenvolvido do zero para uma corretora de seguros substituir planilhas 
 | **Multicálculo async** | Fan-out para N seguradoras com fila em Postgres (SKIP LOCKED), timeout por CIA, resultado parcial exibido conforme chega |
 | **Funil de cotação** | 5 passos (Auto, Moto e Imóvel), autosave por passo, recotar a partir de cotação anterior, finalidade Uber/Táxi |
 | **Tabela FIPE integrada** | Seleção Marca → Modelo → Ano com busca inline, valor FIPE em tempo real, proxy com cache 30 dias no backend |
-| **Comparativo inline** | Tabela com todas as seguradoras, prêmio, restrições, vistoria e botão "Transmitir" por resultado |
-| **Gestão de carteira** | Clientes, apólices, parcelas, comissão prevista, renovações por janela D-30/D-45/D-60 |
+| **Comparativo inline** | Tabela por CIA com prêmio mensal/anual, restrições, vistoria, "Emitir" por linha e calendário de parcelas lazy-load |
+| **Gestão de clientes** | Listagem com busca, criação via modal, edição inline, veículos e imóveis por cliente |
+| **Gestão de carteira** | Apólices, parcelas, comissão prevista, renovações por janela D-30/D-45/D-60 |
 | **Dashboard por papel** | Corretor: fila de trabalho. Admin: KPIs de produção, conversão e comissão |
 | **Relatórios exportáveis** | Produção por corretor, funil de conversão, mix de carteira — export CSV e XLSX |
 | **Timeline do cliente** | Cotação → proposta → apólice → parcela, tudo ordenado e imutável |
-| **Auditoria append-only** | Toda ação relevante registrada; UPDATE e DELETE bloqueados por trigger no Postgres |
+| **Auditoria append-only** | Toda ação registrada; UPDATE e DELETE bloqueados por trigger no Postgres |
+| **Segurança endurecida** | CSRF double-submit, AES-256-GCM no payload, cookie httponly/secure/samesite=strict, CORS guard produção |
 
 ---
 
@@ -130,7 +132,7 @@ cd frontend && npm run dev    # http://localhost:5173
 | Corretor | `carlos.mendes@demo.multik` | `Demo@2026` |
 | Admin | `admin@demo.multik` | `Admin@2026` |
 
-O seed cria ~40 clientes, ~120 cotações e ~60 propostas com dados sintéticos plausíveis (CPFs válidos pelo algoritmo, nomes brasileiros, região Campinas). Idempotente — pode rodar várias vezes.
+O seed cria ~40 clientes, ~120 cotações, ~60 propostas e veículos/imóveis para ~60%/25% dos clientes, com dados sintéticos plausíveis (CPFs válidos pelo algoritmo, nomes brasileiros, região Campinas). Idempotente — pode rodar várias vezes.
 
 ---
 
@@ -171,9 +173,10 @@ O CI executa automaticamente em todo push e pull request. `gitleaks` bloqueia me
 | 2 | Cotação end-to-end | ✅ concluída | — |
 | 3 | Comparativo, PDF, gestão de carteira | ✅ concluída | — |
 | 4 | Dashboard, relatórios, seed de demonstração | ✅ concluída | — |
-| — | FIPE: proxy + FipeSelector combobox | ✅ concluída | — |
-| — | UX-SEC: qualidade e segurança do funil | 🔧 em andamento | — |
-| 5 | Adapter Yelum real (Auto + Residência) | ⏳ aguardando | Credencial de homologação |
+| — | FIPE: proxy Parallelum + FipeSelector combobox | ✅ concluída | — |
+| — | UX-SEC: validações, race-fix, responsividade | ✅ concluída | — |
+| — | SEC: CSRF, AES-256-GCM, SHA-256, rate-limit, CORS | ✅ concluída | — |
+| 5 | Adapter Yelum + Justos (scaffold + docs) | ✅ scaffold; ⏳ gate | Credenciais de homologação |
 | 6 | Paridade ≥ 99% em 200 cotações | ⏳ aguardando | Gate da Fase 5 |
 | 7 | E-Retorno (comissão recebida, sinistro) | ⏳ aguardando | Security Assessment |
 | 8 | Deploy GCP + endurecimento | ⏳ aguardando | Precede chave de produção |
