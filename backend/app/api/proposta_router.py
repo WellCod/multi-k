@@ -158,20 +158,12 @@ async def transmitir(
     )
     job = job_r.scalar_one_or_none()
 
-    if body.cia == "fake":
-        adapter: PortaSeguradora = _default_adapter
-        cia_cotacao_id = str(
-            (job.cotacao_id_cia if job else None)
-            or cotacao.cotacao_id_cia
-            or cotacao_id
-        )
-    else:
-        adapter = get_adapter(body.cia)
-        cia_cotacao_id = str(
-            (job.cotacao_id_cia if job else None)
-            or cotacao.cotacao_id_cia
-            or cotacao_id
-        )
+    adapter: PortaSeguradora = (
+        _default_adapter if body.cia == "fake" else get_adapter(body.cia)
+    )
+    cia_cotacao_id = str(
+        (job.cotacao_id_cia if job else None) or cotacao.cotacao_id_cia or cotacao_id
+    )
 
     risco = RiscoCanonico(ramo=cotacao.ramo, dados=dict(cotacao.dados_risco))
     # Ordem de precedência: payload_original (legado) < job.payload_resposta

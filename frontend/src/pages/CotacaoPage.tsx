@@ -1516,18 +1516,9 @@ export function CotacaoPage() {
     }
   };
 
-  const handleRecotar = async () => {
+  const handleRecotar = () => {
     if (!cotacaoId) return;
-    try {
-      const created = await api.cotacoes.recotar(cotacaoId);
-      setCotacaoId(created.id);
-      setCotacao(null);
-      setItensComparativo([]);
-      navigate(`/cotacao?recotar=${cotacaoId}`);
-      setStep(1);
-    } catch {
-      // ignore
-    }
+    navigate(`/cotacao?recotar=${cotacaoId}`);
   };
 
   const handleCancel = () => {
