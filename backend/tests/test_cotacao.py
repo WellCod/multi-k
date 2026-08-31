@@ -179,3 +179,57 @@ async def test_dominios_filtro_tipo(
 async def test_dominios_sem_auth(client: AsyncClient, engine: AsyncEngine) -> None:
     r = await client.get("/dominios")
     assert r.status_code == 401
+
+
+async def test_cotacao_preserva_cliente_id(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Cotação criada com cliente_id expõe esse vínculo no GET."""
+    await _login(client, db, "corretor_clid@test.com")
+    r_cli = await client.post(
+        "/clientes", json={"nome": "Teste Vínculo", "cpf": "66666666666"}
+    )
+    assert r_cli.status_code == 201
+    cliente_id = r_cli.json()["id"]
+
+    r = await client.post(
+        "/cotacoes",
+        json={**_RISCO_AUTO, "cliente_id": cliente_id},
+    )
+    assert r.status_code == 202
+    cotacao_id = r.json()["id"]
+
+    r2 = await client.get(f"/cotacoes/{cotacao_id}")
+    assert r2.json()["cliente_id"] == cliente_id
+
+
+async def test_nova_cotacao_preserva_cliente_e_versao_anterior(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """POST /cotacoes com versao_anterior_id e cliente_id preserva ambos.
+
+    Simula o fluxo do frontend após ?recotar=: o novo objeto tem vínculo ao
+    cliente e à cotação original.
+    """
+    await _login(client, db, "corretor_recotar_cli@test.com")
+    r_cli = await client.post(
+        "/clientes", json={"nome": "Recotar Cliente", "cpf": "77777777777"}
+    )
+    cliente_id = r_cli.json()["id"]
+
+    r_orig = await client.post(
+        "/cotacoes", json={**_RISCO_AUTO, "cliente_id": cliente_id}
+    )
+    orig_id = r_orig.json()["id"]
+
+    r_nova = await client.post(
+        "/cotacoes",
+        json={**_RISCO_AUTO, "cliente_id": cliente_id, "versao_anterior_id": orig_id},
+    )
+    assert r_nova.status_code == 202
+    nova_id = r_nova.json()["id"]
+
+    r3 = await client.get(f"/cotacoes/{nova_id}")
+    body = r3.json()
+    assert body["cliente_id"] == cliente_id
+    assert body["versao_anterior_id"] == orig_id
