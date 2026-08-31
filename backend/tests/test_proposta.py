@@ -193,7 +193,7 @@ async def test_comparativo_estrutura_por_job(
     assert item["cia"] == "fake"
     assert item["status"] == "sucesso"
     assert item["premio_total"] == "1950.00"
-    assert item["annual_total"] is None  # fake adapter não retorna preço anual
+    assert item["annual_total"] == "21060.00"
     assert item["necessita_vistoria"] is False
     assert item["restricoes"] == []
     assert item["mensagens"] == []
@@ -221,9 +221,187 @@ async def test_renovacoes_vazio(
     assert r.json() == []
 
 
+async def test_renovacoes_janelas(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Proposta com vigência expirando em ≤30 dias aparece na janela D30."""
+    from datetime import timedelta
+
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_ren2@test.com"
+    )
+    # inicio_vigencia 335 dias atrás → fim = hoje + 30 dias → D30
+    inicio = date.today() - timedelta(days=335)
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir",
+        json={**_TRANSMITIR_BODY, "inicio_vigencia": str(inicio)},
+    )
+    assert r_tx.status_code == 201
+
+    r = await client.get("/renovacoes")
+    assert r.status_code == 200
+    items = r.json()
+    assert len(items) >= 1
+    item = items[0]
+    assert item["janela"] == "D30"
+    assert item["dias_para_vencer"] <= 30
+
+
+async def test_renovacoes_janela_d45(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Proposta com vigência expirando em 31–45 dias aparece na janela D45."""
+    from datetime import timedelta
+
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_ren3@test.com"
+    )
+    inicio = date.today() - timedelta(days=322)  # fim = hoje + 43 dias
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir",
+        json={**_TRANSMITIR_BODY, "inicio_vigencia": str(inicio)},
+    )
+    assert r_tx.status_code == 201
+
+    r = await client.get("/renovacoes")
+    assert r.status_code == 200
+    items = r.json()
+    assert any(i["janela"] == "D45" for i in items)
+
+
+async def test_renovacoes_janela_d60(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Proposta com vigência expirando em 46–60 dias aparece na janela D60."""
+    from datetime import timedelta
+
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_ren4@test.com"
+    )
+    inicio = date.today() - timedelta(days=305)  # fim = hoje + 60 dias
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir",
+        json={**_TRANSMITIR_BODY, "inicio_vigencia": str(inicio)},
+    )
+    assert r_tx.status_code == 201
+
+    r = await client.get("/renovacoes")
+    assert r.status_code == 200
+    items = r.json()
+    assert any(i["janela"] == "D60" for i in items)
+
+
+async def test_cotacao_expoe_proposta_id(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """CotacaoOut.proposta_id é None antes de transmitir e preenchido depois."""
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_pid@test.com"
+    )
+
+    r_antes = await client.get(f"/cotacoes/{cotacao_id}")
+    assert r_antes.status_code == 200
+    assert r_antes.json()["proposta_id"] is None
+
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir", json=_TRANSMITIR_BODY
+    )
+    assert r_tx.status_code == 201
+    proposta_id = r_tx.json()["id"]
+
+    r_depois = await client.get(f"/cotacoes/{cotacao_id}")
+    assert r_depois.status_code == 200
+    assert r_depois.json()["proposta_id"] == proposta_id
+
+
+async def test_listar_cotacoes_proposta_id(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /cotacoes lista também expõe proposta_id por item."""
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_listpid@test.com"
+    )
+
+    r_lista = await client.get("/cotacoes")
+    assert r_lista.status_code == 200
+    item = next(c for c in r_lista.json() if c["id"] == str(cotacao_id))
+    assert item["proposta_id"] is None
+
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir", json=_TRANSMITIR_BODY
+    )
+    proposta_id = r_tx.json()["id"]
+
+    r_lista2 = await client.get("/cotacoes")
+    item2 = next(c for c in r_lista2.json() if c["id"] == str(cotacao_id))
+    assert item2["proposta_id"] == proposta_id
+
+
 @pytest.mark.parametrize("sem_auth", [True])
 async def test_transmitir_sem_auth(
     client: AsyncClient, engine: AsyncEngine, sem_auth: bool
 ) -> None:
     r = await client.post(f"/cotacoes/{uuid.uuid4()}/transmitir", json=_TRANSMITIR_BODY)
     assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# comparativo_router — caminhos não cobertos
+# ---------------------------------------------------------------------------
+
+
+async def test_comparativo_404_cotacao_invalida(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /comparativo com UUID inexistente deve retornar 404."""
+    await _login(client, db, "corretor_comp404@test.com")
+    r = await client.get(f"/cotacoes/{uuid.uuid4()}/comparativo")
+    assert r.status_code == 404
+
+
+async def test_comparativo_sem_jobs_concluidos_retorna_lista_vazia(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Cotação sem jobs concluídos deve retornar lista vazia."""
+    await _login(client, db, "corretor_comp_nojob@test.com")
+    r = await client.post("/cotacoes", json=_RISCO_AUTO)
+    assert r.status_code == 202
+    cotacao_id = r.json()["id"]
+    r2 = await client.get(f"/cotacoes/{cotacao_id}/comparativo")
+    assert r2.status_code == 200
+    assert r2.json() == []
+
+
+async def test_comparativo_pdf_sem_jobs_retorna_pdf(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """PDF com cotação sem jobs concluídos deve renderizar 'Nenhum resultado'."""
+    await _login(client, db, "corretor_pdf_nojob@test.com")
+    r = await client.post("/cotacoes", json=_RISCO_AUTO)
+    assert r.status_code == 202
+    cotacao_id = r.json()["id"]
+    r2 = await client.get(f"/cotacoes/{cotacao_id}/comparativo/pdf")
+    assert r2.status_code == 200
+    assert r2.headers["content-type"] == "application/pdf"
+
+
+def test_annual_total_none_quando_raw_ausente() -> None:
+    """_annual_total deve retornar None quando payload não tem annual_total."""
+    from unittest.mock import MagicMock
+
+    from app.api.comparativo_router import _annual_total
+
+    job = MagicMock()
+    job.payload_resposta = {}
+    assert _annual_total(job) is None
+
+
+def test_annual_total_none_quando_valor_invalido() -> None:
+    """_annual_total deve retornar None quando annual_total não é Decimal."""
+    from unittest.mock import MagicMock
+
+    from app.api.comparativo_router import _annual_total
+
+    job = MagicMock()
+    job.payload_resposta = {"annual_total": "nao-e-numero"}
+    assert _annual_total(job) is None

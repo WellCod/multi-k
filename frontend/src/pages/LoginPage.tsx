@@ -76,7 +76,7 @@ export function LoginPage() {
           </div>
 
           {apiError && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+            <p className="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded px-3 py-2">
               {apiError}
             </p>
           )}
