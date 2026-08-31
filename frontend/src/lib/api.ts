@@ -100,6 +100,11 @@ export const api = {
       }),
     imoveis: (clienteId: string) =>
       request<Imovel[]>(`/clientes/${clienteId}/imoveis`),
+    update: (id: string, body: ClientePatch) =>
+      request<Cliente>(`/clientes/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
     timeline: (id: string) =>
       request<TimelineItem[]>(`/clientes/${id}/timeline`),
   },
@@ -184,6 +189,16 @@ export interface Cliente {
 export interface ClienteInput {
   nome: string;
   cpf: string;
+  email?: string;
+  telefone?: string;
+  data_nascimento?: string;
+  sexo?: string;
+  estado_civil?: string;
+  profissao?: string;
+}
+
+export interface ClientePatch {
+  nome?: string;
   email?: string;
   telefone?: string;
   data_nascimento?: string;
