@@ -103,6 +103,7 @@ class FakeSeguradora:
             premio_total=Decimal("1950.00"),
             payload_resposta={
                 "cia": "fake",
+                "annual_total": "21060.00",
                 "simulado_em": datetime.now(UTC).isoformat(),
             },
         )
