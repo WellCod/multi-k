@@ -125,7 +125,7 @@ function EditForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">Nome *</label>
-          <Input value={nome} onChange={(e) => setNome(e.target.value)} required className="mt-0.5" />
+          <Input value={nome} onChange={(e) => setNome(e.target.value)} required autoFocus className="mt-0.5" />
         </div>
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">E-mail</label>
