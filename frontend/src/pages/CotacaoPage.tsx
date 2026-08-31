@@ -1330,11 +1330,23 @@ export function CotacaoPage() {
   const [recotarError, setRecotarError] = useState<string | null>(null);
 
   const recotar = searchParams.get("recotar");
+  const clienteParam = searchParams.get("cliente");
 
   // Carrega domínios
   useEffect(() => {
     api.dominios.list().then(setDominios).catch(() => {});
   }, []);
+
+  // Se cliente param, começa nova cotação pré-vinculada (descarta rascunho anterior)
+  useEffect(() => {
+    if (!clienteParam) return;
+    clearRascunho();
+    setStep(1);
+    setStep2Data(undefined);
+    setStep3Data(undefined);
+    setStep4Data(undefined);
+    setClienteId(clienteParam);
+  }, [clienteParam]);
 
   // Se recotar param, pré-preenche dados do risco
   useEffect(() => {
