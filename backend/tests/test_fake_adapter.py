@@ -45,6 +45,8 @@ async def test_cotar_sucesso(fake: FakeSeguradora) -> None:
     assert resultado.premio_total is not None
     assert len(resultado.restricoes) == 0
     assert resultado.necessita_vistoria is False
+    assert resultado.payload_resposta is not None
+    assert resultado.payload_resposta.get("annual_total") == "21060.00"
 
 
 async def test_cotar_erro(fake: FakeSeguradora) -> None:
