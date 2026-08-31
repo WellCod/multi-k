@@ -28,6 +28,12 @@ function NovoClienteModal({
   const cpfDigits = cpf.replace(/\D/g, "");
   const cpfValid = cpfDigits.length === 11;
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!cpfValid) return;
@@ -68,6 +74,7 @@ function NovoClienteModal({
               onChange={(e) => setNome(e.target.value)}
               placeholder="Nome completo"
               required
+              autoFocus
               className="mt-0.5"
             />
           </div>
