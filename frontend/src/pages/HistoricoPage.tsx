@@ -155,6 +155,11 @@ export function HistoricoPage() {
                           Revisão
                         </span>
                       )}
+                      {c.proposta_id && (
+                        <span className="text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-700 rounded px-1.5 py-0.5">
+                          Emitida
+                        </span>
+                      )}
                     </div>
                     {nome && (
                       <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">
