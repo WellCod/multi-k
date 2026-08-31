@@ -205,7 +205,12 @@ function HomeCorretor() {
   }, []);
 
   if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Carregando…</p>;
-  if (err) return <p className="text-sm text-red-600">{err}</p>;
+  if (err)
+    return (
+      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+        {err}
+      </div>
+    );
   if (!data) return null;
 
   const total =
@@ -293,7 +298,12 @@ function HomeAdmin() {
   }, []);
 
   if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Carregando…</p>;
-  if (err) return <p className="text-sm text-red-600">{err}</p>;
+  if (err)
+    return (
+      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+        {err}
+      </div>
+    );
   if (!data) return null;
 
   const maxRamo = Math.max(...(data.por_ramo as KpiRamo[]).map((r) => r.count), 1);
