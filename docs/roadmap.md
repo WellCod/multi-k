@@ -245,6 +245,37 @@
 | `ClientesPage`: modal Novo Cliente (POST /clientes sem passar pela cotação) | `ClientesPage.tsx` | ✅ |
 | `ComparativoPage`: calendário de parcelas lazy-load + error card modal | `ComparativoPage.tsx` | ✅ |
 | `data_nascimento` formatado pt-BR em ClienteDetailPage | `ClienteDetailPage.tsx` | ✅ |
+| Selects de domínio (estado_civil, profissão) no EditForm | `ClienteDetailPage.tsx` | ✅ |
+| `domain_selects` + ESC/autoFocus nos modais | `ClientesPage.tsx`, `ClienteDetailPage.tsx` | ✅ |
+| Step4 serverError padronizado como red card dark-mode | `CotacaoPage.tsx` | ✅ |
+| Testes `test_cotacao_preserva_cliente_id` + `test_nova_cotacao_preserva_cliente_e_versao_anterior` | `tests/test_cotacao.py` | ✅ |
+| Seed: veículos (~60%) e imóveis (~25%) por cliente | `infra/seed_demo.py` | ✅ |
+| Fix mypy: `sum(..., Decimal("0"))` em `home_router.py` | `api/home_router.py` | ✅ |
+| Testes `test_cotacao_dados_risco_invalido_retorna_422` + `test_cotacao_ramo_invalido_retorna_422` | `tests/test_cotacao.py` | ✅ |
+| `.eslintrc.cjs` + `npm run lint` no CI — gate frontend lint | `frontend/.eslintrc.cjs`, `.github/workflows/ci.yml` | ✅ |
+| Testes `rate_limit.allow` (janela deslizante) — 3 cenários | `tests/test_security.py` | ✅ |
+| Testes `EncryptedJSON` roundtrip + None + chave inválida | `tests/test_security.py` | ✅ |
+| `test_fipe.py` — 7 testes: cache hit, fetch, 502, rate-limit | `tests/test_fipe.py` | ✅ |
+| Suite: 95 → 108 testes; `fipe_router` 32% → 70%+, `rate_limit` 43% → 100%, `encryption` 55% → 100% | vários | ✅ |
+| `test_registry.py` — 8 testes unitários: `get_adapter` + `cias_para_ramo` com/sem credenciais | `tests/test_registry.py` | ✅ |
+| `test_renovacoes_janelas` + `test_renovacoes_janela_d45` — cobre `_janela()` D30/D45 | `tests/test_proposta.py` | ✅ |
+| Suite: 108 → 118 testes; `renovacao_router` 68% → 100%, `registry` 67% → 100% | vários | ✅ |
+| `test_job_excecao_marca_cotacao_como_erro` — exception handler do worker (linhas 119-173) | `tests/test_cotacao.py` | ✅ |
+| `test_processar_job_inexistente` + `test_safe_processar_nao_propaga_excecao` — early return + `_safe_processar` | `tests/test_cotacao.py` | ✅ |
+| `test_renovacoes_janela_d60` — cobre branch `return "D60"` | `tests/test_proposta.py` | ✅ |
+| `test_encrypted_json_chave_ausente` — cobre RuntimeError no `_key()` | `tests/test_security.py` | ✅ |
+| FIPE 502 para `/modelos`, `/anos`, `/preco` — 3 testes de erro upstream | `tests/test_fipe.py` | ✅ |
+| Suite: 118 → 126 testes; cobertura total 73% → 80%+; `worker` 53% → 73%, `fipe_router` 88% → 100%, `encryption` 97% → 100% | vários | ✅ |
+| `test_home.py`: 3 novos testes com dados reais — renovação D30, parcelas, KPIs admin | `tests/test_home.py` | ✅ |
+| Suite: 126 → 129 testes; `home_router` 61% → 90%; cobertura total 80% | vários | ✅ |
+| `test_relatorio.py`: 8 testes com dados reais — produção, funil, mix, CSV, XLSX | `tests/test_relatorio.py` | ✅ |
+| Suite: 129 → 137 testes; `relatorio_router` 70% → 96%; cobertura total 82% | vários | ✅ |
+| `test_worker_loop_*` (3): `_worker_loop` sem jobs, exception handler, `start_worker` | `tests/test_cotacao.py` | ✅ |
+| Suite: 137 → 140 testes; `worker` 73% → 93%; cobertura total 83% | vários | ✅ |
+| `test_domain.py` (17 testes): `eventos.py`, `risco.py`, `cpf_gen.py` — 0% → 100% | `tests/test_domain.py` | ✅ |
+| TTL expirado em `fipe_cache.get` — linhas 33-34 | `tests/test_fipe.py` | ✅ |
+| Comparativo 404, sem jobs concluídos (JSON + PDF), `_annual_total` nulo/inválido | `tests/test_proposta.py` | ✅ |
+| Suite: 140 → 163 testes; `comparativo_router` + `eventos` + `risco` + `fipe_cache` + `cpf_gen` → 100%; total 83% → 87% | vários | ✅ |
 
 Ações humanas necessárias:
 1. E-mail ao ponto focal Yelum com 12 perguntas (`docs/escopo.md §10`)
