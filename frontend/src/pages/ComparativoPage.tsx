@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, type ItemComparativo, type Proposta, type Cotacao } from "@/lib/api";
+import { api, type ItemComparativo, type Parcela, type Proposta, type Cotacao } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatBRL } from "@/lib/utils";
+import { formatBRL, formatDate } from "@/lib/utils";
 
 const PARCELAMENTOS = ["AVISTA", "2X", "3X", "6X", "10X"];
 
@@ -156,7 +156,11 @@ function TransmitirModal({ cotacaoId, cia, onClose, onSuccess }: TransmitirModal
               onChange={(e) => setVigencia(e.target.value)}
             />
           </div>
-          {err && <p className="text-red-600 text-sm">{err}</p>}
+          {err && (
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-400">
+              {err}
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancelar
@@ -167,6 +171,57 @@ function TransmitirModal({ cotacaoId, cia, onClose, onSuccess }: TransmitirModal
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function ParcelasPanel({ propostaId }: { propostaId: string }) {
+  const [parcelas, setParcelas] = useState<Parcela[] | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open || parcelas !== null) return;
+    api.propostas.parcelas(propostaId).then(setParcelas).catch(() => setParcelas([]));
+  }, [open, propostaId, parcelas]);
+
+  return (
+    <div className="mt-3">
+      <button
+        className="text-xs text-green-700 dark:text-green-400 hover:underline"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? "Ocultar parcelas" : "Ver calendário de parcelas"}
+      </button>
+      {open && parcelas && (
+        <div className="mt-2 overflow-x-auto">
+          <table className="text-xs border-collapse">
+            <thead>
+              <tr className="text-left text-gray-500 dark:text-gray-400">
+                <th className="pr-4 py-1">#</th>
+                <th className="pr-4 py-1">Vencimento</th>
+                <th className="pr-4 py-1 text-right">Valor</th>
+                <th className="py-1 text-right">Comissão</th>
+              </tr>
+            </thead>
+            <tbody>
+              {parcelas.map((p) => (
+                <tr key={p.numero} className="border-t border-green-200 dark:border-green-800">
+                  <td className="pr-4 py-1 text-gray-700 dark:text-gray-300">{p.numero}ª</td>
+                  <td className="pr-4 py-1 text-gray-700 dark:text-gray-300">
+                    {p.vencimento ? formatDate(p.vencimento) : "—"}
+                  </td>
+                  <td className="pr-4 py-1 text-right font-mono text-gray-900 dark:text-white">
+                    {formatBRL(p.valor)}
+                  </td>
+                  <td className="py-1 text-right font-mono text-green-700 dark:text-green-400">
+                    {formatBRL(p.comissao)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -243,6 +298,7 @@ export function ComparativoPage() {
             {proposta.n_parcelas}× de {formatBRL(proposta.valor_parcela)}{" "}
             &nbsp;|&nbsp; Comissão: {formatBRL(proposta.comissao_parcela)}/parcela
           </p>
+          <ParcelasPanel propostaId={proposta.id} />
           {cotacao.cliente_id && (
             <Button
               className="mt-3"
