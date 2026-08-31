@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, type Cliente, type ClientePatch, type Imovel, type TimelineItem, type Veiculo } from "@/lib/api";
+import { api, type Cliente, type ClientePatch, type Dominio, type Imovel, type TimelineItem, type Veiculo } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatBRL } from "@/lib/utils";
@@ -62,6 +62,9 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+const SELECT_CLASS =
+  "mt-0.5 w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white";
+
 function EditForm({
   cliente,
   onSave,
@@ -79,6 +82,18 @@ function EditForm({
   const [profissao, setProfissao] = useState(cliente.profissao ?? "");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [estadosCivis, setEstadosCivis] = useState<Dominio[]>([]);
+  const [profissoes, setProfissoes] = useState<Dominio[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      api.dominios.list("estado_civil"),
+      api.dominios.list("profissao"),
+    ]).then(([ec, pr]) => {
+      setEstadosCivis(ec);
+      setProfissoes(pr);
+    }).catch(() => undefined);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -126,11 +141,29 @@ function EditForm({
         </div>
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">Estado civil</label>
-          <Input value={estadoCivil} onChange={(e) => setEstadoCivil(e.target.value)} className="mt-0.5" />
+          <select
+            value={estadoCivil}
+            onChange={(e) => setEstadoCivil(e.target.value)}
+            className={SELECT_CLASS}
+          >
+            <option value="">— selecione —</option>
+            {estadosCivis.map((d) => (
+              <option key={d.codigo} value={d.codigo}>{d.descricao}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">Profissão</label>
-          <Input value={profissao} onChange={(e) => setProfissao(e.target.value)} className="mt-0.5" />
+          <select
+            value={profissao}
+            onChange={(e) => setProfissao(e.target.value)}
+            className={SELECT_CLASS}
+          >
+            <option value="">— selecione —</option>
+            {profissoes.map((d) => (
+              <option key={d.codigo} value={d.codigo}>{d.descricao}</option>
+            ))}
+          </select>
         </div>
       </div>
       <div className="flex gap-2 justify-end">
