@@ -175,3 +175,112 @@ async def test_funil_conta_proposta(
     body = r.json()
     assert body["total_cotacoes"] >= 1
     assert body["total_com_proposta"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# Testes com dados reais — cobre loops de agregação
+# ---------------------------------------------------------------------------
+
+
+async def test_producao_admin_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Produção com dados reais deve retornar linhas por corretor."""
+    await _criar_proposta(client, db, engine, "cor_prod_dados@test.com")
+    await _login(client, db, "adm_prod_dados@test.com", Papel.ADMIN)
+    r = await client.get("/relatorios/producao")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body) >= 1
+    item = body[0]
+    assert "corretor_nome" in item
+    assert "cotacoes" in item
+    assert "taxa_conversao" in item
+    assert "premio_total" in item
+
+
+async def test_mix_corretor_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Mix com dados reais deve retornar lista com pct calculado."""
+    await _criar_proposta(client, db, engine, "cor_mix_dados@test.com")
+    r = await client.get("/relatorios/mix")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body) >= 1
+    assert "pct" in body[0]
+    assert "count" in body[0]
+
+
+async def test_csv_export_producao_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """CSV de produção com dados deve incluir header e ao menos uma linha de dados."""
+    await _criar_proposta(client, db, engine, "cor_csv_prod@test.com")
+    await _login(client, db, "adm_csv_prod@test.com", Papel.ADMIN)
+    r = await client.get("/relatorios/export/csv", params={"tipo": "producao"})
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+    lines = r.text.strip().splitlines()
+    assert "corretor_id" in lines[0]
+    assert len(lines) >= 2  # header + ao menos 1 linha de dados
+
+
+async def test_csv_export_funil_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """CSV de funil com dados deve incluir linhas de por_ramo."""
+    await _criar_proposta(client, db, engine, "cor_csv_funil@test.com")
+    await _login(client, db, "adm_csv_funil@test.com", Papel.ADMIN)
+    r = await client.get("/relatorios/export/csv", params={"tipo": "funil"})
+    assert r.status_code == 200
+    lines = r.text.strip().splitlines()
+    assert "ramo" in lines[0]
+    assert len(lines) >= 2
+
+
+async def test_xlsx_export_producao_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """XLSX de produção com dados deve retornar bytes de workbook válido."""
+    await _criar_proposta(client, db, engine, "cor_xlsx_prod@test.com")
+    await _login(client, db, "adm_xlsx_prod@test.com", Papel.ADMIN)
+    r = await client.get("/relatorios/export/xlsx", params={"tipo": "producao"})
+    assert r.status_code == 200
+    assert "spreadsheet" in r.headers["content-type"]
+    assert len(r.content) > 100  # bytes reais, não vazio
+
+
+async def test_xlsx_export_funil_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """XLSX de funil com dados deve retornar workbook válido."""
+    await _criar_proposta(client, db, engine, "cor_xlsx_funil@test.com")
+    await _login(client, db, "adm_xlsx_funil@test.com", Papel.ADMIN)
+    r = await client.get("/relatorios/export/xlsx", params={"tipo": "funil"})
+    assert r.status_code == 200
+    assert len(r.content) > 100
+
+
+async def test_xlsx_export_mix_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """XLSX de mix com dados deve retornar workbook válido."""
+    await _criar_proposta(client, db, engine, "cor_xlsx_mix@test.com")
+    await _login(client, db, "adm_xlsx_mix@test.com", Papel.ADMIN)
+    r = await client.get("/relatorios/export/xlsx", params={"tipo": "mix"})
+    assert r.status_code == 200
+    assert len(r.content) > 100
+
+
+async def test_csv_export_mix_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """CSV de mix com dados deve incluir header e linhas de ramo."""
+    await _criar_proposta(client, db, engine, "cor_csv_mix@test.com")
+    await _login(client, db, "adm_csv_mix@test.com", Papel.ADMIN)
+    r = await client.get("/relatorios/export/csv", params={"tipo": "mix"})
+    assert r.status_code == 200
+    lines = r.text.strip().splitlines()
+    assert "ramo" in lines[0]
+    assert len(lines) >= 2

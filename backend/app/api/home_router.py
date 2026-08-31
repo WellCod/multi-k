@@ -289,7 +289,9 @@ async def home_admin(
         {c.cliente_id for _, c in vigentes if c.cliente_id is not None}
     )
     apolices_vigentes = len(vigentes)
-    premio_liquido = sum((c.premio_total or Decimal("0")) for _, c in vigentes)
+    premio_liquido = sum(
+        ((c.premio_total or Decimal("0")) for _, c in vigentes), Decimal("0")
+    )
 
     comissao_produzida = sum(
         p.comissao_parcela * p.n_parcelas for p, _ in todas_propostas

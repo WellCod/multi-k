@@ -145,3 +145,101 @@ async def test_fipe_rate_limit_retorna_429(plain_client: AsyncClient) -> None:
     ):
         r = await plain_client.get("/fipe/marcas")
     assert r.status_code == 429
+
+
+# ---------------------------------------------------------------------------
+# Testes rate_limit.allow — lógica da janela deslizante
+# ---------------------------------------------------------------------------
+
+
+async def test_rate_limit_permite_dentro_do_limite() -> None:
+    """Requisições dentro do limite devem retornar True."""
+    from app.infra import rate_limit as rl
+
+    key = "test_allow_dentro"
+    rl._counters.pop(key, None)
+    for _ in range(5):
+        assert await rl.allow(key, max_requests=5, window_seconds=60.0) is True
+
+
+async def test_rate_limit_bloqueia_apos_limite() -> None:
+    """A requisição N+1 deve retornar False quando o limite é N."""
+    from app.infra import rate_limit as rl
+
+    key = "test_allow_bloqueia"
+    rl._counters.pop(key, None)
+    for _ in range(3):
+        await rl.allow(key, max_requests=3, window_seconds=60.0)
+    assert await rl.allow(key, max_requests=3, window_seconds=60.0) is False
+
+
+async def test_rate_limit_janela_expirada_permite_novamente() -> None:
+    """Entradas fora da janela são descartadas e a chave volta a ser permitida."""
+    import time
+
+    from app.infra import rate_limit as rl
+
+    key = "test_allow_expirada"
+    rl._counters[key] = [time.monotonic() - 120.0]  # timestamp já expirado
+    assert await rl.allow(key, max_requests=1, window_seconds=60.0) is True
+
+
+# ---------------------------------------------------------------------------
+# Testes encryption.EncryptedJSON — roundtrip AES-256-GCM
+# ---------------------------------------------------------------------------
+
+
+def test_encrypted_json_roundtrip() -> None:
+    """Encrypt→decrypt deve devolver o mesmo objeto."""
+    import os
+    os.environ.setdefault(
+        "PAYLOAD_ENCRYPTION_KEY", "0" * 64
+    )
+    from app.infra.encryption import EncryptedJSON
+
+    col = EncryptedJSON()
+    original = {"cpf": "12345678901", "valor": 1500.50, "lista": [1, 2, 3]}
+    ciphertext = col.process_bind_param(original, None)
+    assert ciphertext is not None
+    assert ciphertext != str(original)  # efectivamente cifrado
+    recovered = col.process_result_value(ciphertext, None)
+    assert recovered == original
+
+
+def test_encrypted_json_none_passa_transparente() -> None:
+    """None deve passar sem cifrar e sem erro."""
+    from app.infra.encryption import EncryptedJSON
+
+    col = EncryptedJSON()
+    assert col.process_bind_param(None, None) is None
+    assert col.process_result_value(None, None) is None
+
+
+def test_encrypted_json_chave_invalida_levanta_erro() -> None:
+    """Chave com tamanho errado deve levantar ValueError."""
+    import os
+    from unittest.mock import patch
+
+    from app.infra.encryption import EncryptedJSON
+
+    col = EncryptedJSON()
+    with (
+        patch.dict(os.environ, {"PAYLOAD_ENCRYPTION_KEY": "aabbcc"}),
+        pytest.raises((ValueError, RuntimeError)),
+    ):
+        col.process_bind_param({"x": 1}, None)
+
+
+def test_encrypted_json_chave_ausente_levanta_runtime_error() -> None:
+    """Chave completamente ausente deve levantar RuntimeError."""
+    import os
+    from unittest.mock import patch
+
+    from app.infra.encryption import EncryptedJSON
+
+    col = EncryptedJSON()
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        pytest.raises(RuntimeError, match="PAYLOAD_ENCRYPTION_KEY"),
+    ):
+        col.process_bind_param({"x": 1}, None)

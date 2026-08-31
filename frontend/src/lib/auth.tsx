@@ -60,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <Ctx.Provider value={{ user, loading, login, logout }}>{children}</Ctx.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthCtx {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useAuth must be inside AuthProvider");
