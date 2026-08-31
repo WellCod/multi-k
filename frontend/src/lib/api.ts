@@ -100,6 +100,11 @@ export const api = {
       }),
     imoveis: (clienteId: string) =>
       request<Imovel[]>(`/clientes/${clienteId}/imoveis`),
+    update: (id: string, body: ClientePatch) =>
+      request<Cliente>(`/clientes/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
     timeline: (id: string) =>
       request<TimelineItem[]>(`/clientes/${id}/timeline`),
   },
@@ -192,6 +197,16 @@ export interface ClienteInput {
   profissao?: string;
 }
 
+export interface ClientePatch {
+  nome?: string;
+  email?: string;
+  telefone?: string;
+  data_nascimento?: string;
+  sexo?: string;
+  estado_civil?: string;
+  profissao?: string;
+}
+
 export interface Veiculo {
   id: string;
   cliente_id: string;
@@ -269,6 +284,7 @@ export interface Cotacao {
   versao_anterior_id: string | null;
   criado_em: string;
   dados_risco: Record<string, unknown>;
+  proposta_id: string | null;
 }
 
 export interface TransmitirInput {
