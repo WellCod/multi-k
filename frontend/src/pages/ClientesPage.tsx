@@ -150,7 +150,7 @@ export function ClientesPage() {
                         className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap"
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate("/cotacao");
+                          navigate(`/cotacao?cliente=${c.id}`);
                         }}
                       >
                         Nova cotação
