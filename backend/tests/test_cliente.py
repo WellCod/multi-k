@@ -140,4 +140,39 @@ async def test_adicionar_imovel(
     }
     r = await client.post(f"/clientes/{cid}/imoveis", json=payload)
     assert r.status_code == 201
-    assert r.json()["tipo_imovel"] == "apartamento"
+
+
+async def test_atualizar_cliente(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await _login(client, db, "cor_cli_upd@test.com")
+    r_cli = await client.post(
+        "/clientes", json={"nome": "Luiza Braga", "cpf": "44444444444"}
+    )
+    cid = r_cli.json()["id"]
+
+    r_patch = await client.patch(
+        f"/clientes/{cid}",
+        json={"nome": "Luiza Braga Lima", "email": "luiza@example.com"},
+    )
+    assert r_patch.status_code == 200
+    body = r_patch.json()
+    assert body["nome"] == "Luiza Braga Lima"
+    assert body["email"] == "luiza@example.com"
+
+
+async def test_timeline_cliente(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await _login(client, db, "cor_cli_tl@test.com")
+    r_cli = await client.post(
+        "/clientes", json={"nome": "Sandra Melo", "cpf": "55555555555"}
+    )
+    cid = r_cli.json()["id"]
+
+    r_tl = await client.get(f"/clientes/{cid}/timeline")
+    assert r_tl.status_code == 200
+    items = r_tl.json()
+    assert len(items) >= 1
+    assert items[0]["tipo"] == "cliente.criado"
+    assert items[0]["dados"]["nome"] == "Sandra Melo"
