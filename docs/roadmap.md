@@ -228,6 +228,18 @@
 | Transmissão multi-CIA — per-row Emitir + adapter routing | `proposta_router.py`, `CotacaoPage.tsx`, `api.ts` | ✅ |
 | `payload_resposta` por CIA em `CotacaoJob` (migration 008) | `models.py`, `worker.py`, `proposta_router.py` | ✅ |
 
+### Melhorias entregues (2026-08-31 — UX polish + proposta_id)
+
+| Item | Arquivo | Status |
+|---|---|---|
+| Remove MOCK_COTACOES, MOCK_RENOVACOES — estados reais | `HistoricoPage.tsx`, `RenovacaoPage.tsx` | ✅ |
+| Remove MOCK_CLIENTES — estado de erro e vazio reais | `ClientesPage.tsx` | ✅ |
+| `ComparativoPage` standalone: por-CIA Emitir, Justos policy_type, annual_total | `ComparativoPage.tsx` | ✅ |
+| `proposta_id` em `CotacaoOut` — badge "Emitida" no histórico | `cotacao_router.py`, `HistoricoPage.tsx`, `api.ts` | ✅ |
+| `annual_total` no fake adapter (21 060,00) | `adapters/fake/adapter.py` | ✅ |
+| `ComparativoPage` restaura banner proposta ao reabrir | `ComparativoPage.tsx` | ✅ |
+| Teste `test_cotacao_expoe_proposta_id` | `tests/test_proposta.py` | ✅ |
+
 Ações humanas necessárias:
 1. E-mail ao ponto focal Yelum com 12 perguntas (`docs/escopo.md §10`)
 2. Cadastro no Portal do Desenvolvedor Yelum
