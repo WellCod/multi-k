@@ -1252,9 +1252,9 @@ function Step4({
       </div>
 
       {serverError && (
-        <p className="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded px-3 py-2">
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
           {serverError}
-        </p>
+        </div>
       )}
 
       <div className="pt-2 flex justify-between">
