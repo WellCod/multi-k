@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type Cliente } from "@/lib/api";
+import { api, type Cliente, type ClienteInput } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/Pagination";
@@ -11,81 +11,140 @@ function fmtData(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
-const MOCK_CLIENTES: Cliente[] = [
-  {
-    id: "mock-c1",
-    nome: "Ana Beatriz Costa",
-    email: "ana.costa@clientes.demo",
-    telefone: "11998760001",
-    data_nascimento: "1985-04-12",
-    sexo: "F",
-    estado_civil: "casado",
-    profissao: "assalariado",
-    usuario_id: "mock-u1",
-    criado_em: new Date(Date.now() - 30 * 86400000).toISOString(),
-  },
-  {
-    id: "mock-c2",
-    nome: "Carlos Eduardo Lima",
-    email: "carlos.lima@clientes.demo",
-    telefone: "11997650002",
-    data_nascimento: "1978-11-25",
-    sexo: "M",
-    estado_civil: "casado",
-    profissao: "empresario",
-    usuario_id: "mock-u1",
-    criado_em: new Date(Date.now() - 60 * 86400000).toISOString(),
-  },
-  {
-    id: "mock-c3",
-    nome: "Fernanda Souza",
-    email: "fernanda.souza@clientes.demo",
-    telefone: "11996540003",
-    data_nascimento: "1992-07-08",
-    sexo: "F",
-    estado_civil: "solteiro",
-    profissao: "autonomo",
-    usuario_id: "mock-u1",
-    criado_em: new Date(Date.now() - 15 * 86400000).toISOString(),
-  },
-  {
-    id: "mock-c4",
-    nome: "Ricardo Oliveira",
-    email: null,
-    telefone: "11995430004",
-    data_nascimento: "1965-02-19",
-    sexo: "M",
-    estado_civil: "viuvo",
-    profissao: "aposentado",
-    usuario_id: "mock-u1",
-    criado_em: new Date(Date.now() - 90 * 86400000).toISOString(),
-  },
-  {
-    id: "mock-c5",
-    nome: "Juliana Martins Pereira",
-    email: "juliana.martins@clientes.demo",
-    telefone: "11994320005",
-    data_nascimento: "1990-09-30",
-    sexo: "F",
-    estado_civil: "casado",
-    profissao: "servidor_publico",
-    usuario_id: "mock-u1",
-    criado_em: new Date(Date.now() - 5 * 86400000).toISOString(),
-  },
-];
+function NovoClienteModal({
+  onSave,
+  onClose,
+}: {
+  onSave: (c: Cliente) => void;
+  onClose: () => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const cpfDigits = cpf.replace(/\D/g, "");
+  const cpfValid = cpfDigits.length === 11;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cpfValid) return;
+    setSaving(true);
+    setErr(null);
+    const body: ClienteInput = { nome: nome.trim(), cpf: cpfDigits };
+    if (email.trim()) body.email = email.trim();
+    if (telefone.trim()) body.telefone = telefone.trim();
+    try {
+      const created = await api.clientes.create(body);
+      onSave(created);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Erro ao criar cliente");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Novo cliente</h2>
+
+        {err && (
+          <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-400">
+            {err}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">Nome *</label>
+            <Input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Nome completo"
+              required
+              autoFocus
+              className="mt-0.5"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">CPF *</label>
+            <Input
+              value={cpf}
+              onChange={(e) => setCpf(e.target.value)}
+              placeholder="000.000.000-00"
+              maxLength={14}
+              className="mt-0.5"
+            />
+            {cpf && !cpfValid && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">CPF deve ter 11 dígitos</p>
+            )}
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">E-mail</label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="cliente@exemplo.com"
+              className="mt-0.5"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">Telefone</label>
+            <Input
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              placeholder="(11) 90000-0000"
+              className="mt-0.5"
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end pt-1">
+            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={saving || !nome.trim() || !cpfValid}
+            >
+              {saving ? "Criando…" : "Criar cliente"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export function ClientesPage() {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(1);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     api.clientes
       .list()
-      .then((data) => setClientes(data.length > 0 ? data : MOCK_CLIENTES))
-      .catch(() => setClientes(MOCK_CLIENTES))
+      .then(setClientes)
+      .catch((e: unknown) =>
+        setErr(e instanceof Error ? e.message : "Erro ao carregar clientes"),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -108,11 +167,36 @@ export function ClientesPage() {
 
   return (
     <div className="space-y-4">
+      {showModal && (
+        <NovoClienteModal
+          onSave={(created) => {
+            setClientes((prev) => [created, ...prev]);
+            setShowModal(false);
+          }}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Clientes</h1>
-        <Button size="sm" onClick={() => navigate("/cotacao")}>
-          Nova cotação
-        </Button>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Clientes
+          </h1>
+          {!loading && !err && clientes.length > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {clientes.length} cliente{clientes.length !== 1 ? "s" : ""} na
+              carteira
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowModal(true)}>
+            Novo cliente
+          </Button>
+          <Button size="sm" onClick={() => navigate("/cotacao")}>
+            Nova cotação
+          </Button>
+        </div>
       </div>
 
       <Input
@@ -122,68 +206,111 @@ export function ClientesPage() {
         className="max-w-sm"
       />
 
-      {loading ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">Carregando…</p>
-      ) : filtrados.length === 0 ? (
+      {loading && (
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {busca ? "Nenhum cliente encontrado para esta busca." : "Nenhum cliente cadastrado."}
+          Carregando…
         </p>
-      ) : (
+      )}
+
+      {err && (
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+          {err}
+        </div>
+      )}
+
+      {!loading && !err && clientes.length === 0 && (
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          Nenhum cliente cadastrado ainda.
+        </div>
+      )}
+
+      {!loading && !err && clientes.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-left">
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Nome</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">E-mail</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Telefone</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Profissão</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Cadastro</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300"></th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">
+                  Nome
+                </th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">
+                  E-mail
+                </th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">
+                  Telefone
+                </th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">
+                  Profissão
+                </th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">
+                  Cadastro
+                </th>
+                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300" />
               </tr>
             </thead>
             <tbody>
-              {paginated.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
-                  onClick={() => navigate(`/clientes/${c.id}`)}
-                >
-                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{c.nome}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{c.email ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{c.telefone ?? "—"}</td>
-                  <td className="px-4 py-3 capitalize text-gray-600 dark:text-gray-400">
-                    {c.profissao?.replace("_", " ") ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{fmtData(c.criado_em)}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/cotacao`);
-                      }}
-                    >
-                      Nova cotação
-                    </button>
+              {filtrados.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+                  >
+                    Nenhum cliente encontrado para esta busca.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                paginated.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+                    onClick={() => navigate(`/clientes/${c.id}`)}
+                  >
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                      {c.nome}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {c.email ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {c.telefone ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 capitalize text-gray-600 dark:text-gray-400">
+                      {c.profissao?.replace("_", " ") ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                      {fmtData(c.criado_em)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/cotacao?cliente=${c.id}`);
+                        }}
+                      >
+                        Nova cotação
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
-          <div className="px-1">
-            <Pagination
-              page={page}
-              total={filtrados.length}
-              perPage={PAGE_SIZE}
-              onChange={setPage}
-            />
-            {filtrados.length <= PAGE_SIZE && (
+          {filtrados.length > 0 && (
+            <div className="px-1">
+              <Pagination
+                page={page}
+                total={filtrados.length}
+                perPage={PAGE_SIZE}
+                onChange={setPage}
+              />
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                 {filtrados.length} cliente{filtrados.length !== 1 ? "s" : ""}
-                {busca ? ` encontrado${filtrados.length !== 1 ? "s" : ""}` : " na carteira"}
+                {busca
+                  ? ` encontrado${filtrados.length !== 1 ? "s" : ""}`
+                  : " na carteira"}
               </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
