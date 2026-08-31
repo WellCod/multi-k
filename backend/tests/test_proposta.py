@@ -244,6 +244,29 @@ async def test_cotacao_expoe_proposta_id(
     assert r_depois.json()["proposta_id"] == proposta_id
 
 
+async def test_listar_cotacoes_proposta_id(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /cotacoes lista também expõe proposta_id por item."""
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_listpid@test.com"
+    )
+
+    r_lista = await client.get("/cotacoes")
+    assert r_lista.status_code == 200
+    item = next(c for c in r_lista.json() if c["id"] == str(cotacao_id))
+    assert item["proposta_id"] is None
+
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir", json=_TRANSMITIR_BODY
+    )
+    proposta_id = r_tx.json()["id"]
+
+    r_lista2 = await client.get("/cotacoes")
+    item2 = next(c for c in r_lista2.json() if c["id"] == str(cotacao_id))
+    assert item2["proposta_id"] == proposta_id
+
+
 @pytest.mark.parametrize("sem_auth", [True])
 async def test_transmitir_sem_auth(
     client: AsyncClient, engine: AsyncEngine, sem_auth: bool
