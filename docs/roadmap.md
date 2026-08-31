@@ -239,6 +239,12 @@
 | `annual_total` no fake adapter (21 060,00) | `adapters/fake/adapter.py` | ✅ |
 | `ComparativoPage` restaura banner proposta ao reabrir | `ComparativoPage.tsx` | ✅ |
 | Teste `test_cotacao_expoe_proposta_id` | `tests/test_proposta.py` | ✅ |
+| `handleRecotar` não cria cotação órfã no backend | `CotacaoPage.tsx` | ✅ |
+| `proposta_router.py`: dedup `cia_cotacao_id` + `adapter` (if/else → expressão) | `proposta_router.py` | ✅ |
+| `ClienteDetailPage`: editar dados (PATCH) + seções Veículos e Imóveis | `ClienteDetailPage.tsx`, `api.ts` | ✅ |
+| `ClientesPage`: modal Novo Cliente (POST /clientes sem passar pela cotação) | `ClientesPage.tsx` | ✅ |
+| `ComparativoPage`: calendário de parcelas lazy-load + error card modal | `ComparativoPage.tsx` | ✅ |
+| `data_nascimento` formatado pt-BR em ClienteDetailPage | `ClienteDetailPage.tsx` | ✅ |
 
 Ações humanas necessárias:
 1. E-mail ao ponto focal Yelum com 12 perguntas (`docs/escopo.md §10`)

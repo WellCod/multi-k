@@ -277,7 +277,14 @@ export function ClienteDetailPage() {
             <div className="grid grid-cols-2 gap-4">
               <InfoRow label="E-mail" value={cliente.email ?? "—"} />
               <InfoRow label="Telefone" value={cliente.telefone ?? "—"} />
-              <InfoRow label="Nascimento" value={cliente.data_nascimento ?? "—"} />
+              <InfoRow
+                label="Nascimento"
+                value={
+                  cliente.data_nascimento
+                    ? new Date(cliente.data_nascimento + "T00:00:00").toLocaleDateString("pt-BR")
+                    : "—"
+                }
+              />
               <InfoRow label="Estado civil" value={cliente.estado_civil ?? "—"} />
               <InfoRow label="Profissão" value={cliente.profissao?.replace("_", " ") ?? "—"} />
               <InfoRow label="Cadastrado em" value={fmtData(cliente.criado_em)} />
