@@ -31,7 +31,7 @@ Com ela, pedimos que nos forneçam:
 | `partner_name` | campo `iss` do JWT de autenticação |
 | `brokerId` | campo `brokerId` no POST `/brokers/auth/api-token` |
 
-O CNPJ da corretora que usaremos no campo `cpf_cnpj` é: **[CNPJ DA KLUBI]**.
+O CNPJ da corretora que usaremos no campo `cpf_cnpj` é: **33.911.704/0001-75** (Klubi Corretora de Seguros Ltda.).
 
 ---
 
