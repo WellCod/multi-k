@@ -308,7 +308,7 @@ async def home_admin(
     res_ramo = await db.execute(
         select(
             Cotacao.ramo,
-            func.count(Proposta.id).label("count"),
+            func.count(Proposta.id).label("cnt"),
             func.coalesce(func.sum(Cotacao.premio_total), Decimal("0")).label("premio"),
         )
         .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
@@ -319,7 +319,7 @@ async def home_admin(
     por_ramo = [
         KpiRamo(
             ramo=r.ramo,
-            count=int(r.count),
+            count=int(r.cnt),
             premio_total=Decimal(str(r.premio or "0")),
         )
         for r in res_ramo.all()
