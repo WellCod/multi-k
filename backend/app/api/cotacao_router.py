@@ -1,10 +1,13 @@
 """Rotas de cotação — fila assíncrona com SKIP LOCKED."""
 
+import csv
+import io
 import uuid
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -102,7 +105,8 @@ class CotacaoOut(BaseModel):
 
 def _cotacao_out(c: Cotacao, proposta_id: uuid.UUID | None = None) -> CotacaoOut:
     restricoes: list[dict[str, str]] = [
-        {"codigo": r["codigo"], "mensagem": r["mensagem"]} for r in (c.restricoes or [])
+        {"codigo": r["codigo"], "mensagem": r.get("mensagem") or r.get("descricao", "")}
+        for r in (c.restricoes or [])
     ]
     mensagens: list[str] = [str(m) for m in (c.mensagens or [])]
     return CotacaoOut(
@@ -224,6 +228,45 @@ async def listar_cotacoes(
         )
         proposta_map = {row[0]: row[1] for row in p_rows}
     return [_cotacao_out(c, proposta_map.get(c.id)) for c in cotacoes]
+
+
+@router.get("/export/csv")
+async def exportar_historico_csv(
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    fmt: Literal["csv"] = Query("csv"),
+) -> StreamingResponse:
+    """Exporta o histórico de cotações do corretor em CSV."""
+    result = await db.execute(
+        select(Cotacao)
+        .where(Cotacao.usuario_id == usuario.id)
+        .order_by(Cotacao.criado_em.desc())
+    )
+    cotacoes = list(result.scalars().all())
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        ["id", "ramo", "status", "premio_total", "cotacao_id_cia", "criado_em"]
+    )
+    for c in cotacoes:
+        writer.writerow(
+            [
+                str(c.id),
+                c.ramo,
+                c.status,
+                str(c.premio_total) if c.premio_total else "",
+                c.cotacao_id_cia or "",
+                c.criado_em.isoformat(),
+            ]
+        )
+    buf.seek(0)
+    _ = fmt  # kept for future xlsx branch
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=historico.csv"},
+    )
 
 
 @router.post("/{cotacao_id}/recotar", response_model=CotacaoCriadaOut, status_code=202)

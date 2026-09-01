@@ -124,7 +124,7 @@ class Cliente(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     nome: Mapped[str] = mapped_column(String(255))
     # CPF nunca armazenado em claro — só o índice cego (HMAC-SHA256)
-    cpf_idx: Mapped[str] = mapped_column(String(64), index=True)
+    cpf_idx: Mapped[str] = mapped_column(String(70), index=True)
     email: Mapped[str | None] = mapped_column(String(255), default=None)
     telefone: Mapped[str | None] = mapped_column(String(20), default=None)
     data_nascimento: Mapped[date | None] = mapped_column(Date, default=None)
@@ -133,6 +133,7 @@ class Cliente(Base):
     profissao: Mapped[str | None] = mapped_column(String(50), default=None)
     usuario_id: Mapped[uuid.UUID] = mapped_column()
     tenant_id: Mapped[uuid.UUID] = mapped_column(default=lambda: TENANT_ID)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

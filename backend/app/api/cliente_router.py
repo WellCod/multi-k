@@ -4,9 +4,9 @@ import uuid
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api._utils import get_or_404
@@ -97,6 +97,13 @@ class VeiculoOut(BaseModel):
     combustivel: str
     finalidade: str
     cep_pernoite: str
+
+
+class ClienteListOut(BaseModel):
+    items: list["ClienteOut"]
+    total: int
+    page: int
+    page_size: int
 
 
 class ImovelOut(BaseModel):
@@ -224,17 +231,41 @@ async def buscar_por_cpf(
     return [_cliente_out(c) for c in result.scalars().all()]
 
 
-@router.get("", response_model=list[ClienteOut])
+@router.get("", response_model=ClienteListOut)
 async def listar_clientes(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> list[ClienteOut]:
-    result = await db.execute(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    q: str | None = Query(None, description="Busca por nome ou e-mail"),
+) -> ClienteListOut:
+    base = (
         select(Cliente)
         .where(Cliente.usuario_id == usuario.id)
-        .order_by(Cliente.criado_em.desc())
+        .where(Cliente.ativo.is_(True))
     )
-    return [_cliente_out(c) for c in result.scalars().all()]
+    if q:
+        term = f"%{q}%"
+        base = base.where(
+            Cliente.nome.ilike(term)
+            | Cliente.email.ilike(term)
+            | Cliente.telefone.ilike(term)
+        )
+
+    total_r = await db.execute(select(func.count()).select_from(base.subquery()))
+    total = int(total_r.scalar_one())
+
+    result = await db.execute(
+        base.order_by(Cliente.criado_em.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return ClienteListOut(
+        items=[_cliente_out(c) for c in result.scalars().all()],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/{cliente_id}", response_model=ClienteOut)
@@ -244,6 +275,23 @@ async def obter_cliente(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ClienteOut:
     return _cliente_out(await _get_cliente_ou_404(cliente_id, usuario.id, db))
+
+
+@router.delete("/{cliente_id}", status_code=204)
+async def arquivar_cliente(
+    cliente_id: uuid.UUID,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    c = await _get_cliente_ou_404(cliente_id, usuario.id, db)
+    c.ativo = False
+    await audit.registrar(
+        db,
+        tipo="cliente.arquivado",
+        dados={"cliente_id": str(cliente_id)},
+        usuario_id=usuario.id,
+    )
+    await db.commit()
 
 
 @router.patch("/{cliente_id}", response_model=ClienteOut)
