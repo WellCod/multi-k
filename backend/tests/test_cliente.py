@@ -176,3 +176,57 @@ async def test_timeline_cliente(
     assert len(items) >= 1
     assert items[0]["tipo"] == "cliente.criado"
     assert items[0]["dados"]["nome"] == "Sandra Melo"
+
+
+async def test_arquivar_cliente(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """DELETE /clientes/{id} deve arquivar (ativo=False) e retornar 204."""
+    await _login(client, db, "cor_cli_del@test.com")
+    r_cli = await client.post(
+        "/clientes", json={"nome": "Arquivado Teste", "cpf": "88888888881"}
+    )
+    assert r_cli.status_code == 201
+    cid = r_cli.json()["id"]
+
+    r_del = await client.delete(f"/clientes/{cid}")
+    assert r_del.status_code == 204
+
+    # Cliente arquivado não aparece mais no GET (ativo=False)
+    r_list = await client.get("/clientes")
+    assert all(c["id"] != cid for c in r_list.json()["items"])
+
+
+async def test_listar_clientes_com_busca_por_nome(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /clientes?q=termo deve filtrar por nome."""
+    await _login(client, db, "cor_cli_q@test.com")
+    await client.post("/clientes", json={"nome": "Zulmira Busca", "cpf": "88888888882"})
+    r = await client.get("/clientes", params={"q": "Zulmira"})
+    assert r.status_code == 200
+    body = r.json()
+    assert any("Zulmira" in c["nome"] for c in body["items"])
+
+
+async def test_listar_imoveis_cliente(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /clientes/{id}/imoveis deve retornar lista de imóveis."""
+    await _login(client, db, "cor_cli_imolst@test.com")
+    r_cli = await client.post(
+        "/clientes", json={"nome": "Cliente Imovel List", "cpf": "88888888883"}
+    )
+    cid = r_cli.json()["id"]
+
+    await client.post(
+        f"/clientes/{cid}/imoveis",
+        json={
+            "cep": "13010001",
+            "tipo_imovel": "casa",
+            "tipo_construcao": "alvenaria",
+        },
+    )
+    r = await client.get(f"/clientes/{cid}/imoveis")
+    assert r.status_code == 200
+    assert len(r.json()) == 1

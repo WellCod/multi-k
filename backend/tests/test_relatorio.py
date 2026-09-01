@@ -284,3 +284,48 @@ async def test_csv_export_mix_com_dados(
     lines = r.text.strip().splitlines()
     assert "ramo" in lines[0]
     assert len(lines) >= 2
+
+
+async def test_funil_com_date_from(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Funil com date_from explícito deve respeitar o parâmetro."""
+    from datetime import date, timedelta
+
+    await _login(client, db, "cor_funil_dfrom@test.com")
+    date_from = (date.today() - timedelta(days=7)).isoformat()
+    r = await client.get("/relatorios/funil", params={"date_from": date_from})
+    assert r.status_code == 200
+    body = r.json()
+    assert "total_cotacoes" in body
+
+
+async def test_funil_com_date_to(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Funil com date_to explícito deve respeitar o parâmetro."""
+    from datetime import date
+
+    await _login(client, db, "cor_funil_dto@test.com")
+    date_to = date.today().isoformat()
+    r = await client.get("/relatorios/funil", params={"date_to": date_to})
+    assert r.status_code == 200
+    body = r.json()
+    assert "taxa_conversao_geral" in body
+
+
+async def test_mix_com_date_from_e_date_to(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Mix com date_from e date_to deve funcionar com intervalo explícito."""
+    from datetime import date, timedelta
+
+    await _login(client, db, "cor_mix_drange@test.com")
+    date_from = (date.today() - timedelta(days=30)).isoformat()
+    date_to = date.today().isoformat()
+    r = await client.get(
+        "/relatorios/mix",
+        params={"date_from": date_from, "date_to": date_to},
+    )
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)

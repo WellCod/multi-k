@@ -377,6 +377,83 @@ async def test_worker_loop_sem_jobs_cancela_limpo() -> None:
     assert not task.cancelled()  # CancelledError capturado pelo break interno
 
 
+async def test_exportar_historico_csv(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /cotacoes/export/csv deve retornar CSV com header e linhas de dados."""
+    await _login(client, db, "corretor_csv_hist@test.com")
+    r_cot = await client.post("/cotacoes", json=_RISCO_AUTO)
+    assert r_cot.status_code == 202
+
+    r = await client.get("/cotacoes/export/csv")
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+    lines = r.text.strip().splitlines()
+    assert "id" in lines[0]
+    assert "ramo" in lines[0]
+    assert len(lines) >= 2  # header + ao menos 1 cotação
+
+
+async def test_cotacao_ramo_moto_valido(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """POST /cotacoes com ramo moto e dados válidos deve retornar 202."""
+    await _login(client, db, "corretor_moto@test.com")
+    r = await client.post(
+        "/cotacoes",
+        json={
+            "ramo": "moto",
+            "dados": {
+                "codigo_fipe": "001004-9",
+                "cep_pernoite": "13010001",
+                "cilindrada": 250,
+                "categoria": "esporte",
+                "finalidade": "pessoal",
+            },
+        },
+    )
+    assert r.status_code == 202
+
+
+async def test_cotacao_ramo_imovel_valido(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """POST /cotacoes com ramo imovel e dados válidos deve retornar 202."""
+    await _login(client, db, "corretor_imovel@test.com")
+    r = await client.post(
+        "/cotacoes",
+        json={
+            "ramo": "imovel",
+            "dados": {
+                "cep": "13010001",
+                "tipo_imovel": "apartamento",
+                "tipo_construcao": "alvenaria",
+            },
+        },
+    )
+    assert r.status_code == 202
+
+
+def test_cotacao_fim_vigencia_anterior_a_inicio_retorna_422() -> None:
+    """CriarCotacaoInput com fim_vigencia <= inicio_vigencia deve falhar."""
+    import pytest
+    from pydantic import ValidationError
+
+    from app.api.cotacao_router import CriarCotacaoInput
+
+    with pytest.raises(ValidationError, match="fim_vigencia"):
+        CriarCotacaoInput(
+            ramo="auto",
+            dados={
+                "codigo_fipe": "001004-9",
+                "cep_pernoite": "13010001",
+                "finalidade": "pessoal",
+                "inicio_vigencia": "2025-06-01",
+                "fim_vigencia": "2025-05-01",
+            },
+        )
+
+
 async def test_worker_loop_excecao_interna_capturada() -> None:
     """Exceção no DB é capturada; loop continua e encerra na iteração seguinte."""
     from app.infra import worker

@@ -98,3 +98,16 @@ async def test_logout(db: AsyncSession, client: AsyncClient) -> None:
 async def test_rota_protegida_sem_cookie(client: AsyncClient) -> None:
     r = await client.get("/auth/me")
     assert r.status_code in (401, 404)
+
+
+async def test_logout_sem_cookie_retorna_200(client: AsyncClient) -> None:
+    """Logout sem cookie sid deve retornar 200 (idempotente)."""
+    r = await client.post("/auth/logout")
+    assert r.status_code == 200
+
+
+async def test_logout_com_sid_invalido_nao_levanta(client: AsyncClient) -> None:
+    """Logout com SID inválido (não-UUID) deve retornar 200 sem erro."""
+    client.cookies.set("sid", "nao-e-um-uuid-valido")
+    r = await client.post("/auth/logout")
+    assert r.status_code == 200
