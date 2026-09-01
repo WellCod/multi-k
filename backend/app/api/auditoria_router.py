@@ -46,8 +46,6 @@ async def listar_usuarios_auditoria(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[AuditoriaUsuarioOut]:
     """Retorna os usuários distintos que aparecem no log de auditoria."""
-    from sqlalchemy import func
-
     subq = (
         select(Auditoria.usuario_id)
         .where(Auditoria.usuario_id.is_not(None))
@@ -69,7 +67,7 @@ async def listar_auditoria(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     tipo: str | None = Query(None),
-    usuario_id: uuid.UUID | None = Query(None),
+    usuario_id: Annotated[uuid.UUID | None, Query()] = None,
 ) -> AuditoriaListOut:
     from sqlalchemy import func
 
