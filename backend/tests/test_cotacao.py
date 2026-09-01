@@ -342,6 +342,12 @@ async def test_worker_loop_sem_jobs_cancela_limpo() -> None:
         def scalar_one_or_none(self) -> None:
             return None
 
+        def scalars(self) -> "_EmptyResult":
+            return self
+
+        def all(self) -> list:
+            return []
+
     class _NullSession:
         async def __aenter__(self) -> "_NullSession":
             return self
