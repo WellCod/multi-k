@@ -355,8 +355,9 @@ async def export_csv(
     buf = io.StringIO()
     writer = csv.writer(buf)
 
+    inicio, fim = _resolve_corte(periodo, None, None)
     if tipo == "producao":
-        dados = await _dados_producao(db, periodo)
+        dados = await _dados_producao(db, inicio, fim)
         writer.writerow(
             [
                 "corretor_id",
@@ -382,7 +383,7 @@ async def export_csv(
             )
 
     elif tipo == "funil":
-        funil = await _dados_funil(db, periodo)
+        funil = await _dados_funil(db, inicio, fim)
         writer.writerow(
             [
                 "ramo",
@@ -404,7 +405,7 @@ async def export_csv(
             )
 
     else:  # mix
-        mix = await _dados_mix(db, periodo)
+        mix = await _dados_mix(db, inicio, fim)
         writer.writerow(["ramo", "count", "pct", "premio_total"])
         for m in mix:
             writer.writerow([m.ramo, m.count, str(m.pct), str(m.premio_total)])
@@ -443,9 +444,10 @@ async def export_xlsx(
     wb = openpyxl.Workbook()
     ws = wb.active
 
+    inicio, fim = _resolve_corte(periodo, None, None)
     if tipo == "producao":
         ws.title = "Producao"
-        dados = await _dados_producao(db, periodo)
+        dados = await _dados_producao(db, inicio, fim)
         ws.append(
             [
                 "Corretor ID",
@@ -472,7 +474,7 @@ async def export_xlsx(
 
     elif tipo == "funil":
         ws.title = "Funil"
-        funil = await _dados_funil(db, periodo)
+        funil = await _dados_funil(db, inicio, fim)
         ws.append(
             [
                 "Ramo",
@@ -495,7 +497,7 @@ async def export_xlsx(
 
     else:  # mix
         ws.title = "Mix"
-        mix = await _dados_mix(db, periodo)
+        mix = await _dados_mix(db, inicio, fim)
         ws.append(["Ramo", "Qtd", "Pct (%)", "Prêmio Total"])
         for m in mix:
             ws.append([m.ramo, m.count, float(m.pct), float(m.premio_total)])
