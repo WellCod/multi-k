@@ -3,7 +3,7 @@
 import csv
 import io
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated
 
@@ -63,8 +63,25 @@ class MixOut(BaseModel):
 
 
 def _corte(periodo: int) -> datetime:
-    """Retorna o datetime de início do período consultado."""
     return datetime.now(UTC) - timedelta(days=periodo)
+
+
+def _resolve_corte(
+    periodo: int,
+    date_from: date | None,
+    date_to: date | None,
+) -> tuple[datetime, datetime]:
+    """Resolve (inicio, fim) do período a partir de presets ou datas explícitas."""
+    agora = datetime.now(UTC)
+    if date_from is not None:
+        inicio = datetime(date_from.year, date_from.month, date_from.day, tzinfo=UTC)
+    else:
+        inicio = agora - timedelta(days=periodo)
+    if date_to is not None:
+        fim = datetime(date_to.year, date_to.month, date_to.day, 23, 59, 59, tzinfo=UTC)
+    else:
+        fim = agora
+    return inicio, fim
 
 
 def _pct(num: int, den: int) -> Decimal:
@@ -85,21 +102,26 @@ def _taxa(num: int, den: int) -> Decimal:
 
 async def _dados_producao(
     db: AsyncSession,
-    periodo: int,
+    inicio: datetime,
+    fim: datetime,
     usuario_id: uuid.UUID | None = None,
 ) -> list[ProducaoOut]:
     """Monta relatório de produção por corretor no período."""
-    corte = _corte(periodo)
-
-    # Cotações no período
-    q_cot = select(Cotacao).where(Cotacao.criado_em >= corte).limit(10_000)
+    q_cot = (
+        select(Cotacao)
+        .where(Cotacao.criado_em >= inicio, Cotacao.criado_em <= fim)
+        .limit(10_000)
+    )
     if usuario_id is not None:
         q_cot = q_cot.where(Cotacao.usuario_id == usuario_id)
     res_cot = await db.execute(q_cot)
     cotacoes = res_cot.scalars().all()
 
-    # Propostas no período
-    q_prop = select(Proposta).where(Proposta.transmitida_em >= corte).limit(10_000)
+    q_prop = (
+        select(Proposta)
+        .where(Proposta.transmitida_em >= inicio, Proposta.transmitida_em <= fim)
+        .limit(10_000)
+    )
     if usuario_id is not None:
         q_prop = q_prop.where(Proposta.usuario_id == usuario_id)
     res_prop = await db.execute(q_prop)
@@ -168,19 +190,26 @@ async def _dados_producao(
 
 async def _dados_funil(
     db: AsyncSession,
-    periodo: int,
+    inicio: datetime,
+    fim: datetime,
     usuario_id: uuid.UUID | None = None,
 ) -> FunilOut:
     """Calcula funil de conversão por ramo no período."""
-    corte = _corte(periodo)
-
-    q_cot = select(Cotacao).where(Cotacao.criado_em >= corte).limit(10_000)
+    q_cot = (
+        select(Cotacao)
+        .where(Cotacao.criado_em >= inicio, Cotacao.criado_em <= fim)
+        .limit(10_000)
+    )
     if usuario_id is not None:
         q_cot = q_cot.where(Cotacao.usuario_id == usuario_id)
     res_cot = await db.execute(q_cot)
     cotacoes = res_cot.scalars().all()
 
-    q_prop = select(Proposta).where(Proposta.transmitida_em >= corte).limit(10_000)
+    q_prop = (
+        select(Proposta)
+        .where(Proposta.transmitida_em >= inicio, Proposta.transmitida_em <= fim)
+        .limit(10_000)
+    )
     if usuario_id is not None:
         q_prop = q_prop.where(Proposta.usuario_id == usuario_id)
     res_prop = await db.execute(q_prop)
@@ -223,16 +252,15 @@ async def _dados_funil(
 
 async def _dados_mix(
     db: AsyncSession,
-    periodo: int,
+    inicio: datetime,
+    fim: datetime,
     usuario_id: uuid.UUID | None = None,
 ) -> list[MixOut]:
     """Distribuição por ramo no período, ordenada por volume."""
-    corte = _corte(periodo)
-
     q_prop = (
         select(Proposta, Cotacao)
         .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
-        .where(Proposta.transmitida_em >= corte)
+        .where(Proposta.transmitida_em >= inicio, Proposta.transmitida_em <= fim)
     )
     if usuario_id is not None:
         q_prop = q_prop.where(Proposta.usuario_id == usuario_id)
@@ -275,9 +303,12 @@ async def relatorio_producao(
     usuario: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     periodo: int = Query(default=30, ge=7, le=365),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
 ) -> list[ProducaoOut]:
     """Produção por corretor — admin apenas."""
-    return await _dados_producao(db, periodo)
+    inicio, fim = _resolve_corte(periodo, date_from, date_to)
+    return await _dados_producao(db, inicio, fim)
 
 
 @router.get("/funil", response_model=FunilOut)
@@ -285,10 +316,13 @@ async def relatorio_funil(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     periodo: int = Query(default=30, ge=7, le=365),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
 ) -> FunilOut:
     """Funil de conversão. Corretor vê apenas seus dados; admin vê tudo."""
     uid = None if usuario.papel == "admin" else usuario.id
-    return await _dados_funil(db, periodo, uid)
+    inicio, fim = _resolve_corte(periodo, date_from, date_to)
+    return await _dados_funil(db, inicio, fim, uid)
 
 
 @router.get("/mix", response_model=list[MixOut])
@@ -296,10 +330,13 @@ async def relatorio_mix(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     periodo: int = Query(default=30, ge=7, le=365),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
 ) -> list[MixOut]:
     """Mix por ramo. Corretor vê apenas seus dados; admin vê tudo."""
     uid = None if usuario.papel == "admin" else usuario.id
-    return await _dados_mix(db, periodo, uid)
+    inicio, fim = _resolve_corte(periodo, date_from, date_to)
+    return await _dados_mix(db, inicio, fim, uid)
 
 
 # ---------------------------------------------------------------------------
@@ -318,8 +355,9 @@ async def export_csv(
     buf = io.StringIO()
     writer = csv.writer(buf)
 
+    inicio, fim = _resolve_corte(periodo, None, None)
     if tipo == "producao":
-        dados = await _dados_producao(db, periodo)
+        dados = await _dados_producao(db, inicio, fim)
         writer.writerow(
             [
                 "corretor_id",
@@ -345,7 +383,7 @@ async def export_csv(
             )
 
     elif tipo == "funil":
-        funil = await _dados_funil(db, periodo)
+        funil = await _dados_funil(db, inicio, fim)
         writer.writerow(
             [
                 "ramo",
@@ -367,7 +405,7 @@ async def export_csv(
             )
 
     else:  # mix
-        mix = await _dados_mix(db, periodo)
+        mix = await _dados_mix(db, inicio, fim)
         writer.writerow(["ramo", "count", "pct", "premio_total"])
         for m in mix:
             writer.writerow([m.ramo, m.count, str(m.pct), str(m.premio_total)])
@@ -406,9 +444,10 @@ async def export_xlsx(
     wb = openpyxl.Workbook()
     ws = wb.active
 
+    inicio, fim = _resolve_corte(periodo, None, None)
     if tipo == "producao":
         ws.title = "Producao"
-        dados = await _dados_producao(db, periodo)
+        dados = await _dados_producao(db, inicio, fim)
         ws.append(
             [
                 "Corretor ID",
@@ -435,7 +474,7 @@ async def export_xlsx(
 
     elif tipo == "funil":
         ws.title = "Funil"
-        funil = await _dados_funil(db, periodo)
+        funil = await _dados_funil(db, inicio, fim)
         ws.append(
             [
                 "Ramo",
@@ -458,7 +497,7 @@ async def export_xlsx(
 
     else:  # mix
         ws.title = "Mix"
-        mix = await _dados_mix(db, periodo)
+        mix = await _dados_mix(db, inicio, fim)
         ws.append(["Ramo", "Qtd", "Pct (%)", "Prêmio Total"])
         for m in mix:
             ws.append([m.ramo, m.count, float(m.pct), float(m.premio_total)])

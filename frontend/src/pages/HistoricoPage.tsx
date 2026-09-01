@@ -15,6 +15,76 @@ function nomeProponente(dados: Record<string, unknown>): string {
   return String(prop?.nome ?? dados.nome ?? "");
 }
 
+const RAMO_ICON: Record<string, string> = {
+  auto: "🚗",
+  imovel: "🏠",
+  vida: "💙",
+  empresarial: "🏢",
+};
+
+function RamoIcon({ ramo }: { ramo: string }) {
+  return <span className="text-base leading-none">{RAMO_ICON[ramo] ?? "📋"}</span>;
+}
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-4 animate-pulse">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 space-y-2">
+          <div className="flex gap-2 items-center">
+            <div className="h-4 w-4 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-4 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-5 w-16 rounded bg-gray-200 dark:bg-gray-700" />
+          </div>
+          <div className="h-3 w-40 rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+        </div>
+        <div className="space-y-2 text-right">
+          <div className="h-5 w-24 rounded bg-gray-200 dark:bg-gray-700 ml-auto" />
+          <div className="flex gap-2 justify-end">
+            <div className="h-7 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-7 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActiveFilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">
+      {label}
+      <button onClick={onRemove} className="ml-0.5 hover:text-blue-900 dark:hover:text-blue-100 leading-none" aria-label="remover filtro">×</button>
+    </span>
+  );
+}
+
+function RestricoesList({ restricoes }: { restricoes: { codigo: string; mensagem: string }[] }) {
+  const [open, setOpen] = useState(false);
+  if (restricoes.length === 0) return null;
+  return (
+    <div className="mt-1.5">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs text-yellow-700 dark:text-yellow-400 hover:underline flex items-center gap-1"
+      >
+        <span>{open ? "▾" : "▸"}</span>
+        {restricoes.length} restrição{restricoes.length > 1 ? "ões" : ""}
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-0.5 pl-3 border-l-2 border-yellow-300 dark:border-yellow-700">
+          {restricoes.map((r) => (
+            <li key={r.codigo} className="text-xs text-yellow-700 dark:text-yellow-400">
+              <span className="font-mono text-yellow-600 dark:text-yellow-500">{r.codigo}</span> — {r.mensagem}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function HistoricoPage() {
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +92,9 @@ export function HistoricoPage() {
   const [busca, setBusca] = useState("");
   const [filtroRamo, setFiltroRamo] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroDias, setFiltroDias] = useState(0);
+  const [valorMin, setValorMin] = useState("");
+  const [valorMax, setValorMax] = useState("");
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
@@ -37,7 +110,7 @@ export function HistoricoPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [busca, filtroRamo, filtroStatus]);
+  }, [busca, filtroRamo, filtroStatus, filtroDias, valorMin, valorMax]);
 
   const ramos = useMemo(
     () => [...new Set(cotacoes.map((c) => c.ramo))].sort(),
@@ -46,9 +119,19 @@ export function HistoricoPage() {
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase();
+    const corte =
+      filtroDias > 0
+        ? new Date(Date.now() - filtroDias * 86_400_000).toISOString()
+        : null;
+    const vMin = valorMin ? parseFloat(valorMin) : null;
+    const vMax = valorMax ? parseFloat(valorMax) : null;
     return cotacoes.filter((c) => {
       if (filtroRamo && c.ramo !== filtroRamo) return false;
       if (filtroStatus && c.status !== filtroStatus) return false;
+      if (corte && c.criado_em < corte) return false;
+      const premio = c.premio_total ? parseFloat(c.premio_total) : null;
+      if (vMin !== null && (premio === null || premio < vMin)) return false;
+      if (vMax !== null && (premio === null || premio > vMax)) return false;
       if (!q) return true;
       return (
         c.ramo.toLowerCase().includes(q) ||
@@ -57,177 +140,273 @@ export function HistoricoPage() {
         nomeProponente(c.dados_risco).toLowerCase().includes(q)
       );
     });
-  }, [cotacoes, busca, filtroRamo, filtroStatus]);
+  }, [cotacoes, busca, filtroRamo, filtroStatus, filtroDias, valorMin, valorMax]);
 
   const paginated = filtradas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  if (loading) {
-    return (
-      <p className="text-sm text-gray-500 dark:text-gray-400">
-        Carregando histórico…
-      </p>
-    );
+  const temFiltroAtivo = busca || filtroRamo || filtroStatus || filtroDias > 0 || valorMin || valorMax;
+
+  function limparFiltros() {
+    setBusca("");
+    setFiltroRamo("");
+    setFiltroStatus("");
+    setFiltroDias(0);
+    setValorMin("");
+    setValorMax("");
   }
 
-  if (err) {
-    return (
-      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
-        {err}
-      </div>
-    );
-  }
+  const selectClass =
+    "border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Histórico de cotações
-        </h2>
-        <Button size="sm" onClick={() => navigate("/cotacao")}>
-          Nova cotação
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Input
-          placeholder="Buscar por proponente, ramo, status, ID…"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          className="max-w-xs"
-        />
-        <select
-          value={filtroRamo}
-          onChange={(e) => setFiltroRamo(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-        >
-          <option value="">Todos os ramos</option>
-          {ramos.map((r) => (
-            <option key={r} value={r}>
-              {r.charAt(0).toUpperCase() + r.slice(1)}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filtroStatus}
-          onChange={(e) => setFiltroStatus(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-        >
-          <option value="">Todos os status</option>
-          {["sucesso", "restricao", "erro", "aguardando", "processando"].map(
-            (s) => (
-              <option key={s} value={s}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </option>
-            ),
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Histórico de cotações
+          </h1>
+          {!loading && !err && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {temFiltroAtivo
+                ? `${filtradas.length} de ${cotacoes.length} cotações`
+                : `${cotacoes.length} cotação${cotacoes.length !== 1 ? "ões" : ""} no total`}
+            </p>
           )}
-        </select>
+        </div>
+        <div className="flex gap-2 flex-shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => { window.location.href = api.cotacoes.exportCsvUrl(); }}
+          >
+            ↓ Exportar CSV
+          </Button>
+          <Button size="sm" onClick={() => navigate("/cotacao")}>
+            + Nova cotação
+          </Button>
+        </div>
       </div>
 
-      {filtradas.length === 0 ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {busca || filtroRamo || filtroStatus
-            ? "Nenhuma cotação encontrada para este filtro."
-            : "Nenhuma cotação registrada ainda."}
-        </p>
-      ) : (
+      {/* Filtros */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <Input
+            placeholder="Buscar proponente, ID, ramo…"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="min-w-[200px] flex-1"
+          />
+          <select
+            value={filtroRamo}
+            onChange={(e) => setFiltroRamo(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">Todos os ramos</option>
+            {ramos.map((r) => (
+              <option key={r} value={r}>
+                {RAMO_ICON[r] ?? ""} {r.charAt(0).toUpperCase() + r.slice(1)}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filtroStatus}
+            onChange={(e) => setFiltroStatus(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">Qualquer status</option>
+            {[
+              { v: "sucesso", l: "Sucesso" },
+              { v: "restricao", l: "Com restrição" },
+              { v: "erro", l: "Não realizada" },
+              { v: "aguardando", l: "Aguardando" },
+              { v: "processando", l: "Processando" },
+            ].map(({ v, l }) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
+          <select
+            value={filtroDias}
+            onChange={(e) => setFiltroDias(Number(e.target.value))}
+            className={selectClass}
+          >
+            <option value={0}>Qualquer período</option>
+            <option value={7}>Últimos 7 dias</option>
+            <option value={30}>Últimos 30 dias</option>
+            <option value={90}>Últimos 90 dias</option>
+            <option value={365}>Último ano</option>
+          </select>
+        </div>
+
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Prêmio:</span>
+          <Input
+            type="number"
+            placeholder="Mín (R$)"
+            value={valorMin}
+            onChange={(e) => setValorMin(e.target.value)}
+            className="w-32"
+            min={0}
+          />
+          <span className="text-xs text-gray-400">até</span>
+          <Input
+            type="number"
+            placeholder="Máx (R$)"
+            value={valorMax}
+            onChange={(e) => setValorMax(e.target.value)}
+            className="w-32"
+            min={0}
+          />
+          {temFiltroAtivo && (
+            <button
+              onClick={limparFiltros}
+              className="ml-auto text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 underline"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+
+        {/* Chips de filtros ativos */}
+        {temFiltroAtivo && (
+          <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-100 dark:border-gray-700">
+            {busca && <ActiveFilterChip label={`"${busca}"`} onRemove={() => setBusca("")} />}
+            {filtroRamo && <ActiveFilterChip label={`Ramo: ${filtroRamo}`} onRemove={() => setFiltroRamo("")} />}
+            {filtroStatus && <ActiveFilterChip label={`Status: ${filtroStatus}`} onRemove={() => setFiltroStatus("")} />}
+            {filtroDias > 0 && <ActiveFilterChip label={filtroDias === 365 ? "Último ano" : `Últimos ${filtroDias} dias`} onRemove={() => setFiltroDias(0)} />}
+            {valorMin && <ActiveFilterChip label={`Min R$ ${valorMin}`} onRemove={() => setValorMin("")} />}
+            {valorMax && <ActiveFilterChip label={`Máx R$ ${valorMax}`} onRemove={() => setValorMax("")} />}
+          </div>
+        )}
+      </div>
+
+      {/* Erro */}
+      {err && (
+        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+          {err}
+        </div>
+      )}
+
+      {/* Skeleton */}
+      {loading && (
+        <div className="space-y-3">
+          {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !err && filtradas.length === 0 && (
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-16 text-center">
+          <p className="text-4xl mb-3">🔍</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {temFiltroAtivo ? "Nenhuma cotação encontrada" : "Nenhuma cotação registrada"}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {temFiltroAtivo ? "Tente ajustar os filtros acima" : "Clique em + Nova cotação para começar"}
+          </p>
+          {temFiltroAtivo && (
+            <button onClick={limparFiltros} className="mt-3 text-xs text-blue-600 dark:text-blue-400 underline">
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Lista */}
+      {!loading && !err && filtradas.length > 0 && (
         <>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {paginated.map((c) => {
               const nome = nomeProponente(c.dados_risco);
               return (
                 <div
                   key={c.id}
-                  className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between gap-4"
+                  className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                        {c.ramo}
-                      </span>
-                      <StatusBadge status={c.status} />
-                      {c.necessita_vistoria && (
-                        <span className="text-xs text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-700 rounded px-1.5 py-0.5">
-                          Vistoria
+                  <div className="flex items-start gap-4">
+                    {/* Ícone + info principal */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <RamoIcon ramo={c.ramo} />
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white capitalize">
+                          {c.ramo}
                         </span>
-                      )}
-                      {c.versao_anterior_id && (
-                        <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                          Revisão
-                        </span>
-                      )}
-                      {c.proposta_id && (
-                        <span className="text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-700 rounded px-1.5 py-0.5">
-                          Emitida
-                        </span>
-                      )}
-                    </div>
-                    {nome && (
-                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-0.5">
-                        {nome}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                      <span>{formatDate(c.criado_em)}</span>
-                      {c.cotacao_id_cia && (
-                        <span className="font-mono truncate">
-                          {c.cotacao_id_cia}
-                        </span>
-                      )}
-                    </div>
-                    {c.restricoes.length > 0 && (
-                      <ul className="mt-1 text-xs text-yellow-700 dark:text-yellow-400 space-y-0.5">
-                        {c.restricoes.map((r) => (
-                          <li key={r.codigo}>{r.mensagem}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                        <StatusBadge status={c.status} />
+                        {c.necessita_vistoria && (
+                          <span className="text-xs text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-700 rounded-full px-2 py-0.5">
+                            Vistoria obrigatória
+                          </span>
+                        )}
+                        {c.proposta_id && (
+                          <span className="text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-700 rounded-full px-2 py-0.5">
+                            ✓ Emitida
+                          </span>
+                        )}
+                        {c.versao_anterior_id && (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-700 rounded-full px-2 py-0.5">
+                            Revisão
+                          </span>
+                        )}
+                      </div>
 
-                  <div className="text-right flex-shrink-0">
-                    {c.premio_total ? (
-                      <p className="text-base font-semibold text-gray-900 dark:text-white">
-                        {formatBRL(c.premio_total)}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-gray-400 dark:text-gray-500">
-                        —
-                      </p>
-                    )}
-                    <div className="flex gap-2 mt-2 justify-end flex-wrap">
-                      {c.cliente_id && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            navigate(`/clientes/${c.cliente_id}`)
-                          }
-                        >
-                          Ver cliente
-                        </Button>
+                      {nome && (
+                        <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {nome}
+                        </p>
                       )}
-                      {(c.status === "sucesso" || c.status === "restricao") && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            navigate(`/cotacoes/${c.id}/comparativo`)
-                          }
-                        >
-                          Comparativo
-                        </Button>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-400 dark:text-gray-500">
+                        <span>{formatDate(c.criado_em)}</span>
+                        {c.cotacao_id_cia && (
+                          <Tooltip text={c.cotacao_id_cia} position="top">
+                            <span className="font-mono cursor-default">
+                              {c.cotacao_id_cia.length > 20
+                                ? `${c.cotacao_id_cia.slice(0, 20)}…`
+                                : c.cotacao_id_cia}
+                            </span>
+                          </Tooltip>
+                        )}
+                      </div>
+
+                      <RestricoesList restricoes={c.restricoes} />
+                    </div>
+
+                    {/* Prêmio + ações */}
+                    <div className="flex-shrink-0 text-right space-y-2">
+                      {c.premio_total ? (
+                        <p className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+                          {formatBRL(c.premio_total)}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-gray-300 dark:text-gray-600 font-medium">—</p>
                       )}
-                      <Tooltip
-                        text="Abre nova cotação pré-preenchida com os dados desta"
-                        position="top"
-                      >
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/cotacao?recotar=${c.id}`)}
-                        >
-                          Refazer
-                        </Button>
-                      </Tooltip>
+
+                      <div className="flex gap-1.5 justify-end flex-wrap">
+                        {c.cliente_id && (
+                          <button
+                            onClick={() => navigate(`/clientes/${c.cliente_id}`)}
+                            className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            Cliente
+                          </button>
+                        )}
+                        {(c.status === "sucesso" || c.status === "restricao") && (
+                          <button
+                            onClick={() => navigate(`/cotacoes/${c.id}/comparativo`)}
+                            className="text-xs px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                          >
+                            Comparativo
+                          </button>
+                        )}
+                        <Tooltip text="Nova cotação com os mesmos dados" position="top">
+                          <button
+                            onClick={() => navigate(`/cotacao?recotar=${c.id}`)}
+                            className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            Refazer
+                          </button>
+                        </Tooltip>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -446,7 +446,7 @@ async def criar_demo(factory: async_sessionmaker[AsyncSession]) -> None:
                         ),
                         premio_total=premio,
                         restricoes=(
-                            [{"codigo": "R01", "descricao": "Risco elevado"}]
+                            [{"codigo": "R01", "mensagem": "Risco elevado"}]
                             if status == "restricao"
                             else []
                         ),

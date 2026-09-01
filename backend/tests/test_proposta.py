@@ -405,3 +405,75 @@ def test_annual_total_none_quando_valor_invalido() -> None:
     job = MagicMock()
     job.payload_resposta = {"annual_total": "nao-e-numero"}
     assert _annual_total(job) is None
+
+
+async def test_transmitir_adapter_retorna_502(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Quando adapter.transmitir retorna sucesso=False, deve retornar 502."""
+    from unittest.mock import AsyncMock
+
+    from app.adapters.base import ResultadoTransmissao
+    from app.api.proposta_router import _adapter_dep
+
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_tx502@test.com"
+    )
+
+    fake_fail = AsyncMock()
+    fake_fail.transmitir = AsyncMock(
+        return_value=ResultadoTransmissao(
+            sucesso=False, protocolo=None, mensagens=["Erro simulado"]
+        )
+    )
+    app.dependency_overrides[_adapter_dep] = lambda: fake_fail
+    try:
+        r = await client.post(
+            f"/cotacoes/{cotacao_id}/transmitir", json=_TRANSMITIR_BODY
+        )
+        assert r.status_code == 502
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_parcelas_sem_inicio_vigencia_retorna_none(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Proposta sem inicio_vigencia deve ter vencimento=None em cada parcela."""
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_parc_niv@test.com"
+    )
+    body_sem_inicio = {
+        "plano_pagamento": "AVISTA",
+        "n_parcelas": 2,
+        "comissao_pct": "0.1500",
+        # sem inicio_vigencia
+    }
+    r_tx = await client.post(f"/cotacoes/{cotacao_id}/transmitir", json=body_sem_inicio)
+    assert r_tx.status_code == 201
+    proposta_id = r_tx.json()["id"]
+
+    r = await client.get(f"/propostas/{proposta_id}/parcelas")
+    assert r.status_code == 200
+    parcelas = r.json()
+    assert len(parcelas) == 2
+    for p in parcelas:
+        assert p["vencimento"] is None
+
+
+def test_m4_dados_negocio_nao_serializavel_levanta_validation_error() -> None:
+    """dados_negocio com valor não-JSON-serializável deve levantar ValidationError."""
+    from decimal import Decimal
+
+    import pytest
+    from pydantic import ValidationError
+
+    from app.api.proposta_router import TransmitirInput
+
+    with pytest.raises(ValidationError, match="serializáveis"):
+        TransmitirInput(
+            plano_pagamento="mensal",
+            n_parcelas=1,
+            comissao_pct=Decimal("0.05"),
+            dados_negocio={"chave": object()},
+        )
