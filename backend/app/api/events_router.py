@@ -30,7 +30,7 @@ async def stream_events(
     async def generate() -> AsyncGenerator[bytes, None]:
         q = events_bus.subscribe(uid)
         try:
-            yield b"data: {\"tipo\":\"connected\"}\n\n"
+            yield b'data: {"tipo":"connected"}\n\n'
             while True:
                 try:
                     event = await asyncio.wait_for(q.get(), timeout=_KEEPALIVE_INTERVAL)

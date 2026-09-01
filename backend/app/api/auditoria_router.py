@@ -55,9 +55,7 @@ async def listar_usuarios_auditoria(
     result = await db.execute(
         select(Usuario).where(Usuario.id.in_(select(subq))).order_by(Usuario.nome)
     )
-    return [
-        AuditoriaUsuarioOut(id=u.id, nome=u.nome) for u in result.scalars().all()
-    ]
+    return [AuditoriaUsuarioOut(id=u.id, nome=u.nome) for u in result.scalars().all()]
 
 
 @router.get("", response_model=AuditoriaListOut)
@@ -77,9 +75,7 @@ async def listar_auditoria(
     if usuario_id:
         base = base.where(Auditoria.usuario_id == usuario_id)
 
-    total_r = await db.execute(
-        select(func.count()).select_from(base.subquery())
-    )
+    total_r = await db.execute(select(func.count()).select_from(base.subquery()))
     total = int(total_r.scalar_one())
 
     result = await db.execute(
@@ -93,9 +89,7 @@ async def listar_auditoria(
     uid_set = {r.usuario_id for r in rows if r.usuario_id is not None}
     nome_map: dict[uuid.UUID, str] = {}
     if uid_set:
-        u_result = await db.execute(
-            select(Usuario).where(Usuario.id.in_(uid_set))
-        )
+        u_result = await db.execute(select(Usuario).where(Usuario.id.in_(uid_set)))
         nome_map = {u.id: u.nome for u in u_result.scalars().all()}
 
     items = [
