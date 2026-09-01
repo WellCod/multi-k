@@ -7,11 +7,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser
 from app.infra import events_bus
 from app.infra.db import get_db  # noqa: F401 — side-effect import keeps DI working
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/events", tags=["events"])
 
