@@ -5,7 +5,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { api, ApiError } from "./api";
+import { api, ApiError, setUnauthorizedHandler } from "./api";
 
 interface AuthUser {
   nome: string;
@@ -24,6 +24,15 @@ const Ctx = createContext<AuthCtx | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      sessionStorage.clear();
+      sessionStorage.setItem("mk_session_expired", "1");
+      setUser(null);
+    });
+    return () => setUnauthorizedHandler(() => {});
+  }, []);
 
   // Hydrate from /auth/me equivalent — we test by calling a protected endpoint.
   // Simple: try GET /dominios; 200 means we're logged in, 401 means not.

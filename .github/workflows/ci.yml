@@ -68,8 +68,30 @@ jobs:
         run: mypy app
         working-directory: backend
 
-      - name: Testes (pytest)
-        run: pytest -v --tb=short
+      - name: Migração do banco (alembic upgrade head)
+        run: alembic upgrade head
+        working-directory: backend
+
+      - name: Testes com cobertura (pytest-cov ≥ 85%)
+        run: pytest -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=85
+        working-directory: backend
+
+      - name: SAST (bandit)
+        run: bandit -r app -c pyproject.toml -ll
+        working-directory: backend
+
+      - name: CVE scan (pip-audit)
+        # PYSEC-2026-1845 (pytest): ignorado — pytest-asyncio<=0.26 bloqueia pytest>=9
+        run: pip freeze | pip-audit -r /dev/stdin --ignore-vuln PYSEC-2026-1845
+        working-directory: backend
+
+      - name: Gate de produção — REDIS_URL obrigatório fora de dev
+        run: |
+          if [ "${CI_ENV:-dev}" != "dev" ] && [ -z "${REDIS_URL:-}" ]; then
+            echo "ERRO: REDIS_URL ausente em ambiente não-dev. Configure a variável de ambiente."
+            exit 1
+          fi
+          echo "OK: REDIS_URL check passou (CI_ENV=${CI_ENV:-dev})."
         working-directory: backend
 
       - name: Teste de arquitetura — isolamento Yelum

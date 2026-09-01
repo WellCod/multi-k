@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AdminUser, CurrentUser
@@ -265,92 +265,103 @@ async def home_admin(
     usuario: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> HomeAdminOut:
-    """KPIs da carteira — visível apenas para admins."""
+    """KPIs da carteira — visível apenas para admins. Aggregate queries, sem N+1."""
     hoje = date.today()
+    # propostas com inicio_vigencia + 365 > hoje ↔ inicio_vigencia > hoje - 365
+    corte_vigencia = hoje - timedelta(days=_VIGENCIA_DIAS)
 
-    # Busca propostas (cap de segurança — 50k registros)
-    res_props = await db.execute(
-        select(Proposta, Cotacao)
-        .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
-        .limit(50_000)
-    )
-    todas_propostas = res_props.all()
-
-    # Busca todos os corretores para montar o mapa nome → stats
-    res_users = await db.execute(select(Usuario))
-    usuarios_map: dict[uuid.UUID, str] = {
-        u.id: u.nome for u in res_users.scalars().all()
-    }
-
-    # Propostas vigentes (inicio_vigencia + 365 > hoje)
-    vigentes = [(p, c) for p, c in todas_propostas if _proposta_vigente(p, hoje)]
-
-    segurados_vigentes = len(
-        {c.cliente_id for _, c in vigentes if c.cliente_id is not None}
-    )
-    apolices_vigentes = len(vigentes)
-    premio_liquido = sum(
-        ((c.premio_total or Decimal("0")) for _, c in vigentes), Decimal("0")
-    )
-
-    comissao_produzida = sum(
-        p.comissao_parcela * p.n_parcelas for p, _ in todas_propostas
-    )
-
-    # Cotações em andamento (aguardando/processando)
-    res_cot = await db.execute(
-        select(Cotacao).where(Cotacao.status.in_(["aguardando", "processando"]))
-    )
-    cotacoes_em_andamento = len(res_cot.scalars().all())
-
-    # KPIs por ramo — somente propostas vigentes
-    ramo_stats: dict[str, dict[str, Decimal | int]] = {}
-    for _prop, cotacao in vigentes:
-        r = cotacao.ramo
-        if r not in ramo_stats:
-            ramo_stats[r] = {"count": 0, "premio_total": Decimal("0")}
-        ramo_stats[r]["count"] = int(ramo_stats[r]["count"]) + 1
-        ramo_stats[r]["premio_total"] = Decimal(str(ramo_stats[r]["premio_total"])) + (
-            cotacao.premio_total or Decimal("0")
+    # --- Segurados e apólices vigentes + prêmio líquido ---
+    res_vigentes = await db.execute(
+        select(
+            func.count(Proposta.id).label("apolices"),
+            func.count(func.distinct(Cotacao.cliente_id)).label("segurados"),
+            func.coalesce(func.sum(Cotacao.premio_total), Decimal("0")).label("premio"),
         )
+        .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
+        .where(Proposta.inicio_vigencia.is_not(None))
+        .where(Proposta.inicio_vigencia > corte_vigencia)
+    )
+    row_vig = res_vigentes.one()
+    apolices_vigentes = int(row_vig.apolices)
+    segurados_vigentes = int(row_vig.segurados)
+    premio_liquido = Decimal(str(row_vig.premio or "0"))
+
+    # --- Comissão produzida ---
+    res_comissao = await db.execute(
+        select(
+            func.coalesce(
+                func.sum(Proposta.comissao_parcela * Proposta.n_parcelas), Decimal("0")
+            ).label("total")
+        )
+    )
+    comissao_produzida = Decimal(str(res_comissao.scalar_one() or "0"))
+
+    # --- Cotações em andamento ---
+    res_andamento = await db.execute(
+        select(func.count(Cotacao.id)).where(
+            Cotacao.status.in_(["aguardando", "processando"])
+        )
+    )
+    cotacoes_em_andamento = int(res_andamento.scalar_one())
+
+    # --- KPIs por ramo (propostas vigentes) ---
+    res_ramo = await db.execute(
+        select(
+            Cotacao.ramo,
+            func.count(Proposta.id).label("cnt"),
+            func.coalesce(func.sum(Cotacao.premio_total), Decimal("0")).label("premio"),
+        )
+        .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
+        .where(Proposta.inicio_vigencia.is_not(None))
+        .where(Proposta.inicio_vigencia > corte_vigencia)
+        .group_by(Cotacao.ramo)
+    )
     por_ramo = [
         KpiRamo(
-            ramo=r,
-            count=int(v["count"]),
-            premio_total=Decimal(str(v["premio_total"])),
+            ramo=r.ramo,
+            count=int(r.cnt),
+            premio_total=Decimal(str(r.premio or "0")),
         )
-        for r, v in ramo_stats.items()
+        for r in res_ramo.all()
     ]
 
-    # KPIs por corretor — todas as propostas
-    corretor_stats: dict[uuid.UUID, dict[str, int | Decimal]] = {}
-    for prop, cotacao in todas_propostas:
-        uid = prop.usuario_id
-        if uid not in corretor_stats:
-            corretor_stats[uid] = {
-                "propostas": 0,
-                "premio_total": Decimal("0"),
-            }
-        corretor_stats[uid]["propostas"] = int(corretor_stats[uid]["propostas"]) + 1
-        corretor_stats[uid]["premio_total"] = Decimal(
-            str(corretor_stats[uid]["premio_total"])
-        ) + (cotacao.premio_total or Decimal("0"))
-
-    # Cotações por corretor (cap de segurança)
-    res_cots_all = await db.execute(select(Cotacao).limit(50_000))
-    for cot in res_cots_all.scalars().all():
-        uid = cot.usuario_id
-        if uid not in corretor_stats:
-            corretor_stats[uid] = {
-                "propostas": 0,
-                "premio_total": Decimal("0"),
-            }
-        # campo cotacoes acumulado separadamente
-        if "cotacoes" not in corretor_stats[uid]:
-            corretor_stats[uid]["cotacoes"] = 0
-        corretor_stats[uid]["cotacoes"] = (
-            int(corretor_stats[uid].get("cotacoes", 0)) + 1
+    # --- KPIs por corretor: propostas + prêmio ---
+    res_corretor = await db.execute(
+        select(
+            Proposta.usuario_id,
+            func.count(Proposta.id).label("propostas"),
+            func.coalesce(func.sum(Cotacao.premio_total), Decimal("0")).label("premio"),
         )
+        .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
+        .group_by(Proposta.usuario_id)
+    )
+    corretor_stats: dict[uuid.UUID, dict[str, int | Decimal]] = {
+        r.usuario_id: {
+            "propostas": int(r.propostas),
+            "premio_total": Decimal(str(r.premio or "0")),
+            "cotacoes": 0,
+        }
+        for r in res_corretor.all()
+    }
+
+    # Cotações por corretor
+    res_cot_corretor = await db.execute(
+        select(Cotacao.usuario_id, func.count(Cotacao.id).label("cotacoes")).group_by(
+            Cotacao.usuario_id
+        )
+    )
+    for r in res_cot_corretor.all():
+        if r.usuario_id not in corretor_stats:
+            corretor_stats[r.usuario_id] = {
+                "propostas": 0,
+                "premio_total": Decimal("0"),
+                "cotacoes": 0,
+            }
+        corretor_stats[r.usuario_id]["cotacoes"] = int(r.cotacoes)
+
+    # Nomes dos corretores
+    res_users = await db.execute(select(Usuario.id, Usuario.nome))
+    usuarios_map: dict[uuid.UUID, str] = {r.id: r.nome for r in res_users.all()}
 
     por_corretor = [
         KpiCorretor(
