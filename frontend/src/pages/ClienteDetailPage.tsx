@@ -21,14 +21,16 @@ const TIPO_CONFIG: Record<string, { label: string; dot: string }> = {
   "proposta.transmitida": { label: "Proposta transmitida", dot: "bg-green-500" },
 };
 
-function TimelineCard({ item }: { item: TimelineItem }) {
+function TimelineCard({ item, isLast }: { item: TimelineItem; isLast: boolean }) {
   const cfg = TIPO_CONFIG[item.tipo] ?? { label: item.tipo, dot: "bg-gray-400" };
 
   return (
     <div className="flex gap-4">
       <div className="flex flex-col items-center">
-        <div className={`w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ${cfg.dot}`} />
-        <div className="w-px flex-1 bg-gray-200 dark:bg-gray-700 mt-1" />
+        <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${cfg.dot}`} />
+        {!isLast && (
+          <div className="w-px flex-1 border-l-2 border-dashed border-gray-200 dark:border-gray-700 mt-1" />
+        )}
       </div>
       <div className="pb-5 flex-1">
         <p className="text-xs text-gray-500 dark:text-gray-400">{fmtData(item.data)}</p>
@@ -53,17 +55,30 @@ function TimelineCard({ item }: { item: TimelineItem }) {
   );
 }
 
+const INFO_ICONS: Record<string, string> = {
+  "E-mail": "📧",
+  "Telefone": "📱",
+  "Nascimento": "🎂",
+  "Estado civil": "💍",
+  "Profissão": "💼",
+  "Cadastrado em": "📅",
+};
+
 function InfoRow({ label, value }: { label: string; value: string }) {
+  const icon = INFO_ICONS[label];
   return (
     <div>
-      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="text-sm text-gray-900 dark:text-white mt-0.5">{value}</p>
+      <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        {icon && <span className="mr-1">{icon}</span>}
+        {label}
+      </p>
+      <p className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">{value}</p>
     </div>
   );
 }
 
 const SELECT_CLASS =
-  "mt-0.5 w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white";
+  "mt-0.5 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white";
 
 function EditForm({
   cliente,
@@ -125,19 +140,19 @@ function EditForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">Nome *</label>
-          <Input value={nome} onChange={(e) => setNome(e.target.value)} required autoFocus className="mt-0.5" />
+          <Input value={nome} onChange={(e) => setNome(e.target.value)} required autoFocus className="mt-0.5 rounded-lg" />
         </div>
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">E-mail</label>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-0.5" />
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-0.5 rounded-lg" />
         </div>
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">Telefone</label>
-          <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} className="mt-0.5" />
+          <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} className="mt-0.5 rounded-lg" />
         </div>
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">Data de nascimento</label>
-          <Input type="date" value={dataNasc} onChange={(e) => setDataNasc(e.target.value)} className="mt-0.5" />
+          <Input type="date" value={dataNasc} onChange={(e) => setDataNasc(e.target.value)} className="mt-0.5 rounded-lg" />
         </div>
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">Estado civil</label>
@@ -189,7 +204,7 @@ function VeiculosSection({ clienteId }: { clienteId: string }) {
   if (veiculos.length === 0) return null;
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
       <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
         Veículos ({veiculos.length})
       </h2>
@@ -197,15 +212,20 @@ function VeiculosSection({ clienteId }: { clienteId: string }) {
         {veiculos.map((v) => (
           <div
             key={v.id}
-            className="flex items-center justify-between text-sm border border-gray-100 dark:border-gray-700 rounded px-3 py-2"
+            className="flex items-center justify-between text-sm border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
           >
-            <span className="font-medium text-gray-900 dark:text-white">
+            <span className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+              <span>🚗</span>
               {v.marca} {v.modelo}
             </span>
-            <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-3">
+            <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-2 items-center">
               <span>{v.ano_fabricacao}/{v.ano_modelo}</span>
               <span className="capitalize">{v.combustivel}</span>
-              {v.placa && <span className="font-mono uppercase">{v.placa}</span>}
+              {v.placa && (
+                <span className="font-mono uppercase bg-gray-100 dark:bg-gray-700 px-1.5 rounded">
+                  {v.placa}
+                </span>
+              )}
             </div>
           </div>
         ))}
@@ -225,7 +245,7 @@ function ImoveisSection({ clienteId }: { clienteId: string }) {
   if (imoveis.length === 0) return null;
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
       <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
         Imóveis ({imoveis.length})
       </h2>
@@ -233,13 +253,16 @@ function ImoveisSection({ clienteId }: { clienteId: string }) {
         {imoveis.map((im) => (
           <div
             key={im.id}
-            className="flex items-center justify-between text-sm border border-gray-100 dark:border-gray-700 rounded px-3 py-2"
+            className="flex items-center justify-between text-sm border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
           >
-            <span className="font-medium text-gray-900 dark:text-white capitalize">
+            <span className="font-bold text-gray-900 dark:text-white capitalize flex items-center gap-1.5">
+              <span>🏠</span>
               {im.tipo_imovel.replace("_", " ")}
             </span>
-            <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-3">
-              <span>CEP {im.cep}</span>
+            <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-2 items-center">
+              <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1.5 rounded">
+                CEP {im.cep}
+              </span>
               <span className="capitalize">{im.tipo_construcao.replace("_", " ")}</span>
               {im.logradouro && (
                 <span className="truncate max-w-[140px]">
@@ -254,6 +277,12 @@ function ImoveisSection({ clienteId }: { clienteId: string }) {
   );
 }
 
+function getInitials(nome: string): string {
+  const parts = nome.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export function ClienteDetailPage() {
   const { clienteId } = useParams<{ clienteId: string }>();
   const navigate = useNavigate();
@@ -262,6 +291,8 @@ export function ClienteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     if (!clienteId) return;
@@ -274,7 +305,36 @@ export function ClienteDetailPage() {
       .finally(() => setLoading(false));
   }, [clienteId]);
 
-  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Carregando…</p>;
+  if (loading) return (
+    <div className="max-w-2xl space-y-6 animate-pulse">
+      <div className="flex items-center gap-4">
+        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
+      </div>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="space-y-1">
+              <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-3">
+        <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="flex gap-4">
+            <div className="w-2.5 h-2.5 rounded-full bg-gray-200 dark:bg-gray-700 mt-1.5 flex-shrink-0" />
+            <div className="flex-1 space-y-1 pb-5">
+              <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+              <div className="h-4 w-36 bg-gray-200 dark:bg-gray-700 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
   if (err)
     return (
       <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
@@ -283,16 +343,70 @@ export function ClienteDetailPage() {
     );
   if (!cliente) return null;
 
+  async function handleArchive() {
+    if (!clienteId) return;
+    setArchiving(true);
+    try {
+      await api.clientes.archive(clienteId);
+      navigate("/clientes");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Erro ao arquivar");
+      setShowArchiveConfirm(false);
+    } finally {
+      setArchiving(false);
+    }
+  }
+
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
+      {showArchiveConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowArchiveConfirm(false); }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl w-full max-w-sm mx-4 p-6 space-y-4">
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-2xl">⚠️</span>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white">Arquivar cliente?</h2>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              O cliente será removido da lista mas seus dados e histórico serão preservados.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowArchiveConfirm(false)} disabled={archiving}>
+                Cancelar
+              </Button>
+              <Button type="button" size="sm" onClick={handleArchive} disabled={archiving}
+                className="bg-red-600 hover:bg-red-700 text-white border-red-600">
+                {archiving ? "Arquivando…" : "Arquivar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
-          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
         >
-          ← Voltar
+          <span>←</span>
+          <span>Voltar</span>
         </button>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{cliente.nome}</h1>
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-sm flex-shrink-0">
+            {getInitials(cliente.nome)}
+          </div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white truncate">{cliente.nome}</h1>
+        </div>
+        <button
+          onClick={() => setShowArchiveConfirm(true)}
+          title="Arquivar cliente"
+          className="flex items-center gap-1 text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors px-2 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 flex-shrink-0"
+        >
+          <span>🗑</span>
+          <span className="hidden sm:inline">Arquivar</span>
+        </button>
       </div>
 
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
@@ -353,7 +467,7 @@ export function ClienteDetailPage() {
         ) : (
           <div>
             {timeline.map((item, i) => (
-              <TimelineCard key={i} item={item} />
+              <TimelineCard key={i} item={item} isLast={i === timeline.length - 1} />
             ))}
           </div>
         )}

@@ -9,8 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.models import Sessao, TentativaLogin, Usuario
+from app.infra.secrets import get_optional_secret
 
 _log = logging.getLogger(__name__)
+
+# warn  → loga discrepância (padrão)
+# strict → rejeita sessão se IP mudou
+# off    → ignora verificação de IP
+_IP_CHECK_MODE = get_optional_secret("IP_CHECK_MODE", "warn").lower()
 
 _ph = PasswordHasher()
 
@@ -55,12 +61,21 @@ async def buscar_sessao_valida(
     if sessao is None:
         return None
     if current_ip and sessao.ip_origem and sessao.ip_origem != current_ip:
-        _log.warning(
-            "session_ip_mismatch sessao=%s stored=%s current=%s",
-            sessao_id,
-            sessao.ip_origem,
-            current_ip,
-        )
+        if _IP_CHECK_MODE == "strict":
+            _log.warning(
+                "session_ip_mismatch_rejected sessao=%s stored=%s current=%s",
+                sessao_id,
+                sessao.ip_origem,
+                current_ip,
+            )
+            return None
+        if _IP_CHECK_MODE != "off":
+            _log.warning(
+                "session_ip_mismatch sessao=%s stored=%s current=%s",
+                sessao_id,
+                sessao.ip_origem,
+                current_ip,
+            )
     res2 = await db.execute(
         select(Usuario)
         .where(Usuario.id == sessao.usuario_id)
