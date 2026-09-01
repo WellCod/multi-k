@@ -12,7 +12,10 @@ const NAV_BASE = [
   { to: "/renovacoes", label: "Renovações" },
   { to: "/relatorios", label: "Relatórios" },
 ];
-const NAV_ADMIN = [{ to: "/auditoria", label: "Auditoria" }];
+const NAV_ADMIN = [
+  { to: "/auditoria", label: "Auditoria" },
+  { to: "/usuarios", label: "Usuários" },
+];
 
 function MoonIcon() {
   return (
