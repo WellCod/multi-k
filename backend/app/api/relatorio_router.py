@@ -303,8 +303,8 @@ async def relatorio_producao(
     usuario: AdminUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     periodo: int = Query(default=30, ge=7, le=365),
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
 ) -> list[ProducaoOut]:
     """Produção por corretor — admin apenas."""
     inicio, fim = _resolve_corte(periodo, date_from, date_to)
@@ -316,8 +316,8 @@ async def relatorio_funil(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     periodo: int = Query(default=30, ge=7, le=365),
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
 ) -> FunilOut:
     """Funil de conversão. Corretor vê apenas seus dados; admin vê tudo."""
     uid = None if usuario.papel == "admin" else usuario.id
@@ -330,8 +330,8 @@ async def relatorio_mix(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     periodo: int = Query(default=30, ge=7, le=365),
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
 ) -> list[MixOut]:
     """Mix por ramo. Corretor vê apenas seus dados; admin vê tudo."""
     uid = None if usuario.papel == "admin" else usuario.id

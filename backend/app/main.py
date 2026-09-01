@@ -13,11 +13,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auditoria_router import router as auditoria_router
 from app.api.auth_router import router as auth_router
-from app.api.events_router import router as events_router
 from app.api.cliente_router import router as cliente_router
 from app.api.comparativo_router import router as comparativo_router
 from app.api.cotacao_router import router as cotacao_router
 from app.api.dominio_router import router as dominio_router
+from app.api.events_router import router as events_router
 from app.api.fipe_router import router as fipe_router
 from app.api.health import router as health_router
 from app.api.home_router import router as home_router
