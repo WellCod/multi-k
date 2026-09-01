@@ -111,7 +111,9 @@ async def processar_job(
                         "tipo": "cotacao.pronta",
                         "cotacao_id": str(cot.id),
                         "status": cotacao_status,
-                        "premio_total": str(cot.premio_total) if cot.premio_total else None,
+                        "premio_total": (
+                            str(cot.premio_total) if cot.premio_total else None
+                        ),
                     },
                 )
 
@@ -173,7 +175,11 @@ async def processar_job(
                             "tipo": "cotacao.pronta",
                             "cotacao_id": str(err_cot.id),
                             "status": cotacao_status_err,
-                            "premio_total": str(err_cot.premio_total) if err_cot.premio_total else None,
+                            "premio_total": (
+                                str(err_cot.premio_total)
+                                if err_cot.premio_total
+                                else None
+                            ),
                         },
                     )
 
