@@ -250,14 +250,16 @@ async def exportar_historico_csv(
         ["id", "ramo", "status", "premio_total", "cotacao_id_cia", "criado_em"]
     )
     for c in cotacoes:
-        writer.writerow([
-            str(c.id),
-            c.ramo,
-            c.status,
-            str(c.premio_total) if c.premio_total else "",
-            c.cotacao_id_cia or "",
-            c.criado_em.isoformat(),
-        ])
+        writer.writerow(
+            [
+                str(c.id),
+                c.ramo,
+                c.status,
+                str(c.premio_total) if c.premio_total else "",
+                c.cotacao_id_cia or "",
+                c.criado_em.isoformat(),
+            ]
+        )
     buf.seek(0)
     _ = fmt  # kept for future xlsx branch
     return StreamingResponse(

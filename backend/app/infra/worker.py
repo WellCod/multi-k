@@ -233,9 +233,7 @@ async def _worker_loop(factory: async_sessionmaker[AsyncSession]) -> None:
 
                 if cotacao_ids_a_processar:
                     cots_r = await db.execute(
-                        select(Cotacao).where(
-                            Cotacao.id.in_(cotacao_ids_a_processar)
-                        )
+                        select(Cotacao).where(Cotacao.id.in_(cotacao_ids_a_processar))
                     )
                     for cot in cots_r.scalars().all():
                         if cot.status == "aguardando":

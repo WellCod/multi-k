@@ -28,5 +28,3 @@ def publish(usuario_id: uuid.UUID, event: dict) -> None:
     for q in list(_subscribers.get(usuario_id, [])):
         with contextlib.suppress(asyncio.QueueFull):
             q.put_nowait(event)
-
-
