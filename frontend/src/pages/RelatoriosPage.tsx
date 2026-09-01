@@ -12,65 +12,114 @@ const PERIODOS = [
   { label: "15 dias", value: 15 },
   { label: "30 dias", value: 30 },
   { label: "90 dias", value: 90 },
+  { label: "Personalizado", value: 0 },
 ];
 
 function fmtPct(v: string) {
   return `${(Number(v) * 100).toFixed(1)}%`;
 }
 
-function BarraH({ label, value, max, extra }: {
+// ---------------------------------------------------------------------------
+// Skeleton
+// ---------------------------------------------------------------------------
+
+function SkeletonCard({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`animate-pulse rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
+    />
+  );
+}
+
+function RelatoriosSkeleton() {
+  return (
+    <div className="space-y-4">
+      <SkeletonCard className="h-32" />
+      <SkeletonCard className="h-52" />
+      <SkeletonCard className="h-44" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Barra horizontal aprimorada
+// ---------------------------------------------------------------------------
+
+function BarraH({
+  label,
+  value,
+  max,
+  extra,
+}: {
   label: string;
   value: number;
   max: number;
   extra?: string;
 }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
     <div className="flex items-center gap-3">
       <span className="w-28 text-xs text-gray-600 dark:text-gray-400 text-right capitalize truncate shrink-0">
         {label}
       </span>
-      <div className="flex-1 h-4 bg-gray-100 dark:bg-gray-700 rounded overflow-hidden">
+      <div className="flex-1 h-5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
-          className="h-full bg-blue-500 rounded"
-          style={{ width: max > 0 ? `${(value / max) * 100}%` : "0%" }}
+          className="h-full bg-blue-500 rounded-full transition-all duration-500"
+          style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-xs text-gray-700 dark:text-gray-300 w-20 text-right shrink-0">
-        {value}{extra ? ` ${extra}` : ""}
+      <span className="text-xs text-gray-700 dark:text-gray-300 w-28 text-right shrink-0">
+        <span className="font-semibold">{value}</span>
+        {extra ? (
+          <span className="text-gray-400 ml-1">{extra}</span>
+        ) : (
+          <span className="text-gray-400 ml-1">({pct}%)</span>
+        )}
       </span>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Tabela de produção
+// ---------------------------------------------------------------------------
+
 function TabelaProducao({ dados }: { dados: ProducaoOut[] }) {
   if (dados.length === 0) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">Sem propostas no período.</p>;
+    return (
+      <div className="py-12 text-center">
+        <span className="text-3xl">📋</span>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
+          Sem propostas no período.
+        </p>
+      </div>
+    );
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 dark:text-gray-400">
-            <th className="px-3 py-2">Corretor</th>
-            <th className="px-3 py-2 text-right">Cotações</th>
-            <th className="px-3 py-2 text-right">Propostas</th>
-            <th className="px-3 py-2 text-right">Conversão</th>
-            <th className="px-3 py-2 text-right">Prêmio total</th>
-            <th className="px-3 py-2 text-right">Comissão prevista</th>
+            <th className="px-4 py-2.5">Corretor</th>
+            <th className="px-4 py-2.5 text-right">Cotações</th>
+            <th className="px-4 py-2.5 text-right">Propostas</th>
+            <th className="px-4 py-2.5 text-right">Conversão</th>
+            <th className="px-4 py-2.5 text-right">Prêmio total</th>
+            <th className="px-4 py-2.5 text-right">Comissão prevista</th>
           </tr>
         </thead>
         <tbody>
           {dados.map((r) => (
             <tr
               key={r.corretor_id}
-              className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+              className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
             >
-              <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{r.corretor_nome}</td>
-              <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{r.cotacoes}</td>
-              <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{r.propostas}</td>
-              <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{fmtPct(r.taxa_conversao)}</td>
-              <td className="px-3 py-2 text-right font-mono text-gray-900 dark:text-white">{formatBRL(r.premio_total)}</td>
-              <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">
+              <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{r.corretor_nome}</td>
+              <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{r.cotacoes}</td>
+              <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{r.propostas}</td>
+              <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{fmtPct(r.taxa_conversao)}</td>
+              <td className="px-4 py-3 text-right font-mono text-gray-900 dark:text-white">{formatBRL(r.premio_total)}</td>
+              <td className="px-4 py-3 text-right font-mono text-green-700 dark:text-green-400">
                 {formatBRL(r.comissao_prevista)}
               </td>
             </tr>
@@ -81,27 +130,43 @@ function TabelaProducao({ dados }: { dados: ProducaoOut[] }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Funil
+// ---------------------------------------------------------------------------
+
+function StatFunil({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/40 p-5 text-center flex flex-col items-center gap-1">
+      <span className="text-2xl">{icon}</span>
+      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+    </div>
+  );
+}
+
 function Funil({ dados }: { dados: FunilOut }) {
   const maxCots = Math.max(...dados.por_ramo.map((r) => r.cotacoes), 1);
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded p-3 text-center">
-          <p className="text-2xl font-semibold text-gray-900 dark:text-white">{dados.total_cotacoes}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Cotações</p>
-        </div>
-        <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded p-3 text-center">
-          <p className="text-2xl font-semibold text-gray-900 dark:text-white">{dados.total_com_proposta}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Com proposta</p>
-        </div>
-        <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded p-3 text-center">
-          <p className="text-2xl font-semibold text-gray-900 dark:text-white">{fmtPct(dados.taxa_conversao_geral)}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Conversão geral</p>
-        </div>
+        <StatFunil icon="📊" label="Cotações" value={dados.total_cotacoes} />
+        <StatFunil icon="📋" label="Com proposta" value={dados.total_com_proposta} />
+        <StatFunil icon="📈" label="Conversão geral" value={fmtPct(dados.taxa_conversao_geral)} />
       </div>
-      {dados.por_ramo.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Por ramo</p>
+
+      {dados.por_ramo.length > 0 ? (
+        <div className="space-y-2.5">
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Por ramo
+          </p>
           {dados.por_ramo
             .sort((a, b) => b.cotacoes - a.cotacoes)
             .map((r) => (
@@ -114,18 +179,33 @@ function Funil({ dados }: { dados: FunilOut }) {
               />
             ))}
         </div>
+      ) : (
+        <div className="py-8 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">Sem dados por ramo.</p>
+        </div>
       )}
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Mix
+// ---------------------------------------------------------------------------
+
 function Mix({ dados }: { dados: MixOut[] }) {
   const maxCount = Math.max(...dados.map((d) => d.count), 1);
   if (dados.length === 0) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">Sem propostas no período.</p>;
+    return (
+      <div className="py-12 text-center">
+        <span className="text-3xl">📂</span>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
+          Sem propostas no período.
+        </p>
+      </div>
+    );
   }
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {dados
         .sort((a, b) => b.count - a.count)
         .map((d) => (
@@ -141,32 +221,43 @@ function Mix({ dados }: { dados: MixOut[] }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Página principal
+// ---------------------------------------------------------------------------
+
 export function RelatoriosPage() {
   const { user } = useAuth();
   const isAdmin = user?.papel === "admin";
   const [periodo, setPeriodo] = useState(30);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [producao, setProducao] = useState<ProducaoOut[] | null>(null);
   const [funil, setFunil] = useState<FunilOut | null>(null);
   const [mix, setMix] = useState<MixOut[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  const fromParam = periodo === 0 ? dateFrom || undefined : undefined;
+  const toParam = periodo === 0 ? dateTo || undefined : undefined;
+  const periodoParam = periodo === 0 ? 30 : periodo;
+
   useEffect(() => {
+    if (periodo === 0 && !dateFrom && !dateTo) return;
     setLoading(true);
     setErr(null);
     const requests = isAdmin
       ? Promise.all([
-          api.relatorios.producao(periodo),
-          api.relatorios.funil(periodo),
-          api.relatorios.mix(periodo),
+          api.relatorios.producao(periodoParam, fromParam, toParam),
+          api.relatorios.funil(periodoParam, fromParam, toParam),
+          api.relatorios.mix(periodoParam, fromParam, toParam),
         ]).then(([p, f, m]) => {
           setProducao(p);
           setFunil(f);
           setMix(m);
         })
       : Promise.all([
-          api.relatorios.funil(periodo),
-          api.relatorios.mix(periodo),
+          api.relatorios.funil(periodoParam, fromParam, toParam),
+          api.relatorios.mix(periodoParam, fromParam, toParam),
         ]).then(([f, m]) => {
           setFunil(f);
           setMix(m);
@@ -174,56 +265,89 @@ export function RelatoriosPage() {
     requests
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Erro"))
       .finally(() => setLoading(false));
-  }, [periodo, isAdmin]);
+  }, [periodo, dateFrom, dateTo, isAdmin, periodoParam, fromParam, toParam]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div>
         <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Relatórios</h1>
-        <div className="flex items-center gap-1">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          Análise de produção, funil e mix de ramos
+        </p>
+      </div>
+
+      {/* Card de filtros */}
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+          Período
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
           {PERIODOS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriodo(p.value)}
-              className={`px-3 py-1.5 text-xs rounded transition-colors ${
+              className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
                 periodo === p.value
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
               }`}
             >
               {p.label}
             </button>
           ))}
+          {periodo === 0 && (
+            <div className="flex items-center gap-2 ml-1">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-xs text-gray-400">até</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      {loading && <p className="text-sm text-gray-500 dark:text-gray-400">Carregando…</p>}
+      {/* Erro */}
       {err && (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
           {err}
         </div>
       )}
 
+      {/* Skeleton durante loading */}
+      {loading && <RelatoriosSkeleton />}
+
+      {/* Conteúdo */}
       {!loading && !err && (
         <div className="space-y-6">
+          {/* Produção por corretor — só admin */}
           {isAdmin && (
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                 <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
                   Produção por corretor
                 </h2>
                 <div className="flex gap-2">
                   <a
                     href={api.relatorios.exportUrl("producao", periodo, "csv")}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                   >
-                    CSV
+                    ↓ CSV
                   </a>
                   <a
                     href={api.relatorios.exportUrl("producao", periodo, "xlsx")}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                   >
-                    XLSX
+                    ↓ XLSX
                   </a>
                 </div>
               </div>
@@ -231,18 +355,46 @@ export function RelatoriosPage() {
             </div>
           )}
 
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
-              Funil de conversão
-            </h2>
-            {funil && <Funil dados={funil} />}
+          {/* Funil de conversão */}
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Funil de conversão
+              </h2>
+            </div>
+            <div className="p-4">
+              {funil ? (
+                <Funil dados={funil} />
+              ) : (
+                <div className="py-10 text-center">
+                  <span className="text-3xl">📊</span>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-3">
+                    Sem dados no período.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
-              Mix por ramo
-            </h2>
-            {mix && <Mix dados={mix} />}
+          {/* Mix por ramo */}
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Mix por ramo
+              </h2>
+            </div>
+            <div className="p-4">
+              {mix ? (
+                <Mix dados={mix} />
+              ) : (
+                <div className="py-10 text-center">
+                  <span className="text-3xl">📂</span>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-3">
+                    Sem dados no período.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

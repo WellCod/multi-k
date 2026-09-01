@@ -2,6 +2,12 @@ const BASE = import.meta.env.VITE_API_URL ?? "/api";
 
 const _CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+let _unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(fn: () => void): void {
+  _unauthorizedHandler = fn;
+}
+
 function _getCsrfToken(): string | null {
   const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
@@ -25,7 +31,7 @@ async function request<T>(
   });
 
   if (res.status === 401) {
-    // Let auth context handle redirect
+    if (_unauthorizedHandler) _unauthorizedHandler();
     throw new ApiError(401, "Não autenticado");
   }
 
@@ -74,7 +80,14 @@ export const api = {
 
   // ---- Clientes ----
   clientes: {
-    list: () => request<Cliente[]>("/clientes"),
+    list: (params?: { page?: number; page_size?: number; q?: string }) => {
+      const p = new URLSearchParams();
+      if (params?.page) p.set("page", String(params.page));
+      if (params?.page_size) p.set("page_size", String(params.page_size));
+      if (params?.q) p.set("q", params.q);
+      const qs = p.toString();
+      return request<ClienteList>(`/clientes${qs ? `?${qs}` : ""}`);
+    },
     get: (id: string) => request<Cliente>(`/clientes/${id}`),
     create: (body: ClienteInput) =>
       request<Cliente>("/clientes", {
@@ -105,12 +118,15 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(body),
       }),
+    archive: (id: string) =>
+      request<void>(`/clientes/${id}`, { method: "DELETE" }),
     timeline: (id: string) =>
       request<TimelineItem[]>(`/clientes/${id}/timeline`),
   },
 
   // ---- Cotações ----
   cotacoes: {
+    exportCsvUrl: () => `${BASE}/cotacoes/export/csv`,
     create: (body: CriarCotacaoInput) =>
       request<CotacaoCriada>("/cotacoes", {
         method: "POST",
@@ -145,6 +161,20 @@ export const api = {
     },
   },
 
+  // ---- Auditoria ----
+  auditoria: {
+    list: (params?: { page?: number; page_size?: number; tipo?: string; usuario_id?: string }) => {
+      const p = new URLSearchParams();
+      if (params?.page) p.set("page", String(params.page));
+      if (params?.page_size) p.set("page_size", String(params.page_size));
+      if (params?.tipo) p.set("tipo", params.tipo);
+      if (params?.usuario_id) p.set("usuario_id", params.usuario_id);
+      const qs = p.toString();
+      return request<AuditoriaList>(`/auditoria${qs ? `?${qs}` : ""}`);
+    },
+    usuarios: () => request<AuditoriaUsuario[]>("/auditoria/usuarios"),
+  },
+
   // ---- Home ----
   home: {
     corretor: () => request<HomeCorretorOut>("/home/corretor"),
@@ -153,12 +183,24 @@ export const api = {
 
   // ---- Relatórios ----
   relatorios: {
-    producao: (periodo: number) =>
-      request<ProducaoOut[]>(`/relatorios/producao?periodo=${periodo}`),
-    funil: (periodo: number) =>
-      request<FunilOut>(`/relatorios/funil?periodo=${periodo}`),
-    mix: (periodo: number) =>
-      request<MixOut[]>(`/relatorios/mix?periodo=${periodo}`),
+    producao: (periodo: number, dateFrom?: string, dateTo?: string) => {
+      const p = new URLSearchParams({ periodo: String(periodo) });
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      return request<ProducaoOut[]>(`/relatorios/producao?${p}`);
+    },
+    funil: (periodo: number, dateFrom?: string, dateTo?: string) => {
+      const p = new URLSearchParams({ periodo: String(periodo) });
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      return request<FunilOut>(`/relatorios/funil?${p}`);
+    },
+    mix: (periodo: number, dateFrom?: string, dateTo?: string) => {
+      const p = new URLSearchParams({ periodo: String(periodo) });
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      return request<MixOut[]>(`/relatorios/mix?${p}`);
+    },
     exportUrl: (tipo: string, periodo: number, fmt: "csv" | "xlsx") =>
       `${BASE}/relatorios/export/${fmt}?tipo=${tipo}&periodo=${periodo}`,
   },
@@ -171,6 +213,13 @@ export interface Dominio {
   codigo: string;
   descricao: string;
   cia: string | null;
+}
+
+export interface ClienteList {
+  items: Cliente[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 export interface Cliente {
@@ -344,6 +393,30 @@ export interface TimelineItem {
   tipo: string;
   data: string;
   dados: Record<string, unknown>;
+}
+
+// ---- Auditoria ----
+
+export interface AuditoriaItem {
+  id: number;
+  tipo: string;
+  usuario_id: string | null;
+  usuario_nome: string | null;
+  ip_origem: string | null;
+  dados: Record<string, unknown>;
+  criado_em: string;
+}
+
+export interface AuditoriaUsuario {
+  id: string;
+  nome: string;
+}
+
+export interface AuditoriaList {
+  items: AuditoriaItem[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 // ---- Home ----

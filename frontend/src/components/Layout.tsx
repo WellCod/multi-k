@@ -4,7 +4,7 @@ import { useDarkMode } from "@/lib/use-dark-mode";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const NAV = [
+const NAV_BASE = [
   { to: "/home", label: "Home" },
   { to: "/cotacao", label: "Nova cotação" },
   { to: "/historico", label: "Histórico" },
@@ -12,6 +12,7 @@ const NAV = [
   { to: "/renovacoes", label: "Renovações" },
   { to: "/relatorios", label: "Relatórios" },
 ];
+const NAV_ADMIN = [{ to: "/auditoria", label: "Auditoria" }];
 
 function MoonIcon() {
   return (
@@ -73,7 +74,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-6">
             <span className="font-semibold text-gray-900 dark:text-white text-sm">multi-K</span>
             <nav className="flex gap-1">
-              {NAV.map(({ to, label }) => (
+              {[...NAV_BASE, ...(user?.papel === "admin" ? NAV_ADMIN : [])].map(({ to, label }) => (
                 <Link
                   key={to}
                   to={to}

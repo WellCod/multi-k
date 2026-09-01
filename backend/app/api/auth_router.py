@@ -1,4 +1,5 @@
 import hashlib
+import hmac as _hmac
 import secrets
 from typing import Annotated
 from uuid import UUID
@@ -65,10 +66,14 @@ async def login(
         await registrar_falha(db, body.email)
         if ip:
             await registrar_falha(db, ip)
+        _audit_key = get_optional_secret("SECRET_KEY", "dev").encode()
+        email_hash = _hmac.new(
+            _audit_key, body.email.encode(), hashlib.sha256
+        ).hexdigest()
         await audit.registrar(
             db,
             tipo="falha_login",
-            dados={"email_hash": hashlib.sha256(body.email.encode()).hexdigest()},
+            dados={"email_hash": email_hash},
             ip_origem=ip,
         )
         await db.commit()
@@ -95,6 +100,7 @@ async def login(
         samesite="strict",
         secure=_SECURE_COOKIE,
         max_age=_MAX_AGE,
+        path="/",
     )
     response.set_cookie(
         key=_CSRF_COOKIE,
@@ -103,6 +109,7 @@ async def login(
         samesite="strict",
         secure=_SECURE_COOKIE,
         max_age=_MAX_AGE,
+        path="/",
     )
     return LoginOutput(nome=usuario.nome, papel=usuario.papel)
 

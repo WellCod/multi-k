@@ -11,7 +11,9 @@ import structlog.contextvars
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.auditoria_router import router as auditoria_router
 from app.api.auth_router import router as auth_router
+from app.api.events_router import router as events_router
 from app.api.cliente_router import router as cliente_router
 from app.api.comparativo_router import router as comparativo_router
 from app.api.cotacao_router import router as cotacao_router
@@ -78,6 +80,26 @@ app.add_middleware(
 
 _CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 _CSRF_EXEMPT_PATHS = frozenset({"/auth/login", "/auth/logout"})
+_MAX_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+@app.middleware("http")
+async def body_size_limit_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > _MAX_BODY_BYTES:
+                return Response(
+                    content='{"detail":"Request body muito grande (máx 10 MB)."}',
+                    status_code=413,
+                    media_type="application/json",
+                )
+        except ValueError:
+            pass
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -111,6 +133,17 @@ async def security_headers_middleware(
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self' ws: wss:; "
+        "font-src 'self'; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'"
+    )
     return response
 
 
@@ -128,6 +161,8 @@ async def correlation_id_middleware(
 
 
 app.include_router(health_router)
+app.include_router(auditoria_router)
+app.include_router(events_router)
 app.include_router(auth_router)
 app.include_router(cliente_router)
 app.include_router(cotacao_router)
