@@ -95,7 +95,7 @@ async def test_isolamento_entre_corretores(
     )
     r = await client.get("/clientes")
     assert r.status_code == 200
-    assert all(c["nome"] != "Cliente A" for c in r.json())
+    assert all(c["nome"] != "Cliente A" for c in r.json()["items"])
 
 
 async def test_adicionar_veiculo(
