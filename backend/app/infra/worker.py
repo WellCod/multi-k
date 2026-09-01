@@ -216,14 +216,15 @@ async def _worker_loop(factory: async_sessionmaker[AsyncSession]) -> None:
             jobs_batch: list[tuple[uuid.UUID, uuid.UUID]] = []
 
             async with factory() as db, db.begin():
-                result = await db.execute(
-                    select(CotacaoJob)
-                    .where(CotacaoJob.status == "pendente")
-                    .order_by(CotacaoJob.criado_em)
-                    .limit(_BATCH_SIZE)
-                    .with_for_update(skip_locked=True)
+                jobs = list(
+                    await db.scalars(
+                        select(CotacaoJob)
+                        .where(CotacaoJob.status == "pendente")
+                        .order_by(CotacaoJob.criado_em)
+                        .limit(_BATCH_SIZE)
+                        .with_for_update(skip_locked=True)
+                    )
                 )
-                jobs = result.scalars().all()
                 cotacao_ids_a_processar: set[uuid.UUID] = set()
                 for job in jobs:
                     job.status = "processando"

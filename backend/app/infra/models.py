@@ -124,7 +124,7 @@ class Cliente(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     nome: Mapped[str] = mapped_column(String(255))
     # CPF nunca armazenado em claro — só o índice cego (HMAC-SHA256)
-    cpf_idx: Mapped[str] = mapped_column(String(64), index=True)
+    cpf_idx: Mapped[str] = mapped_column(String(70), index=True)
     email: Mapped[str | None] = mapped_column(String(255), default=None)
     telefone: Mapped[str | None] = mapped_column(String(20), default=None)
     data_nascimento: Mapped[date | None] = mapped_column(Date, default=None)
