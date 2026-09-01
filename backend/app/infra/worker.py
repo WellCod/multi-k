@@ -15,11 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.adapters.base import RiscoCanonico
 from app.adapters.registry import get_adapter
+from app.infra import events_bus
 from app.infra.models import Cotacao, CotacaoJob
 
 logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL = 1.0
+_BATCH_SIZE = 5
 
 
 def _utcnow() -> datetime:
@@ -66,9 +68,9 @@ async def processar_job(
             jb.premio_total = resultado.premio_total
             jb.restricoes = [
                 {"codigo": r.codigo, "mensagem": r.mensagem}
-                for r in resultado.restricoes
+                for r in resultado.restricoes[:50]
             ]
-            jb.mensagens = list(resultado.mensagens)
+            jb.mensagens = list(resultado.mensagens[:50])
             jb.necessita_vistoria = resultado.necessita_vistoria
             jb.status_resultado = status_resultado
             jb.payload_resposta = (
@@ -103,6 +105,17 @@ async def processar_job(
                     await db.execute(select(Cotacao).where(Cotacao.id == cotacao_id))
                 ).scalar_one()
                 cot.status = cotacao_status
+                events_bus.publish(
+                    cot.usuario_id,
+                    {
+                        "tipo": "cotacao.pronta",
+                        "cotacao_id": str(cot.id),
+                        "status": cotacao_status,
+                        "premio_total": (
+                            str(cot.premio_total) if cot.premio_total else None
+                        ),
+                    },
+                )
 
                 # For backwards-compat: store the "best" job's result on cotacao
                 best_job = next(
@@ -156,6 +169,19 @@ async def processar_job(
                 ).scalar_one_or_none()
                 if err_cot is not None:
                     err_cot.status = cotacao_status_err
+                    events_bus.publish(
+                        err_cot.usuario_id,
+                        {
+                            "tipo": "cotacao.pronta",
+                            "cotacao_id": str(err_cot.id),
+                            "status": cotacao_status_err,
+                            "premio_total": (
+                                str(err_cot.premio_total)
+                                if err_cot.premio_total
+                                else None
+                            ),
+                        },
+                    )
 
                     best_job_err = next(
                         (
@@ -187,36 +213,38 @@ async def _safe_processar(
 async def _worker_loop(factory: async_sessionmaker[AsyncSession]) -> None:
     while True:
         try:
-            job_id: uuid.UUID | None = None
-            cotacao_id: uuid.UUID | None = None
+            jobs_batch: list[tuple[uuid.UUID, uuid.UUID]] = []
 
             async with factory() as db, db.begin():
                 result = await db.execute(
                     select(CotacaoJob)
                     .where(CotacaoJob.status == "pendente")
                     .order_by(CotacaoJob.criado_em)
-                    .limit(1)
+                    .limit(_BATCH_SIZE)
                     .with_for_update(skip_locked=True)
                 )
-                job = result.scalar_one_or_none()
-                if job is not None:
-                    job_id = job.id
-                    cotacao_id = job.cotacao_id
+                jobs = result.scalars().all()
+                cotacao_ids_a_processar: set[uuid.UUID] = set()
+                for job in jobs:
                     job.status = "processando"
                     job.tentativas += 1
+                    jobs_batch.append((job.id, job.cotacao_id))
+                    cotacao_ids_a_processar.add(job.cotacao_id)
 
-                    cot_r = await db.execute(
-                        select(Cotacao).where(Cotacao.id == cotacao_id)
+                if cotacao_ids_a_processar:
+                    cots_r = await db.execute(
+                        select(Cotacao).where(Cotacao.id.in_(cotacao_ids_a_processar))
                     )
-                    cot = cot_r.scalar_one_or_none()
-                    if cot is not None:
-                        cot.status = "processando"
+                    for cot in cots_r.scalars().all():
+                        if cot.status == "aguardando":
+                            cot.status = "processando"
 
-            if job_id is None or cotacao_id is None:
+            if not jobs_batch:
                 await asyncio.sleep(_POLL_INTERVAL)
                 continue
 
-            asyncio.create_task(_safe_processar(job_id, cotacao_id, factory))
+            for job_id, cotacao_id in jobs_batch:
+                asyncio.create_task(_safe_processar(job_id, cotacao_id, factory))
 
         except asyncio.CancelledError:
             break
