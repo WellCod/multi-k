@@ -346,8 +346,9 @@ async def home_admin(
 
     # Cotações por corretor
     res_cot_corretor = await db.execute(
-        select(Cotacao.usuario_id, func.count(Cotacao.id).label("cotacoes"))
-        .group_by(Cotacao.usuario_id)
+        select(Cotacao.usuario_id, func.count(Cotacao.id).label("cotacoes")).group_by(
+            Cotacao.usuario_id
+        )
     )
     for r in res_cot_corretor.all():
         if r.usuario_id not in corretor_stats:
