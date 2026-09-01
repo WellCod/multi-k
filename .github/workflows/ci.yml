@@ -81,7 +81,8 @@ jobs:
         working-directory: backend
 
       - name: CVE scan (pip-audit)
-        run: pip freeze | pip-audit -r /dev/stdin
+        # PYSEC-2026-1845 (pytest): ignorado — pytest-asyncio<=0.26 bloqueia pytest>=9
+        run: pip freeze | pip-audit -r /dev/stdin --ignore-vuln PYSEC-2026-1845
         working-directory: backend
 
       - name: Gate de produção — REDIS_URL obrigatório fora de dev
