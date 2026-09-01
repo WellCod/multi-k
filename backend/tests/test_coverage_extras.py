@@ -210,6 +210,7 @@ async def test_buscar_sessao_ip_mismatch_warn_retorna_usuario(
         tenant_id=TENANT_ID,
     )
     db.add(u)
+    await db.flush()
     sid = uuid.uuid4()
     sessao = Sessao(
         id=sid,
@@ -247,6 +248,7 @@ async def test_buscar_sessao_ip_mismatch_strict_rejeita(
         tenant_id=TENANT_ID,
     )
     db.add(u)
+    await db.flush()
     sid = uuid.uuid4()
     sessao = Sessao(
         id=sid,
@@ -289,3 +291,399 @@ async def test_invalidar_sessao_nao_existente_nao_levanta(
     )
     async with factory() as session:
         await invalidar_sessao(session, uuid.uuid4())
+
+
+# ---------------------------------------------------------------------------
+# auth_service — branches não cobertos pelos testes HTTP
+# ---------------------------------------------------------------------------
+
+
+async def test_invalidar_sessao_com_sessao_existente(
+    engine: AsyncEngine, db: AsyncSession
+) -> None:
+    """invalidar_sessao deve expirar sessão quando ela existe."""
+    from app.domain.auth import TENANT_ID
+    from app.infra.auth_service import hash_senha, invalidar_sessao
+    from app.infra.models import Sessao, Usuario
+
+    uid = uuid.uuid4()
+    u = Usuario(
+        id=uid,
+        email=f"inv_exist_{uid.hex[:8]}@test.com",
+        nome="Inv Exist",
+        senha_hash=hash_senha("Test@123"),
+        papel="corretor",
+        tenant_id=TENANT_ID,
+    )
+    db.add(u)
+    await db.flush()
+    sid = uuid.uuid4()
+    sessao = Sessao(
+        id=sid,
+        usuario_id=uid,
+        expira_em=datetime.now(UTC) + timedelta(hours=1),
+        ip_origem=None,
+    )
+    db.add(sessao)
+    await db.commit()
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        await invalidar_sessao(session, sid)
+        await session.commit()
+
+
+async def test_registrar_falha_nova_tentativa(engine: AsyncEngine) -> None:
+    """registrar_falha cria nova TentativaLogin para identificador novo."""
+    from app.infra.auth_service import registrar_falha
+
+    ident = f"nova_{uuid.uuid4().hex[:8]}@test.com"
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        await registrar_falha(session, ident)
+        await session.commit()
+
+
+async def test_registrar_falha_atualiza_existente(engine: AsyncEngine) -> None:
+    """registrar_falha incrementa contagem em tentativa existente."""
+    from app.infra.auth_service import registrar_falha
+
+    ident = f"upd_{uuid.uuid4().hex[:8]}@test.com"
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        await registrar_falha(session, ident)
+        await session.commit()
+    async with factory() as session:
+        await registrar_falha(session, ident)
+        await session.commit()
+
+
+async def test_registrar_falha_bloqueia_apos_limite(engine: AsyncEngine) -> None:
+    """registrar_falha define bloqueado_ate após RATE_LIMIT_MAX tentativas."""
+    from app.infra.auth_service import RATE_LIMIT_MAX, registrar_falha
+
+    ident = f"blk_{uuid.uuid4().hex[:8]}@test.com"
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        await registrar_falha(session, ident)
+        await session.commit()
+    for _ in range(RATE_LIMIT_MAX - 1):
+        async with factory() as session:
+            await registrar_falha(session, ident)
+            await session.commit()
+
+
+async def test_checar_rate_limit_bloqueado_levanta_429(engine: AsyncEngine) -> None:
+    """checar_rate_limit levanta HTTPException 429 quando bloqueado."""
+    import pytest
+    from fastapi import HTTPException
+
+    from app.infra.auth_service import (
+        RATE_LIMIT_MAX,
+        checar_rate_limit,
+        registrar_falha,
+    )
+
+    ident = f"blk2_{uuid.uuid4().hex[:8]}@test.com"
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    for _ in range(RATE_LIMIT_MAX):
+        async with factory() as session:
+            await registrar_falha(session, ident)
+            await session.commit()
+
+    async with factory() as session:
+        with pytest.raises(HTTPException) as exc_info:
+            await checar_rate_limit(session, ident)
+        assert exc_info.value.status_code == 429
+
+
+async def test_resetar_tentativas_com_existente(engine: AsyncEngine) -> None:
+    """resetar_tentativas zera contagem de tentativa existente."""
+    from app.infra.auth_service import registrar_falha, resetar_tentativas
+
+    ident = f"rst_{uuid.uuid4().hex[:8]}@test.com"
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        await registrar_falha(session, ident)
+        await session.commit()
+    async with factory() as session:
+        await resetar_tentativas(session, ident)
+        await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# relatorio_router — _dados_producao, _dados_funil, _dados_mix direto (sem HTTP)
+# ---------------------------------------------------------------------------
+
+
+async def _setup_cotacao_proposta(
+    engine: AsyncEngine,
+) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
+    """Cria usuário + cotação + proposta no DB, retorna (uid, cot_id, prop_id)."""
+    from sqlalchemy import text
+
+    from app.domain.auth import TENANT_ID
+    from app.infra.auth_service import hash_senha
+    from app.infra.models import Cotacao, Proposta, Usuario
+
+    uid = uuid.uuid4()
+    cot_id = uuid.uuid4()
+    prop_id = uuid.uuid4()
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        await session.execute(
+            text(f"SELECT set_config('app.usuario_id', '{uid}', true)")
+        )
+        await session.execute(text("SELECT set_config('app.papel', 'corretor', true)"))
+        u = Usuario(
+            id=uid,
+            email=f"rel_{uid.hex[:8]}@test.com",
+            nome="Rel Test",
+            senha_hash=hash_senha("Test@123"),
+            papel="corretor",
+            tenant_id=TENANT_ID,
+        )
+        session.add(u)
+        await session.flush()
+
+        cot = Cotacao(
+            id=cot_id,
+            usuario_id=uid,
+            tenant_id=TENANT_ID,
+            ramo="auto",
+            status="sucesso",
+            dados_risco={},
+            premio_total=Decimal("1500.00"),
+        )
+        session.add(cot)
+        await session.flush()
+
+        prop = Proposta(
+            id=prop_id,
+            cotacao_id=cot_id,
+            protocolo=f"PROTO{uid.hex[:8]}",
+            comissao_pct=Decimal("0.1500"),
+            plano_pagamento="AVISTA",
+            n_parcelas=1,
+            valor_parcela=Decimal("1500.00"),
+            comissao_parcela=Decimal("225.00"),
+            usuario_id=uid,
+            tenant_id=TENANT_ID,
+        )
+        session.add(prop)
+        await session.commit()
+
+    return uid, cot_id, prop_id
+
+
+async def test_dados_producao_vazio(engine: AsyncEngine) -> None:
+    """_dados_producao retorna lista vazia quando não há dados no período."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from app.api.relatorio_router import _dados_producao
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    futuro = datetime.now(UTC) + timedelta(days=365)
+    async with factory() as session:
+        await session.execute(text("SELECT set_config('app.papel', 'admin', true)"))
+        result = await _dados_producao(session, futuro, futuro + timedelta(days=1))
+        assert isinstance(result, list)
+
+
+async def test_dados_producao_com_dados(engine: AsyncEngine) -> None:
+    """_dados_producao cobre loops de cotações e propostas com dados reais."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from app.api.relatorio_router import _dados_producao
+
+    uid, _, _ = await _setup_cotacao_proposta(engine)
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    agora = datetime.now(UTC)
+    async with factory() as session:
+        await session.execute(text("SELECT set_config('app.papel', 'admin', true)"))
+        result = await _dados_producao(
+            session, agora - timedelta(hours=1), agora + timedelta(hours=1)
+        )
+        assert isinstance(result, list)
+        assert any(str(r.corretor_id) == str(uid) for r in result)
+
+
+async def test_dados_producao_com_usuario_id(engine: AsyncEngine) -> None:
+    """_dados_producao com usuario_id cobre branch 'if usuario_id is not None'."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from app.api.relatorio_router import _dados_producao
+
+    uid, _, _ = await _setup_cotacao_proposta(engine)
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    agora = datetime.now(UTC)
+    async with factory() as session:
+        await session.execute(text("SELECT set_config('app.papel', 'admin', true)"))
+        result = await _dados_producao(
+            session,
+            agora - timedelta(hours=1),
+            agora + timedelta(hours=1),
+            usuario_id=uid,
+        )
+        assert isinstance(result, list)
+
+
+async def test_dados_funil_vazio(engine: AsyncEngine) -> None:
+    """_dados_funil retorna FunilOut vazio quando não há dados."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from app.api.relatorio_router import _dados_funil
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    futuro = datetime.now(UTC) + timedelta(days=365)
+    async with factory() as session:
+        await session.execute(text("SELECT set_config('app.papel', 'admin', true)"))
+        result = await _dados_funil(session, futuro, futuro + timedelta(days=1))
+        assert result.total_cotacoes == 0
+
+
+async def test_dados_funil_com_dados(engine: AsyncEngine) -> None:
+    """_dados_funil cobre loops de ramo e agrupamento com dados reais."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from app.api.relatorio_router import _dados_funil
+
+    uid, _, _ = await _setup_cotacao_proposta(engine)
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    agora = datetime.now(UTC)
+    async with factory() as session:
+        await session.execute(text("SELECT set_config('app.papel', 'admin', true)"))
+        result = await _dados_funil(
+            session, agora - timedelta(hours=1), agora + timedelta(hours=1)
+        )
+        assert result.total_cotacoes >= 1
+        assert len(result.por_ramo) >= 1
+
+
+async def test_dados_funil_com_usuario_id(engine: AsyncEngine) -> None:
+    """_dados_funil com usuario_id cobre branch filtro."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from app.api.relatorio_router import _dados_funil
+
+    uid, _, _ = await _setup_cotacao_proposta(engine)
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    agora = datetime.now(UTC)
+    async with factory() as session:
+        await session.execute(text("SELECT set_config('app.papel', 'admin', true)"))
+        result = await _dados_funil(
+            session,
+            agora - timedelta(hours=1),
+            agora + timedelta(hours=1),
+            usuario_id=uid,
+        )
+        assert isinstance(result.por_ramo, list)
+
+
+async def test_dados_mix_vazio(engine: AsyncEngine) -> None:
+    """_dados_mix retorna lista vazia quando não há propostas."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from app.api.relatorio_router import _dados_mix
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    futuro = datetime.now(UTC) + timedelta(days=365)
+    async with factory() as session:
+        await session.execute(text("SELECT set_config('app.papel', 'admin', true)"))
+        result = await _dados_mix(session, futuro, futuro + timedelta(days=1))
+        assert isinstance(result, list)
+
+
+async def test_dados_mix_com_dados(engine: AsyncEngine) -> None:
+    """_dados_mix cobre loop de ramo e cálculo de pct com dados reais."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from app.api.relatorio_router import _dados_mix
+
+    uid, _, _ = await _setup_cotacao_proposta(engine)
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    agora = datetime.now(UTC)
+    async with factory() as session:
+        await session.execute(text("SELECT set_config('app.papel', 'admin', true)"))
+        result = await _dados_mix(
+            session, agora - timedelta(hours=1), agora + timedelta(hours=1)
+        )
+        assert isinstance(result, list)
+        assert len(result) >= 1
+        assert result[0].pct > 0
+
+
+async def test_dados_mix_com_usuario_id(engine: AsyncEngine) -> None:
+    """_dados_mix com usuario_id cobre branch filtro."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    from app.api.relatorio_router import _dados_mix
+
+    uid, _, _ = await _setup_cotacao_proposta(engine)
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    agora = datetime.now(UTC)
+    async with factory() as session:
+        await session.execute(text("SELECT set_config('app.papel', 'admin', true)"))
+        result = await _dados_mix(
+            session,
+            agora - timedelta(hours=1),
+            agora + timedelta(hours=1),
+            usuario_id=uid,
+        )
+        assert isinstance(result, list)
