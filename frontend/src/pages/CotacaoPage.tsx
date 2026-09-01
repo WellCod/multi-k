@@ -1329,6 +1329,9 @@ export function CotacaoPage() {
   // Recotar error
   const [recotarError, setRecotarError] = useState<string | null>(null);
 
+  // Cancel confirmation
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
   const recotar = searchParams.get("recotar");
   const clienteParam = searchParams.get("cliente");
 
@@ -1528,6 +1531,23 @@ export function CotacaoPage() {
   };
 
   const handleNewCotacao = () => {
+    if (step > 1) { setShowCancelConfirm(true); return; }
+    clearRascunho();
+    setStep(1);
+    setStep1Data(undefined);
+    setStep2Data(undefined);
+    setStep3Data(undefined);
+    setStep4Data(undefined);
+    setCotacaoId(null);
+    setCotacao(null);
+    setItensComparativo([]);
+    setProposta(null);
+    setShowTransmitir(false);
+    navigate("/cotacao");
+  };
+
+  const confirmDiscard = () => {
+    setShowCancelConfirm(false);
     clearRascunho();
     setStep(1);
     setStep1Data(undefined);
@@ -1544,6 +1564,29 @@ export function CotacaoPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {showCancelConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCancelConfirm(false); }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-xl w-full max-w-sm mx-4 p-6 space-y-4">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Descartar cotação?</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              O rascunho atual será perdido. Deseja continuar?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowCancelConfirm(false)}>
+                Continuar editando
+              </Button>
+              <Button type="button" size="sm" onClick={confirmDiscard}
+                className="bg-red-600 hover:bg-red-700 text-white border-red-600">
+                Descartar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {recotarError && (
         <div className="mb-4 text-sm text-yellow-800 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded px-4 py-3">
           {recotarError}
