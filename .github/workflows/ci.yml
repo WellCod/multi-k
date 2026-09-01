@@ -81,7 +81,7 @@ jobs:
         working-directory: backend
 
       - name: CVE scan (pip-audit)
-        run: pip-audit --require-hashes=false -r <(pip freeze)
+        run: pip freeze | pip-audit -r /dev/stdin
         working-directory: backend
 
       - name: Gate de produção — REDIS_URL obrigatório fora de dev
