@@ -333,9 +333,7 @@ async def test_listar_cotacoes_proposta_id(
     proposta_id = r_tx.json()["id"]
 
     r_lista2 = await client.get("/cotacoes")
-    item2 = next(
-        c for c in r_lista2.json()["items"] if c["id"] == str(cotacao_id)
-    )
+    item2 = next(c for c in r_lista2.json()["items"] if c["id"] == str(cotacao_id))
     assert item2["proposta_id"] == proposta_id
 
 
