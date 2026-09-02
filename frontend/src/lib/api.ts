@@ -60,6 +60,13 @@ export interface LoginOut {
   papel: string;
 }
 
+export interface MeOut {
+  id: string;
+  nome: string;
+  papel: string;
+  email: string;
+}
+
 export const api = {
   auth: {
     login: (email: string, senha: string) =>
@@ -68,6 +75,8 @@ export const api = {
         body: JSON.stringify({ email, senha }),
       }),
     logout: () => request<void>("/auth/logout", { method: "POST" }),
+    me: () => request<MeOut>("/auth/me"),
+    refresh: () => request<void>("/auth/refresh", { method: "POST" }),
   },
 
   // ---- Domínios ----
