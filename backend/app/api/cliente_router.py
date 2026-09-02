@@ -494,8 +494,12 @@ def _gerar_ficha_pdf(
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
-        buf, pagesize=A4, rightMargin=2 * cm, leftMargin=2 * cm,
-        topMargin=2 * cm, bottomMargin=2 * cm,
+        buf,
+        pagesize=A4,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
     )
     styles = getSampleStyleSheet()
     story: list[Any] = []
@@ -519,15 +523,23 @@ def _gerar_ficha_pdf(
         _row("Profissão", cliente.profissao),
     ]
     t = Table(dados, colWidths=[5 * cm, 10 * cm])
-    t.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("ROWBACKGROUNDS", (0, 0), (-1, -1),
-         [colors.white, colors.HexColor("#F5F5F5")]),
-        ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#DDDDDD")),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("PADDING", (0, 0), (-1, -1), 6),
-    ]))
+    t.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 0),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#F5F5F5")],
+                ),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#DDDDDD")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("PADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     story.append(t)
 
     if veiculos:
@@ -535,20 +547,34 @@ def _gerar_ficha_pdf(
         story.append(Paragraph("Veículos", styles["Heading2"]))
         vrows = [["Marca", "Modelo", "Ano", "Placa", "CEP pernoite"]]
         for v in veiculos:
-            vrows.append([
-                v.marca, v.modelo, str(v.ano_modelo), v.placa or "—", v.cep_pernoite,
-            ])
+            vrows.append(
+                [
+                    v.marca,
+                    v.modelo,
+                    str(v.ano_modelo),
+                    v.placa or "—",
+                    v.cep_pernoite,
+                ]
+            )
         vt = Table(vrows, colWidths=[3.5 * cm, 4 * cm, 2 * cm, 2.5 * cm, 3 * cm])
-        vt.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A5F")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1),
-             [colors.white, colors.HexColor("#F5F5F5")]),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#DDDDDD")),
-            ("PADDING", (0, 0), (-1, -1), 5),
-        ]))
+        vt.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A5F")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.white, colors.HexColor("#F5F5F5")],
+                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#DDDDDD")),
+                    ("PADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
         story.append(vt)
 
     if imoveis:
@@ -556,21 +582,34 @@ def _gerar_ficha_pdf(
         story.append(Paragraph("Imóveis", styles["Heading2"]))
         irows = [["CEP", "Logradouro", "Número", "Tipo", "Construção"]]
         for im in imoveis:
-            irows.append([
-                im.cep, im.logradouro or "—", im.numero or "—",
-                im.tipo_imovel, im.tipo_construcao,
-            ])
+            irows.append(
+                [
+                    im.cep,
+                    im.logradouro or "—",
+                    im.numero or "—",
+                    im.tipo_imovel,
+                    im.tipo_construcao,
+                ]
+            )
         it = Table(irows, colWidths=[2.5 * cm, 5 * cm, 2 * cm, 3 * cm, 2.5 * cm])
-        it.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A5F")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1),
-             [colors.white, colors.HexColor("#F5F5F5")]),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#DDDDDD")),
-            ("PADDING", (0, 0), (-1, -1), 5),
-        ]))
+        it.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A5F")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.white, colors.HexColor("#F5F5F5")],
+                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#DDDDDD")),
+                    ("PADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
         story.append(it)
 
     doc.build(story)
@@ -595,9 +634,7 @@ async def ficha_pdf(
     veiculos_r = await db.execute(
         select(Veiculo).where(Veiculo.cliente_id == cliente_id)
     )
-    imoveis_r = await db.execute(
-        select(Imovel).where(Imovel.cliente_id == cliente_id)
-    )
+    imoveis_r = await db.execute(select(Imovel).where(Imovel.cliente_id == cliente_id))
     pdf_bytes = _gerar_ficha_pdf(
         cliente, list(veiculos_r.scalars().all()), list(imoveis_r.scalars().all())
     )
