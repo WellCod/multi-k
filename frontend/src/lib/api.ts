@@ -142,7 +142,13 @@ export const api = {
         body: JSON.stringify(body),
       }),
     get: (id: string) => request<Cotacao>(`/cotacoes/${id}`),
-    list: () => request<Cotacao[]>("/cotacoes"),
+    list: (params?: { page?: number; page_size?: number }) => {
+      const p = new URLSearchParams();
+      if (params?.page) p.set("page", String(params.page));
+      if (params?.page_size) p.set("page_size", String(params.page_size));
+      const qs = p.toString();
+      return request<PaginatedCotacoes>(`/cotacoes${qs ? `?${qs}` : ""}`);
+    },
     recotar: (id: string) =>
       request<CotacaoCriada>(`/cotacoes/${id}/recotar`, { method: "POST" }),
     comparativo: (id: string) =>
@@ -366,6 +372,14 @@ export interface Cotacao {
   criado_em: string;
   dados_risco: Record<string, unknown>;
   proposta_id: string | null;
+}
+
+export interface PaginatedCotacoes {
+  items: Cotacao[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
 }
 
 export interface TransmitirInput {
