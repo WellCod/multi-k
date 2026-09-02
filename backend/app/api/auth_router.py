@@ -16,6 +16,7 @@ from app.infra.auth_service import (
     checar_rate_limit,
     criar_sessao,
     invalidar_sessao,
+    prorrogar_sessao,
     registrar_falha,
     resetar_tentativas,
     verificar_senha,
@@ -153,3 +154,53 @@ async def me(
         papel=usuario.papel,
         email=usuario.email,
     )
+
+
+@router.post("/refresh", status_code=200)
+async def refresh(
+    request: Request,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, str]:
+    """Prorroga a sessão ativa por mais 8h."""
+    sid = request.cookies.get(_COOKIE)
+    if not sid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Não autenticado.",
+        )
+    try:
+        sessao_id = uuid.UUID(sid)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Não autenticado.",
+        ) from exc
+
+    ok = await prorrogar_sessao(db, sessao_id)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessão expirada.",
+        )
+    await db.commit()
+
+    response.set_cookie(
+        key=_COOKIE,
+        value=str(sessao_id),
+        httponly=True,
+        samesite="strict",
+        secure=_SECURE_COOKIE,
+        max_age=_MAX_AGE,
+        path="/",
+    )
+    response.set_cookie(
+        key=_CSRF_COOKIE,
+        value=secrets.token_hex(32),
+        httponly=False,
+        samesite="strict",
+        secure=_SECURE_COOKIE,
+        max_age=_MAX_AGE,
+        path="/",
+    )
+    return {}
