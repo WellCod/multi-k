@@ -193,7 +193,7 @@ def test_encrypted_json_roundtrip() -> None:
     """Encrypt→decrypt deve devolver o mesmo objeto."""
     import os
 
-    os.environ.setdefault("PAYLOAD_ENCRYPTION_KEY", "0" * 64)
+    os.environ["PAYLOAD_ENCRYPTION_KEY"] = "0" * 64
     from app.infra.encryption import EncryptedJSON
 
     col = EncryptedJSON()
