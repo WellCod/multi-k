@@ -371,8 +371,8 @@ async def export_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     tipo: str = Query(pattern="^(producao|funil|mix)$"),
     periodo: int = Query(default=30, ge=7, le=365),
-    limit: int = Query(default=1000, ge=1, le=5000),
-    offset: int = Query(default=0, ge=0),
+    limit: Annotated[int, Query(ge=1, le=5000)] = 1000,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> StreamingResponse:
     """Exporta relatório em CSV. Admin apenas."""
     buf = io.StringIO()
@@ -459,8 +459,8 @@ async def export_xlsx(
     db: Annotated[AsyncSession, Depends(get_db)],
     tipo: str = Query(pattern="^(producao|funil|mix)$"),
     periodo: int = Query(default=30, ge=7, le=365),
-    limit: int = Query(default=1000, ge=1, le=5000),
-    offset: int = Query(default=0, ge=0),
+    limit: Annotated[int, Query(ge=1, le=5000)] = 1000,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> StreamingResponse:
     """Exporta relatório em XLSX (openpyxl). Admin apenas."""
     try:
