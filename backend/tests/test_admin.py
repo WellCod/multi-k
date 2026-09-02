@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from app.domain.auth import Papel
 from app.infra.models import Base
 from app.main import app
-from tests.conftest import CsrfAuth, _RLS_STMTS, criar_usuario
+from tests.conftest import _RLS_STMTS, CsrfAuth, criar_usuario
 
 
 @pytest_asyncio.fixture(scope="module")
@@ -40,8 +40,10 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
         yield c
 
 
-async def _login(client: AsyncClient, db: AsyncSession, papel: Papel, email: str) -> None:
-    u = await criar_usuario(db, email, papel)
+async def _login(
+    client: AsyncClient, db: AsyncSession, papel: Papel, email: str
+) -> None:
+    await criar_usuario(db, email, papel)
     await db.commit()
     r = await client.post("/auth/login", json={"email": email, "senha": "Senha@123"})
     assert r.status_code == 200
@@ -89,9 +91,7 @@ async def test_listar_usuarios_como_admin(
 # ---------------------------------------------------------------------------
 
 
-async def test_criar_usuario_retorna_201(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_criar_usuario_retorna_201(db: AsyncSession, client: AsyncClient) -> None:
     await _login(client, db, Papel.ADMIN, "admin_criar@test.com")
     r = await client.post(
         "/admin/usuarios",
@@ -131,7 +131,12 @@ async def test_criar_usuario_nome_curto_retorna_422(
     await _login(client, db, Papel.ADMIN, "admin_nome_curto@test.com")
     r = await client.post(
         "/admin/usuarios",
-        json={"email": "x@test.com", "nome": "A", "papel": "corretor", "senha": "Senha@123"},
+        json={
+            "email": "x@test.com",
+            "nome": "A",
+            "papel": "corretor",
+            "senha": "Senha@123",
+        },
     )
     assert r.status_code == 422
 
@@ -142,7 +147,12 @@ async def test_criar_usuario_senha_curta_retorna_422(
     await _login(client, db, Papel.ADMIN, "admin_senha_curta@test.com")
     r = await client.post(
         "/admin/usuarios",
-        json={"email": "y@test.com", "nome": "Valido", "papel": "corretor", "senha": "curta"},
+        json={
+            "email": "y@test.com",
+            "nome": "Valido",
+            "papel": "corretor",
+            "senha": "curta",
+        },
     )
     assert r.status_code == 422
 
@@ -180,9 +190,7 @@ async def test_atualizar_papel_para_admin(
     assert r.json()["papel"] == "admin"
 
 
-async def test_desativar_outro_usuario(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_desativar_outro_usuario(db: AsyncSession, client: AsyncClient) -> None:
     await _login(client, db, Papel.ADMIN, "admin_desat@test.com")
     alvo = await criar_usuario(db, "alvo_desat@test.com", Papel.CORRETOR)
     await db.commit()
@@ -211,6 +219,7 @@ async def test_atualizar_usuario_inexistente_retorna_404(
 ) -> None:
     await _login(client, db, Papel.ADMIN, "admin_404patch@test.com")
     import uuid
+
     r = await client.patch(
         f"/admin/usuarios/{uuid.uuid4()}",
         json={"nome": "Fantasma"},
@@ -223,9 +232,7 @@ async def test_atualizar_usuario_inexistente_retorna_404(
 # ---------------------------------------------------------------------------
 
 
-async def test_reset_senha_retorna_204(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_reset_senha_retorna_204(db: AsyncSession, client: AsyncClient) -> None:
     await _login(client, db, Papel.ADMIN, "admin_reset@test.com")
     alvo = await criar_usuario(db, "alvo_reset@test.com", Papel.CORRETOR)
     await db.commit()
@@ -241,6 +248,7 @@ async def test_reset_senha_usuario_inexistente_retorna_404(
 ) -> None:
     await _login(client, db, Papel.ADMIN, "admin_reset404@test.com")
     import uuid
+
     r = await client.post(
         f"/admin/usuarios/{uuid.uuid4()}/reset-senha",
         json={"nova_senha": "NovaSenha@456"},
@@ -279,8 +287,6 @@ async def test_direct_listar_usuarios(db: AsyncSession) -> None:
 
 async def test_direct_criar_usuario(db: AsyncSession) -> None:
     """Chama criar_usuario diretamente — cobre o corpo após await."""
-    import uuid
-
     import pytest
     from fastapi import HTTPException
 
@@ -374,7 +380,5 @@ async def test_direct_reset_senha(db: AsyncSession) -> None:
     await _reset(usuario_id=alvo.id, _usuario=admin, db=db, body=body)
 
     with pytest.raises(HTTPException) as exc:
-        await _reset(
-            usuario_id=uuid.uuid4(), _usuario=admin, db=db, body=body
-        )
+        await _reset(usuario_id=uuid.uuid4(), _usuario=admin, db=db, body=body)
     assert exc.value.status_code == 404
