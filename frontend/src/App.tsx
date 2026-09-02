@@ -15,6 +15,7 @@ const ClienteDetailPage = lazy(() => import("@/pages/ClienteDetailPage").then((m
 const RenovacaoPage = lazy(() => import("@/pages/RenovacaoPage").then((m) => ({ default: m.RenovacaoPage })));
 const RelatoriosPage = lazy(() => import("@/pages/RelatoriosPage").then((m) => ({ default: m.RelatoriosPage })));
 const AuditoriaPage = lazy(() => import("@/pages/AuditoriaPage").then((m) => ({ default: m.AuditoriaPage })));
+const UsuariosPage = lazy(() => import("@/pages/UsuariosPage").then((m) => ({ default: m.UsuariosPage })));
 
 function PageLoader() {
   return (
@@ -122,6 +123,16 @@ function AppRoutes() {
           <RequireAuth>
             <Layout>
               <AuditoriaPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/usuarios"
+        element={
+          <RequireAuth>
+            <Layout>
+              <UsuariosPage />
             </Layout>
           </RequireAuth>
         }

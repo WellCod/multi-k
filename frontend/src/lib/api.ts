@@ -175,6 +175,23 @@ export const api = {
     usuarios: () => request<AuditoriaUsuario[]>("/auditoria/usuarios"),
   },
 
+  // ---- Usuários (admin) ----
+  usuarios: {
+    list: () => request<UsuarioAdmin[]>("/admin/usuarios"),
+    criar: (data: { email: string; nome: string; papel: string; senha: string }) =>
+      request<UsuarioAdmin>("/admin/usuarios", { method: "POST", body: JSON.stringify(data) }),
+    atualizar: (id: string, data: { nome?: string; papel?: string; ativo?: boolean }) =>
+      request<UsuarioAdmin>(`/admin/usuarios/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    resetSenha: (id: string, nova_senha: string) =>
+      request<void>(`/admin/usuarios/${id}/reset-senha`, {
+        method: "POST",
+        body: JSON.stringify({ nova_senha }),
+      }),
+  },
+
   // ---- Home ----
   home: {
     corretor: () => request<HomeCorretorOut>("/home/corretor"),
@@ -417,6 +434,17 @@ export interface AuditoriaList {
   total: number;
   page: number;
   page_size: number;
+}
+
+// ---- Usuários (admin) ----
+
+export interface UsuarioAdmin {
+  id: string;
+  email: string;
+  nome: string;
+  papel: string;
+  ativo: boolean;
+  criado_em: string;
 }
 
 // ---- Home ----
