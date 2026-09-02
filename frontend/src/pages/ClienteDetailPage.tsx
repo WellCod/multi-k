@@ -399,6 +399,16 @@ export function ClienteDetailPage() {
           </div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white truncate">{cliente.nome}</h1>
         </div>
+        <a
+          href={api.clientes.fichaUrl(clienteId!)}
+          target="_blank"
+          rel="noreferrer"
+          title="Exportar ficha do cliente em PDF"
+          className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex-shrink-0"
+        >
+          <span>↓</span>
+          <span className="hidden sm:inline">PDF</span>
+        </a>
         <button
           onClick={() => setShowArchiveConfirm(true)}
           title="Arquivar cliente"
