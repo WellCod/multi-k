@@ -324,7 +324,7 @@ async def test_listar_cotacoes_proposta_id(
 
     r_lista = await client.get("/cotacoes")
     assert r_lista.status_code == 200
-    item = next(c for c in r_lista.json() if c["id"] == str(cotacao_id))
+    item = next(c for c in r_lista.json()["items"] if c["id"] == str(cotacao_id))
     assert item["proposta_id"] is None
 
     r_tx = await client.post(
@@ -333,7 +333,9 @@ async def test_listar_cotacoes_proposta_id(
     proposta_id = r_tx.json()["id"]
 
     r_lista2 = await client.get("/cotacoes")
-    item2 = next(c for c in r_lista2.json() if c["id"] == str(cotacao_id))
+    item2 = next(
+        c for c in r_lista2.json()["items"] if c["id"] == str(cotacao_id)
+    )
     assert item2["proposta_id"] == proposta_id
 
 
