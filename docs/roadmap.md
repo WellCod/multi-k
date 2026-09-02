@@ -285,6 +285,66 @@ Ações humanas necessárias:
 
 ---
 
+## FASE MELHORIAS — Análise completa 2026-09-02 ✅
+
+*Análise e implementação: 2026-09-02*
+
+### Críticos ✅
+
+| # | Problema | Arquivo | Status |
+|---|---|---|---|
+| C1 | CSV Injection em export | `relatorio_router.py` | ✅ `_csv_escape()` prefixo `'` em fórmulas |
+| C2 | `SECRET_KEY` padrão no CI | `.github/workflows/ci.yml` | ✅ Valor sem semântica de prod |
+| C3 | Paginação hardcoded `.limit(10_000)` | `cotacao_router.py` | ✅ `page`/`page_size` real + `total` |
+| C4 | RLS ausente em `_dados_producao` | `relatorio_router.py` | ✅ Filtro por `tenant_id` |
+| C5 | Erro silencioso na transmissão | `CotacaoPage.tsx` | ✅ Red card dismissível com ×, mensagem legível |
+
+### Altos ✅
+
+| # | Problema | Arquivo | Status |
+|---|---|---|---|
+| A1 | Sessão 8h fixas sem refresh | `auth_router.py`, `auth_service.py`, `auth.tsx` | ✅ `POST /auth/refresh` + auto-refresh 30 min |
+| A2 | `/auth/me` ausente — hydration usava `/dominios` | `auth_router.py`, `auth.tsx`, `api.ts` | ✅ Hydration robusta via GET /auth/me |
+| A3 | CPF busca só no blur | `ClientesPage.tsx` | ✅ Debounce 500ms com spinner |
+| A4 | Toast cotação sem link | `App.tsx` | ✅ Toast clicável → `/historico` |
+| A5 | FipeSelector sem aria-label/aria-live | `FipeSelector.tsx` | ✅ `role=combobox`, `aria-expanded`, `aria-live` |
+| A6 | Paginação relatório hardcoded | `relatorio_router.py` | ✅ `limit`/`offset` params nos 3 queries |
+| A7 | Comissão sem validação em tempo real | `CotacaoPage.tsx` `TransmitirModal` | ✅ Input + erro inline, submit bloqueado |
+
+### Médios ✅
+
+| # | Problema | Arquivo | Status |
+|---|---|---|---|
+| M1 | Dark mode FOUC no localStorage | `index.html` | ✅ Script inline antes do React |
+| M2 | `color-scheme` sem meta tag | `index.html` | ✅ `meta name=color-scheme content="dark light"` |
+
+### Novas features ✅
+
+| Feature | Arquivo | Status |
+|---|---|---|
+| Dashboard de métricas (conversão, ticket médio, por ramo, ranking CIAs) | `dashboard_router.py`, `DashboardPage.tsx`, `api.ts` | ✅ |
+| Comparativo visual — highlight melhor preço | `CotacaoPage.tsx` `ComparativoInline` | ✅ Badge "Melhor preço" + row verde |
+| `/dashboard` na navegação | `Layout.tsx`, `App.tsx` | ✅ |
+
+### Planejado para Fase 8 (infra)
+
+| # | Problema | Quando |
+|---|---|---|
+| Rate-limit Redis (atualmente in-memory) | Fase 8 — multi-processo |
+| AES KDF sem PBKDF2 | Fase 8 — breaking change, migração planejada |
+
+### Features futuras (backlog)
+
+- Vínculo cliente ↔ apólice (número de apólice pós-emissão)
+- Gestão de comissão por CIA
+- Exportar ficha do cliente em PDF
+- Paginação avançada com filtros no histórico
+- Notificações WhatsApp/Email (credencial externa)
+- Multi-tenant real (Fase futura — breaking change)
+- Integração calendário Google (OAuth)
+
+---
+
 ## FASE 6 — Paridade
 
 **Gate:** ≥ 99% de paridade exata em 200 cotações, sustentado 30 dias  
