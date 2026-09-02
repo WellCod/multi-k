@@ -166,6 +166,11 @@ export const api = {
   propostas: {
     get: (id: string) => request<Proposta>(`/propostas/${id}`),
     parcelas: (id: string) => request<Parcela[]>(`/propostas/${id}/parcelas`),
+    vincularApolice: (id: string, numero_apolice: string) =>
+      request<Proposta>(`/propostas/${id}/apolice`, {
+        method: "PATCH",
+        body: JSON.stringify({ numero_apolice }),
+      }),
   },
 
   // ---- Renovações ----
@@ -402,6 +407,7 @@ export interface Proposta {
   comissao_pct: string;
   inicio_vigencia: string | null;
   transmitida_em: string;
+  numero_apolice: string | null;
 }
 
 export interface Parcela {

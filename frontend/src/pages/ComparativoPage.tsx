@@ -346,6 +346,9 @@ export function ComparativoPage() {
   const [err, setErr] = useState<string | null>(null);
   const [transmitirCia, setTransmitirCia] = useState<string | null>(null);
   const [proposta, setProposta] = useState<Proposta | null>(null);
+  const [apoliceInput, setApoliceInput] = useState("");
+  const [apoliceLoading, setApoliceLoading] = useState(false);
+  const [apoliceErr, setApoliceErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!cotacaoId) return;
@@ -426,6 +429,62 @@ export function ComparativoPage() {
                 &nbsp;|&nbsp; Comissão: {formatBRL(proposta.comissao_parcela)}/parcela
               </p>
               <ParcelasPanel propostaId={proposta.id} />
+
+              {/* Vínculo apólice */}
+              <div className="mt-4 pt-4 border-t border-green-200 dark:border-green-700">
+                {proposta.numero_apolice ? (
+                  <p className="text-sm text-green-700 dark:text-green-400">
+                    Apólice:{" "}
+                    <span className="font-mono font-bold text-green-900 dark:text-green-200">
+                      {proposta.numero_apolice}
+                    </span>
+                  </p>
+                ) : (
+                  <form
+                    className="flex gap-2 items-center"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!apoliceInput.trim()) return;
+                      setApoliceLoading(true);
+                      setApoliceErr(null);
+                      try {
+                        const updated = await api.propostas.vincularApolice(
+                          proposta.id,
+                          apoliceInput.trim(),
+                        );
+                        setProposta(updated);
+                        setApoliceInput("");
+                      } catch (ex: unknown) {
+                        setApoliceErr(
+                          ex instanceof Error ? ex.message : "Erro ao vincular apólice",
+                        );
+                      } finally {
+                        setApoliceLoading(false);
+                      }
+                    }}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Nº da apólice emitida"
+                      value={apoliceInput}
+                      onChange={(e) => setApoliceInput(e.target.value)}
+                      maxLength={100}
+                      className="flex-1 border border-green-300 dark:border-green-700 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-400"
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={apoliceLoading || !apoliceInput.trim()}
+                    >
+                      {apoliceLoading ? "Salvando…" : "Vincular apólice"}
+                    </Button>
+                  </form>
+                )}
+                {apoliceErr && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">{apoliceErr}</p>
+                )}
+              </div>
+
               {cotacao.cliente_id && (
                 <Button
                   className="mt-4"

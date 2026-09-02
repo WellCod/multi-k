@@ -224,6 +224,7 @@ class Proposta(Base):
     )
     usuario_id: Mapped[uuid.UUID] = mapped_column()
     tenant_id: Mapped[uuid.UUID] = mapped_column(default=lambda: TENANT_ID)
+    numero_apolice: Mapped[str | None] = mapped_column(String(100), default=None)
 
 
 class CotacaoJob(Base):
