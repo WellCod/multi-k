@@ -477,3 +477,62 @@ def test_m4_dados_negocio_nao_serializavel_levanta_validation_error() -> None:
             comissao_pct=Decimal("0.05"),
             dados_negocio={"chave": object()},
         )
+
+
+# ---------------------------------------------------------------------------
+# PATCH /propostas/{id}/apolice
+# ---------------------------------------------------------------------------
+
+
+async def test_vincular_apolice(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_apo@test.com"
+    )
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir", json=_TRANSMITIR_BODY
+    )
+    assert r_tx.status_code == 201
+    proposta_id = r_tx.json()["id"]
+
+    r = await client.patch(
+        f"/propostas/{proposta_id}/apolice",
+        json={"numero_apolice": "APOLICE-001"},
+    )
+    assert r.status_code == 200
+    assert r.json()["numero_apolice"] == "APOLICE-001"
+
+
+async def test_vincular_apolice_ja_existente_retorna_409(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_apo2@test.com"
+    )
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir", json=_TRANSMITIR_BODY
+    )
+    assert r_tx.status_code == 201
+    proposta_id = r_tx.json()["id"]
+
+    await client.patch(
+        f"/propostas/{proposta_id}/apolice",
+        json={"numero_apolice": "APOLICE-001"},
+    )
+    r = await client.patch(
+        f"/propostas/{proposta_id}/apolice",
+        json={"numero_apolice": "APOLICE-002"},
+    )
+    assert r.status_code == 409
+
+
+async def test_vincular_apolice_proposta_nao_encontrada_retorna_404(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await _login(client, db, "corretor_apo404@test.com")
+    r = await client.patch(
+        f"/propostas/{uuid.uuid4()}/apolice",
+        json={"numero_apolice": "APOLICE-X"},
+    )
+    assert r.status_code == 404
