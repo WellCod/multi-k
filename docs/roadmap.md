@@ -1,6 +1,6 @@
 # multi-K — Roadmap
 
-*Atualizado: 2026-08-28 (noite)*
+*Atualizado: 2026-09-02*
 
 ---
 
@@ -17,6 +17,7 @@
 ✅ UX-SEC      Qualidade e segurança do funil de cotação
 ✅ SEC         Endurecimento de segurança (auditoria 2026-08-26)
 🔨 Fase 5      Adapters Yelum + Justos (scaffold + docs; gate: credenciais)
+✅ MELHORIAS   Análise completa: segurança, perf, UX, features (2026-09-02)
 ⏳ Fase 6      Paridade (gate: ≥99% em 200 cotações)
 ⏳ Fase 7      E-Retorno (gate: Security Assessment)
 ⏳ Fase 8      Deploy GCP + endurecimento

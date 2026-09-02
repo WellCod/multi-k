@@ -529,54 +529,83 @@ function ComparativoInline({
               </tr>
             </thead>
             <tbody>
-              {itens.map((item, i) => (
-                <tr key={i} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-4 py-3 font-semibold uppercase">{item.cia}</td>
-                  <td className="px-4 py-3 font-mono">{formatBRL(item.premio_total)}</td>
-                  <td className="px-4 py-3 font-mono text-gray-500 dark:text-gray-400">
-                    {item.annual_total ? formatBRL(item.annual_total) : <span className="text-gray-300 dark:text-gray-600">—</span>}
-                  </td>
-                  <td className="px-4 py-3 max-w-xs">
-                    {item.restricoes.length === 0 && item.mensagens.length === 0 ? (
-                      <span className="text-gray-400">—</span>
-                    ) : (
-                      <>
-                        {item.restricoes.map((r) => (
-                          <span key={r.codigo} className="block text-xs text-yellow-700 dark:text-yellow-400">
-                            {r.codigo}: {r.mensagem}
+              {(() => {
+                const aprovados = itens.filter(
+                  (it) => (it.status === "sucesso" || it.status === "restricao") && it.premio_total,
+                );
+                const minPreco =
+                  aprovados.length > 0
+                    ? Math.min(...aprovados.map((it) => parseFloat(it.premio_total!)))
+                    : null;
+                return itens.map((item, i) => {
+                  const isBest =
+                    minPreco !== null &&
+                    item.premio_total !== null &&
+                    parseFloat(item.premio_total) === minPreco;
+                  return (
+                    <tr
+                      key={i}
+                      className={
+                        isBest
+                          ? "border-b border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20"
+                          : "border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      }
+                    >
+                      <td className="px-4 py-3 font-semibold uppercase">
+                        {item.cia}
+                        {isBest && (
+                          <span className="ml-2 inline-block text-[10px] font-bold uppercase tracking-wide text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/50 border border-green-300 dark:border-green-700 rounded px-1.5 py-0.5">
+                            Melhor preço
                           </span>
-                        ))}
-                        {item.mensagens.map((m, j) => (
-                          <span key={j} className="block text-xs text-blue-600 dark:text-blue-400">
-                            {m}
-                          </span>
-                        ))}
-                      </>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {item.necessita_vistoria ? (
-                      <span className="text-yellow-700 dark:text-yellow-400 text-xs font-medium">Sim</span>
-                    ) : (
-                      <span className="text-gray-400 text-xs">Não</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={item.status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {(item.status === "sucesso" || item.status === "restricao") && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onEmitir(item.cia)}
-                      >
-                        Emitir
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-mono">{formatBRL(item.premio_total)}</td>
+                      <td className="px-4 py-3 font-mono text-gray-500 dark:text-gray-400">
+                        {item.annual_total ? formatBRL(item.annual_total) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                      </td>
+                      <td className="px-4 py-3 max-w-xs">
+                        {item.restricoes.length === 0 && item.mensagens.length === 0 ? (
+                          <span className="text-gray-400">—</span>
+                        ) : (
+                          <>
+                            {item.restricoes.map((r) => (
+                              <span key={r.codigo} className="block text-xs text-yellow-700 dark:text-yellow-400">
+                                {r.codigo}: {r.mensagem}
+                              </span>
+                            ))}
+                            {item.mensagens.map((m, j) => (
+                              <span key={j} className="block text-xs text-blue-600 dark:text-blue-400">
+                                {m}
+                              </span>
+                            ))}
+                          </>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {item.necessita_vistoria ? (
+                          <span className="text-yellow-700 dark:text-yellow-400 text-xs font-medium">Sim</span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">Não</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={item.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {(item.status === "sucesso" || item.status === "restricao") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onEmitir(item.cia)}
+                          >
+                            Emitir
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                });
+              })()}
             </tbody>
           </table>
         </div>
