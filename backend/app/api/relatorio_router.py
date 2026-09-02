@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AdminUser, CurrentUser
+from app.domain.auth import TENANT_ID
 from app.infra.db import get_db
 from app.infra.models import Cotacao, Proposta, Usuario
 
@@ -62,6 +63,14 @@ class MixOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _csv_escape(v: object) -> str:
+    """Neutraliza injeção de fórmula CSV/Excel prefixando com apóstrofo."""
+    s = str(v)
+    if s and s[0] in ("=", "+", "-", "@", "|", "%"):
+        return "'" + s
+    return s
+
+
 def _corte(periodo: int) -> datetime:
     return datetime.now(UTC) - timedelta(days=periodo)
 
@@ -105,12 +114,15 @@ async def _dados_producao(
     inicio: datetime,
     fim: datetime,
     usuario_id: uuid.UUID | None = None,
+    limit: int = 1000,
+    offset: int = 0,
 ) -> list[ProducaoOut]:
     """Monta relatório de produção por corretor no período."""
     q_cot = (
         select(Cotacao)
         .where(Cotacao.criado_em >= inicio, Cotacao.criado_em <= fim)
-        .limit(10_000)
+        .limit(limit)
+        .offset(offset)
     )
     if usuario_id is not None:
         q_cot = q_cot.where(Cotacao.usuario_id == usuario_id)
@@ -120,7 +132,8 @@ async def _dados_producao(
     q_prop = (
         select(Proposta)
         .where(Proposta.transmitida_em >= inicio, Proposta.transmitida_em <= fim)
-        .limit(10_000)
+        .limit(limit)
+        .offset(offset)
     )
     if usuario_id is not None:
         q_prop = q_prop.where(Proposta.usuario_id == usuario_id)
@@ -130,8 +143,8 @@ async def _dados_producao(
     # Mapa de cotações para buscar prêmio
     cot_map: dict[uuid.UUID, Cotacao] = {c.id: c for c in cotacoes}
 
-    # Mapa de usuários
-    res_u = await db.execute(select(Usuario))
+    # Mapa de usuários (filtrado por tenant)
+    res_u = await db.execute(select(Usuario).where(Usuario.tenant_id == TENANT_ID))
     usuarios_map: dict[uuid.UUID, str] = {u.id: u.nome for u in res_u.scalars().all()}
 
     # Agrupa por corretor
@@ -193,12 +206,15 @@ async def _dados_funil(
     inicio: datetime,
     fim: datetime,
     usuario_id: uuid.UUID | None = None,
+    limit: int = 1000,
+    offset: int = 0,
 ) -> FunilOut:
     """Calcula funil de conversão por ramo no período."""
     q_cot = (
         select(Cotacao)
         .where(Cotacao.criado_em >= inicio, Cotacao.criado_em <= fim)
-        .limit(10_000)
+        .limit(limit)
+        .offset(offset)
     )
     if usuario_id is not None:
         q_cot = q_cot.where(Cotacao.usuario_id == usuario_id)
@@ -208,7 +224,8 @@ async def _dados_funil(
     q_prop = (
         select(Proposta)
         .where(Proposta.transmitida_em >= inicio, Proposta.transmitida_em <= fim)
-        .limit(10_000)
+        .limit(limit)
+        .offset(offset)
     )
     if usuario_id is not None:
         q_prop = q_prop.where(Proposta.usuario_id == usuario_id)
@@ -255,12 +272,16 @@ async def _dados_mix(
     inicio: datetime,
     fim: datetime,
     usuario_id: uuid.UUID | None = None,
+    limit: int = 1000,
+    offset: int = 0,
 ) -> list[MixOut]:
     """Distribuição por ramo no período, ordenada por volume."""
     q_prop = (
         select(Proposta, Cotacao)
         .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
         .where(Proposta.transmitida_em >= inicio, Proposta.transmitida_em <= fim)
+        .limit(limit)
+        .offset(offset)
     )
     if usuario_id is not None:
         q_prop = q_prop.where(Proposta.usuario_id == usuario_id)
@@ -350,6 +371,8 @@ async def export_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     tipo: str = Query(pattern="^(producao|funil|mix)$"),
     periodo: int = Query(default=30, ge=7, le=365),
+    limit: int = Query(default=1000, ge=1, le=5000),
+    offset: int = Query(default=0, ge=0),
 ) -> StreamingResponse:
     """Exporta relatório em CSV. Admin apenas."""
     buf = io.StringIO()
@@ -357,7 +380,7 @@ async def export_csv(
 
     inicio, fim = _resolve_corte(periodo, None, None)
     if tipo == "producao":
-        dados = await _dados_producao(db, inicio, fim)
+        dados = await _dados_producao(db, inicio, fim, limit=limit, offset=offset)
         writer.writerow(
             [
                 "corretor_id",
@@ -372,18 +395,18 @@ async def export_csv(
         for d in dados:
             writer.writerow(
                 [
-                    str(d.corretor_id),
-                    d.corretor_nome,
-                    d.cotacoes,
-                    d.propostas,
-                    str(d.taxa_conversao),
-                    str(d.premio_total),
-                    str(d.comissao_prevista),
+                    _csv_escape(d.corretor_id),
+                    _csv_escape(d.corretor_nome),
+                    _csv_escape(d.cotacoes),
+                    _csv_escape(d.propostas),
+                    _csv_escape(d.taxa_conversao),
+                    _csv_escape(d.premio_total),
+                    _csv_escape(d.comissao_prevista),
                 ]
             )
 
     elif tipo == "funil":
-        funil = await _dados_funil(db, inicio, fim)
+        funil = await _dados_funil(db, inicio, fim, limit=limit, offset=offset)
         writer.writerow(
             [
                 "ramo",
@@ -396,19 +419,26 @@ async def export_csv(
         for r in funil.por_ramo:
             writer.writerow(
                 [
-                    r.ramo,
-                    r.cotacoes,
-                    r.com_proposta,
-                    str(r.taxa_conversao),
-                    str(r.premio_medio),
+                    _csv_escape(r.ramo),
+                    _csv_escape(r.cotacoes),
+                    _csv_escape(r.com_proposta),
+                    _csv_escape(r.taxa_conversao),
+                    _csv_escape(r.premio_medio),
                 ]
             )
 
     else:  # mix
-        mix = await _dados_mix(db, inicio, fim)
+        mix = await _dados_mix(db, inicio, fim, limit=limit, offset=offset)
         writer.writerow(["ramo", "count", "pct", "premio_total"])
         for m in mix:
-            writer.writerow([m.ramo, m.count, str(m.pct), str(m.premio_total)])
+            writer.writerow(
+                [
+                    _csv_escape(m.ramo),
+                    _csv_escape(m.count),
+                    _csv_escape(m.pct),
+                    _csv_escape(m.premio_total),
+                ]
+            )
 
     buf.seek(0)
     return StreamingResponse(
@@ -429,6 +459,8 @@ async def export_xlsx(
     db: Annotated[AsyncSession, Depends(get_db)],
     tipo: str = Query(pattern="^(producao|funil|mix)$"),
     periodo: int = Query(default=30, ge=7, le=365),
+    limit: int = Query(default=1000, ge=1, le=5000),
+    offset: int = Query(default=0, ge=0),
 ) -> StreamingResponse:
     """Exporta relatório em XLSX (openpyxl). Admin apenas."""
     try:
@@ -447,7 +479,7 @@ async def export_xlsx(
     inicio, fim = _resolve_corte(periodo, None, None)
     if tipo == "producao":
         ws.title = "Producao"
-        dados = await _dados_producao(db, inicio, fim)
+        dados = await _dados_producao(db, inicio, fim, limit=limit, offset=offset)
         ws.append(
             [
                 "Corretor ID",
@@ -474,7 +506,7 @@ async def export_xlsx(
 
     elif tipo == "funil":
         ws.title = "Funil"
-        funil = await _dados_funil(db, inicio, fim)
+        funil = await _dados_funil(db, inicio, fim, limit=limit, offset=offset)
         ws.append(
             [
                 "Ramo",
@@ -497,7 +529,7 @@ async def export_xlsx(
 
     else:  # mix
         ws.title = "Mix"
-        mix = await _dados_mix(db, inicio, fim)
+        mix = await _dados_mix(db, inicio, fim, limit=limit, offset=offset)
         ws.append(["Ramo", "Qtd", "Pct (%)", "Prêmio Total"])
         for m in mix:
             ws.append([m.ramo, m.count, float(m.pct), float(m.premio_total)])
