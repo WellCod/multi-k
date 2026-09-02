@@ -9,8 +9,9 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import AdminUser, get_db
+from app.api.deps import AdminUser
 from app.infra.auth_service import hash_senha
+from app.infra.db import get_db
 from app.infra.models import Usuario
 
 router = APIRouter(prefix="/admin", tags=["admin"])
