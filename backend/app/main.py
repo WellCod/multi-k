@@ -11,6 +11,7 @@ import structlog.contextvars
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.admin_router import router as admin_router
 from app.api.auditoria_router import router as auditoria_router
 from app.api.auth_router import router as auth_router
 from app.api.cliente_router import router as cliente_router
@@ -161,6 +162,7 @@ async def correlation_id_middleware(
 
 
 app.include_router(health_router)
+app.include_router(admin_router)
 app.include_router(auditoria_router)
 app.include_router(events_router)
 app.include_router(auth_router)
