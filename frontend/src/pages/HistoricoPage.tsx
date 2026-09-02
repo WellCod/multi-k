@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type Cotacao } from "@/lib/api";
+import { api, type Cotacao, type PaginatedCotacoes } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -87,6 +87,7 @@ function RestricoesList({ restricoes }: { restricoes: { codigo: string; mensagem
 
 export function HistoricoPage() {
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
@@ -100,8 +101,11 @@ export function HistoricoPage() {
 
   useEffect(() => {
     api.cotacoes
-      .list()
-      .then(setCotacoes)
+      .list({ page_size: 100 })
+      .then((r: PaginatedCotacoes) => {
+        setCotacoes(r.items);
+        setServerTotal(r.total);
+      })
       .catch((e: unknown) =>
         setErr(e instanceof Error ? e.message : "Erro ao carregar histórico"),
       )
@@ -169,8 +173,8 @@ export function HistoricoPage() {
           {!loading && !err && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {temFiltroAtivo
-                ? `${filtradas.length} de ${cotacoes.length} cotações`
-                : `${cotacoes.length} cotação${cotacoes.length !== 1 ? "ões" : ""} no total`}
+                ? `${filtradas.length} de ${cotacoes.length} carregadas`
+                : `${serverTotal} cotação${serverTotal !== 1 ? "ões" : ""} no total`}
             </p>
           )}
         </div>
