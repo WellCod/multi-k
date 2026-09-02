@@ -1,6 +1,7 @@
 import hashlib
 import hmac as _hmac
 import secrets
+import uuid
 from typing import Annotated
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import CurrentUser
 from app.infra import audit
 from app.infra.auth_service import (
     checar_rate_limit,
@@ -130,3 +132,24 @@ async def logout(
     response.delete_cookie(_COOKIE)
     response.delete_cookie(_CSRF_COOKIE)
     return {}
+
+
+class MeOutput(BaseModel):
+    id: uuid.UUID
+    nome: str
+    papel: str
+    email: str
+
+
+@router.get("/me", response_model=MeOutput)
+async def me(
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> MeOutput:
+    """Retorna dados do usuário autenticado."""
+    return MeOutput(
+        id=usuario.id,
+        nome=usuario.nome,
+        papel=usuario.papel,
+        email=usuario.email,
+    )

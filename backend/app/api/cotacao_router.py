@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.registry import cias_para_ramo
@@ -206,17 +206,37 @@ async def obter_cotacao(
     return _cotacao_out(c, proposta_id)
 
 
-@router.get("", response_model=list[CotacaoOut])
+class PaginatedCotacoes(BaseModel):
+    items: list[CotacaoOut]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+@router.get("", response_model=PaginatedCotacoes)
 async def listar_cotacoes(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> list[CotacaoOut]:
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> PaginatedCotacoes:
+    base_where = Cotacao.usuario_id == usuario.id
+
+    total_row = await db.execute(
+        select(func.count()).select_from(Cotacao).where(base_where)
+    )
+    total: int = total_row.scalar_one()
+
     result = await db.execute(
         select(Cotacao)
-        .where(Cotacao.usuario_id == usuario.id)
+        .where(base_where)
         .order_by(Cotacao.criado_em.desc())
+        .limit(page_size)
+        .offset((page - 1) * page_size)
     )
     cotacoes = list(result.scalars().all())
+
     proposta_map: dict[uuid.UUID, uuid.UUID] = {}
     if cotacoes:
         ids = [c.id for c in cotacoes]
@@ -227,7 +247,15 @@ async def listar_cotacoes(
             .order_by(Proposta.cotacao_id, Proposta.transmitida_em.desc())
         )
         proposta_map = {row[0]: row[1] for row in p_rows}
-    return [_cotacao_out(c, proposta_map.get(c.id)) for c in cotacoes]
+
+    pages = max(1, -(-total // page_size))  # ceiling division
+    return PaginatedCotacoes(
+        items=[_cotacao_out(c, proposta_map.get(c.id)) for c in cotacoes],
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages,
+    )
 
 
 @router.get("/export/csv")

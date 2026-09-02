@@ -273,8 +273,8 @@ function TransmitirModal({
   const isJustos = cia === "justos";
 
   const handleComissaoChange = (pct: number) => {
-    if (pct < 1 || pct > 30) {
-      setComissaoErr("Comissão deve estar entre 1% e 30%");
+    if (pct < 0 || pct > 30) {
+      setComissaoErr("Comissão deve ser entre 0% e 30%");
     } else {
       setComissaoErr(null);
     }
@@ -284,8 +284,8 @@ function TransmitirModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const pct = Number(comissao) * 100;
-    if (pct < 1 || pct > 30) {
-      setComissaoErr("Comissão deve estar entre 1% e 30%");
+    if (pct < 0 || pct > 30) {
+      setComissaoErr("Comissão deve ser entre 0% e 30%");
       return;
     }
     setLoading(true);
@@ -360,13 +360,17 @@ function TransmitirModal({
             <input
               type="number"
               step="0.5"
-              min="1"
+              min="0"
               max="30"
               className={`w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${comissaoErr ? "border-red-500 dark:border-red-500" : "border-gray-300 dark:border-gray-600"}`}
               value={Number(comissao) * 100}
               onChange={(e) => handleComissaoChange(Number(e.target.value))}
             />
-            {comissaoErr && <p className="text-xs text-red-600 mt-1">{comissaoErr}</p>}
+            {comissaoErr && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1" role="alert">
+                {comissaoErr}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">Início vigência</label>
@@ -377,12 +381,24 @@ function TransmitirModal({
               onChange={(e) => setVigencia(e.target.value)}
             />
           </div>
-          {err && <p className="text-red-600 text-sm">{err}</p>}
+          {err && (
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-4 py-3 flex items-start gap-3">
+              <div className="flex-1 text-sm text-red-700 dark:text-red-400">{err}</div>
+              <button
+                type="button"
+                onClick={() => setErr(null)}
+                className="text-red-400 hover:text-red-600 dark:hover:text-red-200 leading-none text-lg flex-shrink-0"
+                aria-label="Fechar erro"
+              >
+                ×
+              </button>
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || !!comissaoErr}>
               {loading ? "Transmitindo…" : "Confirmar"}
             </Button>
           </div>
