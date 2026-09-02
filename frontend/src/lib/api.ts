@@ -129,6 +129,7 @@ export const api = {
       }),
     archive: (id: string) =>
       request<void>(`/clientes/${id}`, { method: "DELETE" }),
+    fichaUrl: (id: string) => `${BASE}/clientes/${id}/ficha.pdf`,
     timeline: (id: string) =>
       request<TimelineItem[]>(`/clientes/${id}/timeline`),
   },
