@@ -58,21 +58,13 @@ async def _calcular_dashboard(
     usuario_id: uuid.UUID | None,
     is_admin: bool,
 ) -> DashboardOut:
-    q_cot = (
-        select(Cotacao)
-        .where(Cotacao.criado_em >= inicio)
-        .limit(10_000)
-    )
+    q_cot = select(Cotacao).where(Cotacao.criado_em >= inicio).limit(10_000)
     if usuario_id is not None:
         q_cot = q_cot.where(Cotacao.usuario_id == usuario_id)
     res_cot = await db.execute(q_cot)
     cotacoes = res_cot.scalars().all()
 
-    q_prop = (
-        select(Proposta)
-        .where(Proposta.transmitida_em >= inicio)
-        .limit(10_000)
-    )
+    q_prop = select(Proposta).where(Proposta.transmitida_em >= inicio).limit(10_000)
     if usuario_id is not None:
         q_prop = q_prop.where(Proposta.usuario_id == usuario_id)
     res_prop = await db.execute(q_prop)
@@ -125,11 +117,7 @@ async def _calcular_dashboard(
 
     ranking_cias: list[DashboardCiaOut] = []
     if is_admin:
-        q_jobs = (
-            select(CotacaoJob)
-            .where(CotacaoJob.criado_em >= inicio)
-            .limit(10_000)
-        )
+        q_jobs = select(CotacaoJob).where(CotacaoJob.criado_em >= inicio).limit(10_000)
         res_jobs = await db.execute(q_jobs)
         jobs = res_jobs.scalars().all()
 
