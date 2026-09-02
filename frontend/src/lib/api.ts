@@ -230,6 +230,12 @@ export const api = {
     exportUrl: (tipo: string, periodo: number, fmt: "csv" | "xlsx") =>
       `${BASE}/relatorios/export/${fmt}?tipo=${tipo}&periodo=${periodo}`,
   },
+
+  // ---- Dashboard ----
+  dashboard: {
+    get: (periodo = 30) =>
+      request<DashboardOut>(`/dashboard?periodo=${periodo}`),
+  },
 };
 
 // ---- Types ----
@@ -560,4 +566,29 @@ export interface MixOut {
   count: number;
   pct: string;
   premio_total: string;
+}
+
+// ---- Dashboard ----
+
+export interface DashboardRamoOut {
+  ramo: string;
+  cotacoes: number;
+  propostas: number;
+  premio_total: string;
+}
+
+export interface DashboardCiaOut {
+  cia: string;
+  cotacoes: number;
+  propostas: number;
+  premio_total: string;
+}
+
+export interface DashboardOut {
+  total_cotacoes: number;
+  total_propostas: number;
+  taxa_conversao: string;
+  ticket_medio: string;
+  por_ramo: DashboardRamoOut[];
+  ranking_cias: DashboardCiaOut[];
 }
