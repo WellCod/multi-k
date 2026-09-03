@@ -163,6 +163,9 @@ async def refresh(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, str]:
     """Prorroga a sessão ativa por mais 8h."""
+    ip = request.client.host if request.client else None
+    if ip:
+        await checar_rate_limit(db, f"refresh:{ip}")
     sid = request.cookies.get(_COOKIE)
     if not sid:
         raise HTTPException(

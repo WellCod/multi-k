@@ -8,6 +8,17 @@ export function setUnauthorizedHandler(fn: () => void): void {
   _unauthorizedHandler = fn;
 }
 
+function _traduzirErro(status: number, detail: string): string {
+  if (status === 409) return "Este registro já existe.";
+  if (status === 404) return "Registro não encontrado.";
+  if (status === 403) return "Você não tem permissão para esta ação.";
+  if (status === 422) return "Dados inválidos. Verifique os campos e tente novamente.";
+  if (status === 429) return "Muitas tentativas. Aguarde alguns minutos.";
+  if (status === 503 || status === 502) return "Serviço temporariamente indisponível. Tente novamente.";
+  if (status >= 500) return "Erro interno. Nossa equipe foi notificada.";
+  return detail ?? "Erro inesperado.";
+}
+
 function _getCsrfToken(): string | null {
   const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
@@ -37,7 +48,7 @@ async function request<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, body.detail ?? "Erro inesperado");
+    throw new ApiError(res.status, _traduzirErro(res.status, body.detail));
   }
 
   if (res.status === 204) return undefined as T;
@@ -152,6 +163,8 @@ export const api = {
     },
     recotar: (id: string) =>
       request<CotacaoCriada>(`/cotacoes/${id}/recotar`, { method: "POST" }),
+    versoes: (id: string) =>
+      request<VersaoPremio[]>(`/cotacoes/${id}/versoes`),
     comparativo: (id: string) =>
       request<ItemComparativo[]>(`/cotacoes/${id}/comparativo`),
     comparativoPdfUrl: (id: string) =>
@@ -418,6 +431,13 @@ export interface Parcela {
   comissao: string;
 }
 
+export interface VersaoPremio {
+  id: string;
+  criado_em: string;
+  premio_total: string | null;
+  ramo: string;
+}
+
 export interface ItemComparativo {
   cia: string;
   cotacao_id_cia: string | null;
@@ -603,6 +623,7 @@ export interface DashboardCiaOut {
   cotacoes: number;
   propostas: number;
   premio_total: string;
+  latencia_media_s: number | null;
 }
 
 export interface DashboardOut {
@@ -612,4 +633,5 @@ export interface DashboardOut {
   ticket_medio: string;
   por_ramo: DashboardRamoOut[];
   ranking_cias: DashboardCiaOut[];
+  ranking_truncado: boolean;
 }
