@@ -10,6 +10,7 @@ const NAV_BASE = [
   { to: "/historico", label: "Histórico" },
   { to: "/clientes", label: "Clientes" },
   { to: "/renovacoes", label: "Renovações" },
+  { to: "/dashboard", label: "Dashboard" },
   { to: "/relatorios", label: "Relatórios" },
 ];
 const NAV_ADMIN = [

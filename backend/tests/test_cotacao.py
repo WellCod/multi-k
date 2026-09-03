@@ -153,7 +153,7 @@ async def test_listar_cotacoes(
     await client.post("/cotacoes", json=_RISCO_AUTO)
     r = await client.get("/cotacoes")
     assert r.status_code == 200
-    assert len(r.json()) >= 1
+    assert r.json()["total"] >= 1
 
 
 async def test_dominios_retorna_lista(

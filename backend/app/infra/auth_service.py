@@ -92,6 +92,23 @@ async def invalidar_sessao(db: AsyncSession, sessao_id: UUID) -> None:
         await db.flush()
 
 
+async def prorrogar_sessao(db: AsyncSession, sessao_id: UUID) -> bool:
+    """Estende a expiração da sessão por SESSION_DURATION a partir de agora.
+
+    Retorna False se a sessão não existir ou já estiver expirada.
+    """
+    agora = datetime.now(UTC)
+    res = await db.execute(
+        select(Sessao).where(Sessao.id == sessao_id).where(Sessao.expira_em > agora)
+    )
+    sessao = res.scalar_one_or_none()
+    if sessao is None:
+        return False
+    sessao.expira_em = agora + SESSION_DURATION
+    await db.flush()
+    return True
+
+
 async def checar_rate_limit(db: AsyncSession, identificador: str) -> None:
     agora = datetime.now(UTC)
     res = await db.execute(

@@ -17,6 +17,7 @@ from app.api.auth_router import router as auth_router
 from app.api.cliente_router import router as cliente_router
 from app.api.comparativo_router import router as comparativo_router
 from app.api.cotacao_router import router as cotacao_router
+from app.api.dashboard_router import router as dashboard_router
 from app.api.dominio_router import router as dominio_router
 from app.api.events_router import router as events_router
 from app.api.fipe_router import router as fipe_router
@@ -174,4 +175,5 @@ app.include_router(renovacao_router)
 app.include_router(dominio_router)
 app.include_router(home_router)
 app.include_router(relatorio_router)
+app.include_router(dashboard_router)
 app.include_router(fipe_router)
