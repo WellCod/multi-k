@@ -60,6 +60,13 @@ export interface LoginOut {
   papel: string;
 }
 
+export interface MeOut {
+  id: string;
+  nome: string;
+  papel: string;
+  email: string;
+}
+
 export const api = {
   auth: {
     login: (email: string, senha: string) =>
@@ -68,6 +75,8 @@ export const api = {
         body: JSON.stringify({ email, senha }),
       }),
     logout: () => request<void>("/auth/logout", { method: "POST" }),
+    me: () => request<MeOut>("/auth/me"),
+    refresh: () => request<void>("/auth/refresh", { method: "POST" }),
   },
 
   // ---- Domínios ----
@@ -120,6 +129,7 @@ export const api = {
       }),
     archive: (id: string) =>
       request<void>(`/clientes/${id}`, { method: "DELETE" }),
+    fichaUrl: (id: string) => `${BASE}/clientes/${id}/ficha.pdf`,
     timeline: (id: string) =>
       request<TimelineItem[]>(`/clientes/${id}/timeline`),
   },
@@ -133,7 +143,13 @@ export const api = {
         body: JSON.stringify(body),
       }),
     get: (id: string) => request<Cotacao>(`/cotacoes/${id}`),
-    list: () => request<Cotacao[]>("/cotacoes"),
+    list: (params?: { page?: number; page_size?: number }) => {
+      const p = new URLSearchParams();
+      if (params?.page) p.set("page", String(params.page));
+      if (params?.page_size) p.set("page_size", String(params.page_size));
+      const qs = p.toString();
+      return request<PaginatedCotacoes>(`/cotacoes${qs ? `?${qs}` : ""}`);
+    },
     recotar: (id: string) =>
       request<CotacaoCriada>(`/cotacoes/${id}/recotar`, { method: "POST" }),
     comparativo: (id: string) =>
@@ -151,6 +167,11 @@ export const api = {
   propostas: {
     get: (id: string) => request<Proposta>(`/propostas/${id}`),
     parcelas: (id: string) => request<Parcela[]>(`/propostas/${id}/parcelas`),
+    vincularApolice: (id: string, numero_apolice: string) =>
+      request<Proposta>(`/propostas/${id}/apolice`, {
+        method: "PATCH",
+        body: JSON.stringify({ numero_apolice }),
+      }),
   },
 
   // ---- Renovações ----
@@ -220,6 +241,12 @@ export const api = {
     },
     exportUrl: (tipo: string, periodo: number, fmt: "csv" | "xlsx") =>
       `${BASE}/relatorios/export/${fmt}?tipo=${tipo}&periodo=${periodo}`,
+  },
+
+  // ---- Dashboard ----
+  dashboard: {
+    get: (periodo = 30) =>
+      request<DashboardOut>(`/dashboard?periodo=${periodo}`),
   },
 };
 
@@ -353,6 +380,14 @@ export interface Cotacao {
   proposta_id: string | null;
 }
 
+export interface PaginatedCotacoes {
+  items: Cotacao[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
 export interface TransmitirInput {
   plano_pagamento: string;
   n_parcelas: number;
@@ -373,6 +408,7 @@ export interface Proposta {
   comissao_pct: string;
   inicio_vigencia: string | null;
   transmitida_em: string;
+  numero_apolice: string | null;
 }
 
 export interface Parcela {
@@ -551,4 +587,29 @@ export interface MixOut {
   count: number;
   pct: string;
   premio_total: string;
+}
+
+// ---- Dashboard ----
+
+export interface DashboardRamoOut {
+  ramo: string;
+  cotacoes: number;
+  propostas: number;
+  premio_total: string;
+}
+
+export interface DashboardCiaOut {
+  cia: string;
+  cotacoes: number;
+  propostas: number;
+  premio_total: string;
+}
+
+export interface DashboardOut {
+  total_cotacoes: number;
+  total_propostas: number;
+  taxa_conversao: string;
+  ticket_medio: string;
+  por_ramo: DashboardRamoOut[];
+  ranking_cias: DashboardCiaOut[];
 }

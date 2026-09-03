@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import { Navigate, Route, BrowserRouter as Router, Routes, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { DarkModeContext, useDarkModeState } from "@/lib/use-dark-mode";
 import { Layout } from "@/components/Layout";
@@ -16,6 +16,7 @@ const RenovacaoPage = lazy(() => import("@/pages/RenovacaoPage").then((m) => ({ 
 const RelatoriosPage = lazy(() => import("@/pages/RelatoriosPage").then((m) => ({ default: m.RelatoriosPage })));
 const AuditoriaPage = lazy(() => import("@/pages/AuditoriaPage").then((m) => ({ default: m.AuditoriaPage })));
 const UsuariosPage = lazy(() => import("@/pages/UsuariosPage").then((m) => ({ default: m.UsuariosPage })));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 
 function PageLoader() {
   return (
@@ -53,6 +54,16 @@ function AppRoutes() {
           <RequireAuth>
             <Layout>
               <RelatoriosPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <RequireAuth>
+            <Layout>
+              <DashboardPage />
             </Layout>
           </RequireAuth>
         }
@@ -153,6 +164,7 @@ interface CotacaoToastData {
 
 function CotacaoToasts() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [toasts, setToasts] = useState<CotacaoToastData[]>([]);
   const counterRef = useRef(0);
 
@@ -197,6 +209,15 @@ function CotacaoToasts() {
             {t.premio_total && t.status === "sucesso" && (
               <p className="text-xs opacity-80 mt-0.5">Prêmio: R$ {t.premio_total}</p>
             )}
+            <button
+              onClick={() => {
+                setToasts((prev) => prev.filter((x) => x.id !== t.id));
+                navigate("/historico");
+              }}
+              className="mt-1.5 text-xs underline opacity-80 hover:opacity-100 transition-opacity"
+            >
+              Ver cotação →
+            </button>
           </div>
           <button
             onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}

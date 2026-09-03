@@ -1,6 +1,7 @@
 import hashlib
 import hmac as _hmac
 import secrets
+import uuid
 from typing import Annotated
 from uuid import UUID
 
@@ -9,11 +10,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import CurrentUser
 from app.infra import audit
 from app.infra.auth_service import (
     checar_rate_limit,
     criar_sessao,
     invalidar_sessao,
+    prorrogar_sessao,
     registrar_falha,
     resetar_tentativas,
     verificar_senha,
@@ -129,4 +132,75 @@ async def logout(
             pass
     response.delete_cookie(_COOKIE)
     response.delete_cookie(_CSRF_COOKIE)
+    return {}
+
+
+class MeOutput(BaseModel):
+    id: uuid.UUID
+    nome: str
+    papel: str
+    email: str
+
+
+@router.get("/me", response_model=MeOutput)
+async def me(
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> MeOutput:
+    """Retorna dados do usuário autenticado."""
+    return MeOutput(
+        id=usuario.id,
+        nome=usuario.nome,
+        papel=usuario.papel,
+        email=usuario.email,
+    )
+
+
+@router.post("/refresh", status_code=200)
+async def refresh(
+    request: Request,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, str]:
+    """Prorroga a sessão ativa por mais 8h."""
+    sid = request.cookies.get(_COOKIE)
+    if not sid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Não autenticado.",
+        )
+    try:
+        sessao_id = uuid.UUID(sid)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Não autenticado.",
+        ) from exc
+
+    ok = await prorrogar_sessao(db, sessao_id)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessão expirada.",
+        )
+    await db.commit()
+
+    response.set_cookie(
+        key=_COOKIE,
+        value=str(sessao_id),
+        httponly=True,
+        samesite="strict",
+        secure=_SECURE_COOKIE,
+        max_age=_MAX_AGE,
+        path="/",
+    )
+    response.set_cookie(
+        key=_CSRF_COOKIE,
+        value=secrets.token_hex(32),
+        httponly=False,
+        samesite="strict",
+        secure=_SECURE_COOKIE,
+        max_age=_MAX_AGE,
+        path="/",
+    )
     return {}
