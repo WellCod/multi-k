@@ -401,6 +401,7 @@ function HomeAdmin() {
   const [data, setData] = useState<HomeAdminOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.home
@@ -424,11 +425,19 @@ function HomeAdmin() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Visão geral</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          Indicadores consolidados da carteira
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Visão geral</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Indicadores consolidados da carteira
+          </p>
+        </div>
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+        >
+          Ver métricas detalhadas →
+        </button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
