@@ -44,11 +44,12 @@ def _base_url() -> str:
 
 
 def _gerar_jwt() -> str:
-    # Preferência: JUSTOS_PRIVATE_KEY_PATH (caminho do arquivo, nunca entra no .env do projeto)
-    # Fallback: JUSTOS_PRIVATE_KEY (conteúdo PEM inline, usado em GCP Secret Manager)
+    # JUSTOS_PRIVATE_KEY_PATH: caminho do arquivo (dev local, fora do projeto)
+    # JUSTOS_PRIVATE_KEY: conteúdo PEM inline (produção via GCP Secret Manager)
     key_path = get_optional_secret("JUSTOS_PRIVATE_KEY_PATH")
     if key_path:
         import pathlib
+
         private_key_pem = pathlib.Path(key_path).read_text()
     else:
         raw_pem = get_secret("JUSTOS_PRIVATE_KEY")
