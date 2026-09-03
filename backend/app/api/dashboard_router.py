@@ -119,14 +119,14 @@ async def _calcular_dashboard(
 
     ranking_cias: list[DashboardCiaOut] = []
     ranking_truncado = False
-    _JOBS_LIMIT = 10_000
+    _jobs_limit = 10_000
     if is_admin:
         q_jobs = (
-            select(CotacaoJob).where(CotacaoJob.criado_em >= inicio).limit(_JOBS_LIMIT)
+            select(CotacaoJob).where(CotacaoJob.criado_em >= inicio).limit(_jobs_limit)
         )
         res_jobs = await db.execute(q_jobs)
         jobs = res_jobs.scalars().all()
-        ranking_truncado = len(jobs) == _JOBS_LIMIT
+        ranking_truncado = len(jobs) == _jobs_limit
 
         cia_stats: dict[str, dict[str, object]] = {}
         for job in jobs:
