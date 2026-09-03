@@ -4,11 +4,15 @@ Idempotente: se ana.souza@demo.multik já existir, retorna sem fazer nada.
 Executa dentro de transação com app.papel = 'admin' para bypassar RLS.
 """
 
+import logging
 import random
+import secrets
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -290,10 +294,19 @@ async def criar_demo(factory: async_sessionmaker[AsyncSession]) -> None:
         await db.execute(text("SET LOCAL app.papel = 'admin'"))
 
         # ------------------------------------------------------------------
-        # Cria usuários
+        # Cria usuários — senhas geradas aleatoriamente a cada seed
         # ------------------------------------------------------------------
-        senha_corretor = hash_senha("Demo@2026")
-        senha_admin = hash_senha("Admin@2026")
+        _raw_corretor = secrets.token_urlsafe(12)
+        _raw_admin = secrets.token_urlsafe(12)
+        senha_corretor = hash_senha(_raw_corretor)
+        senha_admin = hash_senha(_raw_admin)
+        _log.warning(
+            "SEED DEMO — credenciais geradas (só visíveis aqui, nunca em prod):\n"
+            "  corretores : %s\n"
+            "  admin      : %s",
+            _raw_corretor,
+            _raw_admin,
+        )
 
         corretores: list[Usuario] = []
         for nome, email in _CORRETORES:
