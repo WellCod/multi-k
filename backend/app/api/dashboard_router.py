@@ -29,6 +29,7 @@ class DashboardCiaOut(BaseModel):
     cotacoes: int
     propostas: int
     premio_total: Decimal
+    latencia_media_s: float | None = None
 
 
 class DashboardOut(BaseModel):
@@ -38,6 +39,7 @@ class DashboardOut(BaseModel):
     ticket_medio: Decimal
     por_ramo: list[DashboardRamoOut]
     ranking_cias: list[DashboardCiaOut]
+    ranking_truncado: bool = False
 
 
 def _corte(periodo: int) -> datetime:
@@ -116,12 +118,17 @@ async def _calcular_dashboard(
     ]
 
     ranking_cias: list[DashboardCiaOut] = []
+    ranking_truncado = False
+    _JOBS_LIMIT = 10_000
     if is_admin:
-        q_jobs = select(CotacaoJob).where(CotacaoJob.criado_em >= inicio).limit(10_000)
+        q_jobs = (
+            select(CotacaoJob).where(CotacaoJob.criado_em >= inicio).limit(_JOBS_LIMIT)
+        )
         res_jobs = await db.execute(q_jobs)
         jobs = res_jobs.scalars().all()
+        ranking_truncado = len(jobs) == _JOBS_LIMIT
 
-        cia_stats: dict[str, dict[str, int | Decimal]] = {}
+        cia_stats: dict[str, dict[str, object]] = {}
         for job in jobs:
             cia = job.cia
             if cia not in cia_stats:
@@ -129,12 +136,16 @@ async def _calcular_dashboard(
                     "cotacoes": 0,
                     "propostas": 0,
                     "premio_total": Decimal("0"),
+                    "latencias": [],
                 }
-            cia_stats[cia]["cotacoes"] = int(cia_stats[cia]["cotacoes"]) + 1
+            cia_stats[cia]["cotacoes"] = int(cia_stats[cia]["cotacoes"]) + 1  # type: ignore[operator]
+            if job.processado_em is not None:
+                delta = (job.processado_em - job.criado_em).total_seconds()
+                cia_stats[cia]["latencias"].append(delta)  # type: ignore[union-attr]
             cot = cot_map.get(job.cotacao_id)
             if cot is not None and cot.id in ids_com_prop:
-                cia_stats[cia]["propostas"] = int(cia_stats[cia]["propostas"]) + 1
-                cia_stats[cia]["premio_total"] = Decimal(
+                cia_stats[cia]["propostas"] = int(cia_stats[cia]["propostas"]) + 1  # type: ignore[operator]
+                cia_stats[cia]["premio_total"] = Decimal(  # type: ignore[assignment]
                     str(cia_stats[cia]["premio_total"])
                 ) + (job.premio_total or Decimal("0"))
 
@@ -142,9 +153,14 @@ async def _calcular_dashboard(
             [
                 DashboardCiaOut(
                     cia=cia,
-                    cotacoes=int(v["cotacoes"]),
-                    propostas=int(v["propostas"]),
+                    cotacoes=int(v["cotacoes"]),  # type: ignore[arg-type]
+                    propostas=int(v["propostas"]),  # type: ignore[arg-type]
                     premio_total=Decimal(str(v["premio_total"])),
+                    latencia_media_s=(
+                        round(sum(v["latencias"]) / len(v["latencias"]), 1)  # type: ignore[arg-type]
+                        if v["latencias"]  # type: ignore[truthy-iterable]
+                        else None
+                    ),
                 )
                 for cia, v in cia_stats.items()
             ],
@@ -159,6 +175,7 @@ async def _calcular_dashboard(
         ticket_medio=ticket_medio,
         por_ramo=por_ramo,
         ranking_cias=ranking_cias,
+        ranking_truncado=ranking_truncado,
     )
 
 

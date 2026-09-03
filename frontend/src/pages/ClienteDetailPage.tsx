@@ -186,7 +186,15 @@ function EditForm({
           Cancelar
         </Button>
         <Button type="submit" size="sm" disabled={saving || !nome.trim()}>
-          {saving ? "Salvando…" : "Salvar"}
+          {saving ? (
+            <>
+              <svg className="animate-spin h-3.5 w-3.5 mr-1.5 inline" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              Aguarde...
+            </>
+          ) : "Salvar"}
         </Button>
       </div>
     </form>
@@ -360,26 +368,23 @@ export function ClienteDetailPage() {
   return (
     <div className="max-w-2xl space-y-6">
       {showArchiveConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowArchiveConfirm(false); }}
-        >
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl w-full max-w-sm mx-4 p-6 space-y-4">
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-2xl">⚠️</span>
-              <h2 className="text-base font-semibold text-gray-900 dark:text-white">Arquivar cliente?</h2>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              O cliente será removido da lista mas seus dados e histórico serão preservados.
-            </p>
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" size="sm" onClick={() => setShowArchiveConfirm(false)} disabled={archiving}>
-                Cancelar
-              </Button>
-              <Button type="button" size="sm" onClick={handleArchive} disabled={archiving}
-                className="bg-red-600 hover:bg-red-700 text-white border-red-600">
-                {archiving ? "Arquivando…" : "Arquivar"}
-              </Button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Arquivar cliente</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Tem certeza? Esta ação pode ser desfeita pelo administrador.</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowArchiveConfirm(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
+              <button onClick={handleArchive} disabled={archiving} className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60">
+                {archiving ? (
+                  <>
+                    <svg className="animate-spin h-3.5 w-3.5 mr-1.5 inline" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    Aguarde...
+                  </>
+                ) : "Arquivar"}
+              </button>
             </div>
           </div>
         </div>
