@@ -26,7 +26,8 @@ Campos obrigatórios em dados_negocio para transmitir():
   - policy_type        "monthly" ou "annual" (default: "monthly")
 
 Campos opcionais em dados_negocio:
-  - ci_code           Código CI da apólice anterior (obrigatório em renovações)
+  - ci_code           Código CI da apólice anterior (obrigatório quando bonus_anterior > 0;
+                      consta no PDF da apólice — não é retornado pelo /policy/export)
   - installments      Número de parcelas (obrigatório para annual)
   - scheduling_date   Data de início de vigência futura
 """
@@ -143,7 +144,7 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
         "under_24": bool(dados.get("condutor_menor_24", False)),
         "is_insured": bool(dados.get("ja_segurado", False)),
         "previous_bonus": str(dados.get("bonus_anterior") or "0"),
-        "broker_commission_percentage": int(dados.get("comissao_pct") or 15),
+        "broker_commission_percentage": int(dados.get("comissao_pct") or 15),  # faixa 0–25; omitido → default do corretor (15)
     }
 
     condutor_cpf = str(dados.get("condutor_cpf") or "")
