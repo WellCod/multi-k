@@ -1,6 +1,7 @@
 """Rota de dashboard de métricas — corretor e admin."""
 
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated
@@ -15,6 +16,14 @@ from app.infra.db import get_db
 from app.infra.models import Cotacao, CotacaoJob, Proposta
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+@dataclass
+class _CiaStats:
+    cotacoes: int = 0
+    propostas: int = 0
+    premio_total: Decimal = field(default_factory=lambda: Decimal("0"))
+    latencias: list[float] = field(default_factory=list)
 
 
 class DashboardRamoOut(BaseModel):
@@ -128,37 +137,30 @@ async def _calcular_dashboard(
         jobs = res_jobs.scalars().all()
         ranking_truncado = len(jobs) == _jobs_limit
 
-        cia_stats: dict[str, dict[str, object]] = {}
+        cia_stats: dict[str, _CiaStats] = {}
         for job in jobs:
             cia = job.cia
             if cia not in cia_stats:
-                cia_stats[cia] = {
-                    "cotacoes": 0,
-                    "propostas": 0,
-                    "premio_total": Decimal("0"),
-                    "latencias": [],
-                }
-            cia_stats[cia]["cotacoes"] = int(cia_stats[cia]["cotacoes"]) + 1  # type: ignore[operator]
+                cia_stats[cia] = _CiaStats()
+            cia_stats[cia].cotacoes += 1
             if job.processado_em is not None:
                 delta = (job.processado_em - job.criado_em).total_seconds()
-                cia_stats[cia]["latencias"].append(delta)  # type: ignore[union-attr]
+                cia_stats[cia].latencias.append(delta)
             cot = cot_map.get(job.cotacao_id)
             if cot is not None and cot.id in ids_com_prop:
-                cia_stats[cia]["propostas"] = int(cia_stats[cia]["propostas"]) + 1  # type: ignore[operator]
-                cia_stats[cia]["premio_total"] = Decimal(  # type: ignore[assignment]
-                    str(cia_stats[cia]["premio_total"])
-                ) + (job.premio_total or Decimal("0"))
+                cia_stats[cia].propostas += 1
+                cia_stats[cia].premio_total += job.premio_total or Decimal("0")
 
         ranking_cias = sorted(
             [
                 DashboardCiaOut(
                     cia=cia,
-                    cotacoes=int(v["cotacoes"]),  # type: ignore[arg-type]
-                    propostas=int(v["propostas"]),  # type: ignore[arg-type]
-                    premio_total=Decimal(str(v["premio_total"])),
+                    cotacoes=v.cotacoes,
+                    propostas=v.propostas,
+                    premio_total=v.premio_total,
                     latencia_media_s=(
-                        round(sum(v["latencias"]) / len(v["latencias"]), 1)  # type: ignore[arg-type]
-                        if v["latencias"]  # type: ignore[truthy-iterable]
+                        round(sum(v.latencias) / len(v.latencias), 1)
+                        if v.latencias
                         else None
                     ),
                 )
