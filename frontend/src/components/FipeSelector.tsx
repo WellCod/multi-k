@@ -111,6 +111,7 @@ function ComboBox({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const listboxId = `listbox-${label.replace(/\s+/g, "-").toLowerCase()}`;
 
   const selectedLabel = options.find((o) => o.codigo === value)?.nome ?? "";
 
@@ -171,10 +172,20 @@ function ComboBox({
         {label}
       </p>
 
+      {/* Aria-live region for announcing current selection */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {value ? `${label} selecionado: ${selectedLabel}` : ""}
+      </div>
+
       {/* Trigger */}
       {!open ? (
         <button
           type="button"
+          role="combobox"
+          aria-label={`Selecionar ${label} FIPE`}
+          aria-expanded={false}
+          aria-haspopup="listbox"
+          aria-controls={listboxId}
           disabled={disabled}
           onClick={handleOpen}
           className={`${baseCls} ${disabled ? disabledCls : enabledCls}`}
@@ -186,6 +197,7 @@ function ComboBox({
             {value && !disabled && (
               <span
                 role="button"
+                aria-label={`Limpar seleção de ${label}`}
                 onClick={handleClear}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none"
               >
@@ -207,6 +219,12 @@ function ComboBox({
           <input
             ref={inputRef}
             type="text"
+            role="combobox"
+            aria-label={`Buscar ${label} FIPE`}
+            aria-expanded={true}
+            aria-haspopup="listbox"
+            aria-controls={listboxId}
+            aria-autocomplete="list"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={`Buscar ${label.toLowerCase()}...`}
@@ -226,8 +244,10 @@ function ComboBox({
           />
           <ul
             ref={listRef}
+            id={listboxId}
             className="max-h-52 overflow-y-auto"
             role="listbox"
+            aria-label={`Opções de ${label}`}
           >
             {filtered.length === 0 ? (
               <li className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500 italic">

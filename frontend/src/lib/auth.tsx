@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { api, ApiError, setUnauthorizedHandler } from "./api";
@@ -21,9 +22,12 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 
+const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 min
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -34,30 +38,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => setUnauthorizedHandler(() => {});
   }, []);
 
-  // Hydrate from /auth/me equivalent — we test by calling a protected endpoint.
-  // Simple: try GET /dominios; 200 means we're logged in, 401 means not.
+  // Hydrate from /auth/me — authoritative session check with correct user data
   useEffect(() => {
-    api.dominios
-      .list()
-      .then(() => {
-        // We don't have /auth/me yet; store user name from session storage
-        const stored = sessionStorage.getItem("mk_user");
-        if (stored) setUser(JSON.parse(stored) as AuthUser);
-        else setUser({ nome: "Usuário", papel: "corretor" });
-      })
+    api.auth
+      .me()
+      .then((me) => setUser({ nome: me.nome, papel: me.papel }))
       .catch((err: unknown) => {
-        if (err instanceof ApiError && err.status === 401) {
-          setUser(null);
-        }
+        if (err instanceof ApiError && err.status === 401) setUser(null);
       })
       .finally(() => setLoading(false));
   }, []);
 
+  // Proactively refresh session every 30 min while the tab is open
+  useEffect(() => {
+    if (!user) return;
+    refreshTimer.current = setInterval(() => {
+      api.auth.refresh().catch(() => {});
+    }, REFRESH_INTERVAL_MS);
+    return () => {
+      if (refreshTimer.current) clearInterval(refreshTimer.current);
+    };
+  }, [user]);
+
   const login = useCallback(async (email: string, senha: string) => {
     const out = await api.auth.login(email, senha);
-    const u = { nome: out.nome, papel: out.papel };
-    sessionStorage.setItem("mk_user", JSON.stringify(u));
-    setUser(u);
+    setUser({ nome: out.nome, papel: out.papel });
   }, []);
 
   const logout = useCallback(async () => {

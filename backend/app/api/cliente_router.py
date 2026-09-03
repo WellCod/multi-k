@@ -1,10 +1,12 @@
 """Rotas de cliente — CRUD com busca por CPF via índice cego."""
 
+import io
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -468,3 +470,177 @@ async def timeline_cliente(
 
     items.sort(key=lambda x: x.data)
     return items
+
+
+# ---------------------------------------------------------------------------
+# Ficha do cliente em PDF
+# ---------------------------------------------------------------------------
+
+
+def _gerar_ficha_pdf(
+    cliente: Cliente, veiculos: list[Any], imoveis: list[Any]
+) -> bytes:
+    from reportlab.lib import colors  # noqa: PLC0415
+    from reportlab.lib.pagesizes import A4  # noqa: PLC0415
+    from reportlab.lib.styles import getSampleStyleSheet  # noqa: PLC0415
+    from reportlab.lib.units import cm  # noqa: PLC0415
+    from reportlab.platypus import (  # noqa: PLC0415
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+    styles = getSampleStyleSheet()
+    story: list[Any] = []
+
+    story.append(Paragraph("Ficha do Cliente", styles["Title"]))
+    story.append(Spacer(1, 0.4 * cm))
+    gerado_em = datetime.now(UTC).strftime("%d/%m/%Y %H:%M UTC")
+    story.append(Paragraph(f"Gerado em: {gerado_em}", styles["Normal"]))
+    story.append(Spacer(1, 0.6 * cm))
+
+    def _row(label: str, value: object) -> list[str]:
+        return [label, str(value) if value is not None else "—"]
+
+    dados: list[list[str]] = [
+        _row("Nome", cliente.nome),
+        _row("E-mail", cliente.email),
+        _row("Telefone", cliente.telefone),
+        _row("Data de nascimento", cliente.data_nascimento),
+        _row("Sexo", cliente.sexo),
+        _row("Estado civil", cliente.estado_civil),
+        _row("Profissão", cliente.profissao),
+    ]
+    t = Table(dados, colWidths=[5 * cm, 10 * cm])
+    t.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 0),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#F5F5F5")],
+                ),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#DDDDDD")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("PADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    story.append(t)
+
+    if veiculos:
+        story.append(Spacer(1, 0.6 * cm))
+        story.append(Paragraph("Veículos", styles["Heading2"]))
+        vrows = [["Marca", "Modelo", "Ano", "Placa", "CEP pernoite"]]
+        for v in veiculos:
+            vrows.append(
+                [
+                    v.marca,
+                    v.modelo,
+                    str(v.ano_modelo),
+                    v.placa or "—",
+                    v.cep_pernoite,
+                ]
+            )
+        vt = Table(vrows, colWidths=[3.5 * cm, 4 * cm, 2 * cm, 2.5 * cm, 3 * cm])
+        vt.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A5F")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.white, colors.HexColor("#F5F5F5")],
+                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#DDDDDD")),
+                    ("PADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
+        story.append(vt)
+
+    if imoveis:
+        story.append(Spacer(1, 0.6 * cm))
+        story.append(Paragraph("Imóveis", styles["Heading2"]))
+        irows = [["CEP", "Logradouro", "Número", "Tipo", "Construção"]]
+        for im in imoveis:
+            irows.append(
+                [
+                    im.cep,
+                    im.logradouro or "—",
+                    im.numero or "—",
+                    im.tipo_imovel,
+                    im.tipo_construcao,
+                ]
+            )
+        it = Table(irows, colWidths=[2.5 * cm, 5 * cm, 2 * cm, 3 * cm, 2.5 * cm])
+        it.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A5F")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.white, colors.HexColor("#F5F5F5")],
+                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#DDDDDD")),
+                    ("PADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
+        story.append(it)
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+@router.get("/clientes/{cliente_id}/ficha.pdf")
+async def ficha_pdf(
+    cliente_id: uuid.UUID,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> StreamingResponse:
+    """Exporta ficha do cliente em PDF."""
+    cliente = await get_or_404(
+        select(Cliente)
+        .where(Cliente.id == cliente_id)
+        .where(Cliente.usuario_id == usuario.id)
+        .where(Cliente.ativo.is_(True)),
+        db,
+        "Cliente não encontrado.",
+    )
+    veiculos_r = await db.execute(
+        select(Veiculo).where(Veiculo.cliente_id == cliente_id)
+    )
+    imoveis_r = await db.execute(select(Imovel).where(Imovel.cliente_id == cliente_id))
+    pdf_bytes = _gerar_ficha_pdf(
+        cliente, list(veiculos_r.scalars().all()), list(imoveis_r.scalars().all())
+    )
+    filename = f"ficha_{cliente.nome.replace(' ', '_')}.pdf"
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
