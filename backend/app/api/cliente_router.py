@@ -616,7 +616,7 @@ def _gerar_ficha_pdf(
     return buf.getvalue()
 
 
-@router.get("/clientes/{cliente_id}/ficha.pdf")
+@router.get("/{cliente_id}/ficha.pdf")
 async def ficha_pdf(
     cliente_id: uuid.UUID,
     usuario: CurrentUser,
