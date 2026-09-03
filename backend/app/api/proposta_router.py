@@ -72,6 +72,7 @@ class PropostaOut(BaseModel):
     comissao_pct: Decimal
     inicio_vigencia: date | None
     transmitida_em: str
+    numero_apolice: str | None = None
 
 
 class ParcelaOut(BaseModel):
@@ -98,6 +99,7 @@ def _proposta_out(p: Proposta) -> PropostaOut:
         comissao_pct=p.comissao_pct,
         inicio_vigencia=p.inicio_vigencia,
         transmitida_em=p.transmitida_em.isoformat(),
+        numero_apolice=p.numero_apolice,
     )
 
 
@@ -263,3 +265,27 @@ async def listar_parcelas(
             )
         )
     return parcelas
+
+
+class ApoliceInput(BaseModel):
+    numero_apolice: str = Field(min_length=1, max_length=100)
+
+
+@router.patch("/propostas/{proposta_id}/apolice", response_model=PropostaOut)
+async def vincular_apolice(
+    proposta_id: uuid.UUID,
+    body: ApoliceInput,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PropostaOut:
+    """Vincula o número de apólice emitido pela seguradora à proposta."""
+    p = await _get_proposta_ou_404(proposta_id, usuario.id, db)
+    if p.numero_apolice is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Proposta já possui apólice vinculada.",
+        )
+    p.numero_apolice = body.numero_apolice
+    await db.commit()
+    await db.refresh(p)
+    return _proposta_out(p)

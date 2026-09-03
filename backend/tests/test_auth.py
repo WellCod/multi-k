@@ -111,3 +111,43 @@ async def test_logout_com_sid_invalido_nao_levanta(client: AsyncClient) -> None:
     client.cookies.set("sid", "nao-e-um-uuid-valido")
     r = await client.post("/auth/logout")
     assert r.status_code == 200
+
+
+async def test_me_retorna_dados_usuario(db: AsyncSession, client: AsyncClient) -> None:
+    await criar_usuario(db, "me_test@test.com", Papel.CORRETOR)
+    await db.commit()
+    await client.post(
+        "/auth/login", json={"email": "me_test@test.com", "senha": "Senha@123"}
+    )
+
+    r = await client.get("/auth/me")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["email"] == "me_test@test.com"
+    assert body["papel"] == "corretor"
+    assert "id" in body
+    assert "nome" in body
+
+
+async def test_refresh_prorroga_sessao(db: AsyncSession, client: AsyncClient) -> None:
+    await criar_usuario(db, "refresh_test@test.com", Papel.CORRETOR)
+    await db.commit()
+    await client.post(
+        "/auth/login", json={"email": "refresh_test@test.com", "senha": "Senha@123"}
+    )
+
+    r = await client.post("/auth/refresh")
+    assert r.status_code == 200
+    assert "sid" in r.cookies
+
+
+async def test_refresh_sem_cookie_retorna_401(client: AsyncClient) -> None:
+    r = await client.post("/auth/refresh")
+    assert r.status_code == 401
+
+
+async def test_refresh_sid_invalido_retorna_401(client: AsyncClient) -> None:
+    client.cookies.set("sid", "nao-e-uuid-valido")
+    r = await client.post("/auth/refresh")
+    # CSRF middleware blocks (403) when sid cookie present but csrf_token absent
+    assert r.status_code in (401, 403)
