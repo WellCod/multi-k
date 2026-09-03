@@ -165,6 +165,20 @@ async def test_calcular_dashboard_admin_com_jobs(engine: AsyncEngine) -> None:
                 payload_resposta={},
             )
         )
+        # Proposta vinculada — faz ids_com_prop conter cot_id → cobre linhas 136-137
+        session.add(
+            Proposta(
+                cotacao_id=cot_id,
+                protocolo=f"ADM{uid.hex[:8]}",
+                comissao_pct=Decimal("0.1500"),
+                plano_pagamento="AVISTA",
+                n_parcelas=1,
+                valor_parcela=Decimal("1800.00"),
+                comissao_parcela=Decimal("270.00"),
+                usuario_id=uid,
+                tenant_id=TENANT_ID,
+            )
+        )
         await session.commit()
 
     async with factory() as session:
