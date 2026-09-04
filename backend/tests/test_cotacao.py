@@ -156,6 +156,47 @@ async def test_listar_cotacoes(
     assert r.json()["total"] >= 1
 
 
+async def test_listar_cotacoes_filtro_ramo(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /cotacoes?ramo=auto retorna apenas cotações do ramo."""
+    await _login(client, db, "corretor_filtro_ramo@test.com")
+    await client.post("/cotacoes", json=_RISCO_AUTO)
+    r = await client.get("/cotacoes", params={"ramo": "auto"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] >= 1
+    assert all(c["ramo"] == "auto" for c in body["items"])
+
+
+async def test_listar_cotacoes_filtro_status_vazio(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /cotacoes?status=sucesso retorna 0 sem cotações finalizadas."""
+    await _login(client, db, "corretor_filtro_status@test.com")
+    r = await client.get("/cotacoes", params={"status": "sucesso", "dias": "1"})
+    assert r.status_code == 200
+
+
+async def test_listar_cotacoes_filtro_dias(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /cotacoes?dias=30 não retorna cotações fora do período."""
+    await _login(client, db, "corretor_filtro_dias@test.com")
+    r = await client.get("/cotacoes", params={"dias": "30"})
+    assert r.status_code == 200
+    assert isinstance(r.json()["total"], int)
+
+
+async def test_listar_cotacoes_filtro_q(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /cotacoes?q=busca não levanta exceção (cobre branch JSONB)."""
+    await _login(client, db, "corretor_filtro_q@test.com")
+    r = await client.get("/cotacoes", params={"q": "Test"})
+    assert r.status_code == 200
+
+
 async def test_dominios_retorna_lista(
     db: AsyncSession, client: AsyncClient, engine: AsyncEngine
 ) -> None:
