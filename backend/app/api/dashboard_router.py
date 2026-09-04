@@ -1,6 +1,7 @@
 """Rota de dashboard de métricas — corretor e admin."""
 
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated
@@ -17,6 +18,14 @@ from app.infra.models import Cotacao, CotacaoJob, Proposta
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
+@dataclass
+class _CiaStats:
+    cotacoes: int = 0
+    propostas: int = 0
+    premio_total: Decimal = field(default_factory=lambda: Decimal("0"))
+    latencias: list[float] = field(default_factory=list)
+
+
 class DashboardRamoOut(BaseModel):
     ramo: str
     cotacoes: int
@@ -29,6 +38,7 @@ class DashboardCiaOut(BaseModel):
     cotacoes: int
     propostas: int
     premio_total: Decimal
+    latencia_media_s: float | None = None
 
 
 class DashboardOut(BaseModel):
@@ -38,6 +48,7 @@ class DashboardOut(BaseModel):
     ticket_medio: Decimal
     por_ramo: list[DashboardRamoOut]
     ranking_cias: list[DashboardCiaOut]
+    ranking_truncado: bool = False
 
 
 def _corte(periodo: int) -> datetime:
@@ -116,35 +127,42 @@ async def _calcular_dashboard(
     ]
 
     ranking_cias: list[DashboardCiaOut] = []
+    ranking_truncado = False
+    _jobs_limit = 10_000
     if is_admin:
-        q_jobs = select(CotacaoJob).where(CotacaoJob.criado_em >= inicio).limit(10_000)
+        q_jobs = (
+            select(CotacaoJob).where(CotacaoJob.criado_em >= inicio).limit(_jobs_limit)
+        )
         res_jobs = await db.execute(q_jobs)
         jobs = res_jobs.scalars().all()
+        ranking_truncado = len(jobs) == _jobs_limit
 
-        cia_stats: dict[str, dict[str, int | Decimal]] = {}
+        cia_stats: dict[str, _CiaStats] = {}
         for job in jobs:
             cia = job.cia
             if cia not in cia_stats:
-                cia_stats[cia] = {
-                    "cotacoes": 0,
-                    "propostas": 0,
-                    "premio_total": Decimal("0"),
-                }
-            cia_stats[cia]["cotacoes"] = int(cia_stats[cia]["cotacoes"]) + 1
+                cia_stats[cia] = _CiaStats()
+            cia_stats[cia].cotacoes += 1
+            if job.processado_em is not None:
+                delta = (job.processado_em - job.criado_em).total_seconds()
+                cia_stats[cia].latencias.append(delta)
             cot = cot_map.get(job.cotacao_id)
             if cot is not None and cot.id in ids_com_prop:
-                cia_stats[cia]["propostas"] = int(cia_stats[cia]["propostas"]) + 1
-                cia_stats[cia]["premio_total"] = Decimal(
-                    str(cia_stats[cia]["premio_total"])
-                ) + (job.premio_total or Decimal("0"))
+                cia_stats[cia].propostas += 1
+                cia_stats[cia].premio_total += job.premio_total or Decimal("0")
 
         ranking_cias = sorted(
             [
                 DashboardCiaOut(
                     cia=cia,
-                    cotacoes=int(v["cotacoes"]),
-                    propostas=int(v["propostas"]),
-                    premio_total=Decimal(str(v["premio_total"])),
+                    cotacoes=v.cotacoes,
+                    propostas=v.propostas,
+                    premio_total=v.premio_total,
+                    latencia_media_s=(
+                        round(sum(v.latencias) / len(v.latencias), 1)
+                        if v.latencias
+                        else None
+                    ),
                 )
                 for cia, v in cia_stats.items()
             ],
@@ -159,6 +177,7 @@ async def _calcular_dashboard(
         ticket_medio=ticket_medio,
         por_ramo=por_ramo,
         ranking_cias=ranking_cias,
+        ranking_truncado=ranking_truncado,
     )
 
 

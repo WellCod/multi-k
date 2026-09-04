@@ -341,3 +341,47 @@ async def recotar(
     await db.commit()
 
     return CotacaoCriadaOut(id=nova.id, status=nova.status, ramo=nova.ramo)
+
+
+class VersaoPremioOut(BaseModel):
+    id: uuid.UUID
+    criado_em: str
+    premio_total: Decimal | None
+    ramo: str
+
+
+@router.get("/{cotacao_id}/versoes", response_model=list[VersaoPremioOut])
+async def historico_versoes(
+    cotacao_id: uuid.UUID,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[VersaoPremioOut]:
+    """Retorna a cadeia de recotações a partir de qualquer versão (até 20)."""
+    versoes: list[VersaoPremioOut] = []
+    atual_id: uuid.UUID | None = cotacao_id
+    visitados: set[uuid.UUID] = set()
+
+    while atual_id is not None and len(versoes) < 20:
+        if atual_id in visitados:
+            break
+        visitados.add(atual_id)
+        stmt = (
+            select(Cotacao)
+            .where(Cotacao.id == atual_id)
+            .where(Cotacao.usuario_id == usuario.id)
+        )
+        cot = (await db.execute(stmt)).scalar_one_or_none()
+        if cot is None:
+            break
+        versoes.append(
+            VersaoPremioOut(
+                id=cot.id,
+                criado_em=cot.criado_em.isoformat(),
+                premio_total=cot.premio_total,
+                ramo=cot.ramo,
+            )
+        )
+        atual_id = cot.versao_anterior_id
+
+    versoes.reverse()
+    return versoes

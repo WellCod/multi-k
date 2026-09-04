@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type DashboardOut } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatBRL } from "@/lib/utils";
+import { KpiCard } from "@/components/KpiCard";
 
 const PERIODOS = [
   { label: "7 dias", value: 7 },
@@ -14,25 +15,7 @@ function fmtPct(v: string) {
   return `${(Number(v) * 100).toFixed(1)}%`;
 }
 
-function KpiCard({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
-        {label}
-      </p>
-      <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-    </div>
-  );
-}
+
 
 function BarH({
   label,
@@ -174,18 +157,33 @@ export function DashboardPage() {
           {/* Ranking CIAs — admin only */}
           {isAdmin && data.ranking_cias.length > 0 && (
             <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                Ranking de seguradoras
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Ranking de seguradoras
+                </h2>
+                {data.ranking_truncado && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded px-2 py-0.5">
+                    Volume alto — dados parciais
+                  </span>
+                )}
+              </div>
               <div className="space-y-3">
                 {data.ranking_cias.map((c) => (
-                  <BarH
-                    key={c.cia}
-                    label={c.cia}
-                    value={Number(c.premio_total)}
-                    max={Math.max(...data.ranking_cias.map((x) => Number(x.premio_total)))}
-                    extra={`${formatBRL(c.premio_total)} · ${c.propostas} prop.`}
-                  />
+                  <div key={c.cia}>
+                    <BarH
+                      label={c.cia}
+                      value={Number(c.premio_total)}
+                      max={Math.max(...data.ranking_cias.map((x) => Number(x.premio_total)))}
+                      extra={`${formatBRL(c.premio_total)} · ${c.propostas} prop.`}
+                    />
+                    {c.latencia_media_s !== null && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 ml-28 mt-0.5">
+                        SLA médio: {c.latencia_media_s < 60
+                          ? `${c.latencia_media_s}s`
+                          : `${(c.latencia_media_s / 60).toFixed(1)}min`}
+                      </p>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

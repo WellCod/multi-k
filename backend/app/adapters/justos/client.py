@@ -44,9 +44,16 @@ def _base_url() -> str:
 
 
 def _gerar_jwt() -> str:
-    raw_pem = get_secret("JUSTOS_PRIVATE_KEY")
-    # Suporta chave com \\n escapado (comum em variáveis de ambiente)
-    private_key_pem = raw_pem.replace("\\n", "\n")
+    # JUSTOS_PRIVATE_KEY_PATH: caminho do arquivo (dev local, fora do projeto)
+    # JUSTOS_PRIVATE_KEY: conteúdo PEM inline (produção via GCP Secret Manager)
+    key_path = get_optional_secret("JUSTOS_PRIVATE_KEY_PATH")
+    if key_path:
+        import pathlib
+
+        private_key_pem = pathlib.Path(key_path).read_text()
+    else:
+        raw_pem = get_secret("JUSTOS_PRIVATE_KEY")
+        private_key_pem = raw_pem.replace("\\n", "\n")
     partner_name = get_secret("JUSTOS_PARTNER_NAME")
     now = int(time.time())
     payload: dict[str, object] = {
@@ -77,8 +84,16 @@ async def _obter_token() -> str:
         resp.raise_for_status()
         data: dict[str, Any] = resp.json()
 
-    _cache.token = str(data["token"])
-    _cache.expira_em = now + 3600.0  # token válido 60 min
+    token_str = str(data["token"])
+    # Lê o exp do próprio JWT retornado — mais robusto que hardcode de 60 min
+    try:
+        decoded = jwt.decode(token_str, options={"verify_signature": False})
+        exp_unix = int(decoded["exp"])
+        # Converte wall-clock → monotonic para comparação consistente
+        _cache.expira_em = now + (exp_unix - time.time())
+    except Exception:
+        _cache.expira_em = now + 3600.0
+    _cache.token = token_str
     return _cache.token
 
 
