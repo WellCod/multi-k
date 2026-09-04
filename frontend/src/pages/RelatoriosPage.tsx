@@ -398,13 +398,13 @@ export function RelatoriosPage() {
                 </h2>
                 <div className="flex gap-2">
                   <a
-                    href={api.relatorios.exportUrl("producao", periodo, "csv")}
+                    href={api.relatorios.exportUrl("producao", periodoParam, "csv", fromParam, toParam)}
                     className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                   >
                     ↓ CSV
                   </a>
                   <a
-                    href={api.relatorios.exportUrl("producao", periodo, "xlsx")}
+                    href={api.relatorios.exportUrl("producao", periodoParam, "xlsx", fromParam, toParam)}
                     className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                   >
                     ↓ XLSX

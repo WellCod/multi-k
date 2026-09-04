@@ -536,3 +536,34 @@ async def test_vincular_apolice_proposta_nao_encontrada_retorna_404(
         json={"numero_apolice": "APOLICE-X"},
     )
     assert r.status_code == 404
+
+
+async def test_vincular_apolice_registra_audit(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Vincular apólice deve registrar evento 'apolice.vinculada' na auditoria."""
+    from sqlalchemy import select
+
+    from app.infra.models import Auditoria
+
+    cotacao_id = await _criar_cotacao_processada(
+        client, db, engine, "corretor_apo_audit@test.com"
+    )
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir", json=_TRANSMITIR_BODY
+    )
+    assert r_tx.status_code == 201
+    proposta_id = r_tx.json()["id"]
+
+    r = await client.patch(
+        f"/propostas/{proposta_id}/apolice",
+        json={"numero_apolice": "AUDIT-001"},
+    )
+    assert r.status_code == 200
+
+    result = await db.execute(
+        select(Auditoria).where(Auditoria.tipo == "apolice.vinculada")
+    )
+    log = result.scalars().first()
+    assert log is not None
+    assert log.dados["numero_apolice"] == "AUDIT-001"
