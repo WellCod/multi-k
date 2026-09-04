@@ -172,7 +172,7 @@ async def test_listar_cotacoes_filtro_ramo(
 async def test_listar_cotacoes_filtro_status_vazio(
     db: AsyncSession, client: AsyncClient, engine: AsyncEngine
 ) -> None:
-    """GET /cotacoes?status=sucesso retorna 0 quando não há cotações com sucesso imediato."""
+    """GET /cotacoes?status=sucesso retorna 0 sem cotações finalizadas."""
     await _login(client, db, "corretor_filtro_status@test.com")
     r = await client.get("/cotacoes", params={"status": "sucesso", "dias": "1"})
     assert r.status_code == 200
