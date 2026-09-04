@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AdminUser, CurrentUser
@@ -55,6 +55,13 @@ class MixOut(BaseModel):
     ramo: str
     count: int
     pct: Decimal
+    premio_total: Decimal
+
+
+class ComissaoRamoOut(BaseModel):
+    ramo: str
+    n_propostas: int
+    comissao_total: Decimal
     premio_total: Decimal
 
 
@@ -358,6 +365,57 @@ async def relatorio_mix(
     uid = None if usuario.papel == "admin" else usuario.id
     inicio, fim = _resolve_corte(periodo, date_from, date_to)
     return await _dados_mix(db, inicio, fim, uid)
+
+
+# ---------------------------------------------------------------------------
+# Comissões por ramo
+# ---------------------------------------------------------------------------
+
+
+@router.get("/comissoes", response_model=list[ComissaoRamoOut])
+async def relatorio_comissoes(
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    periodo: int = Query(default=30, ge=1, le=365),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
+) -> list[ComissaoRamoOut]:
+    """Comissão total emitida por ramo no período. Corretor vê só os próprios."""
+    inicio, fim = _resolve_corte(periodo, date_from, date_to)
+    base = Proposta.transmitida_em >= inicio
+    base = base & (Proposta.transmitida_em <= fim)
+    base = base & (Proposta.tenant_id == TENANT_ID)
+    if usuario.papel != "admin":
+        base = base & (Proposta.usuario_id == usuario.id)
+
+    comissao_expr = func.sum(Proposta.comissao_parcela * Proposta.n_parcelas)
+    premio_expr = func.sum(Cotacao.premio_total)
+
+    rows = await db.execute(
+        select(
+            Cotacao.ramo,
+            func.count(Proposta.id).label("n_propostas"),
+            comissao_expr.label("comissao_total"),
+            premio_expr.label("premio_total"),
+        )
+        .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
+        .where(base)
+        .group_by(Cotacao.ramo)
+        .order_by(comissao_expr.desc())
+    )
+    return [
+        ComissaoRamoOut(
+            ramo=row.ramo,
+            n_propostas=row.n_propostas,
+            comissao_total=(row.comissao_total or Decimal("0")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            ),
+            premio_total=(row.premio_total or Decimal("0")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            ),
+        )
+        for row in rows
+    ]
 
 
 # ---------------------------------------------------------------------------

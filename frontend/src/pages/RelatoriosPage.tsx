@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   api,
+  type ComissaoRamoOut,
   type FunilOut,
   type MixOut,
   type ProducaoOut,
@@ -222,6 +223,60 @@ function Mix({ dados }: { dados: MixOut[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// Comissões por ramo
+// ---------------------------------------------------------------------------
+
+function TabelaComissoes({ dados }: { dados: ComissaoRamoOut[] }) {
+  if (dados.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <span className="text-3xl">💰</span>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
+          Sem comissões no período.
+        </p>
+      </div>
+    );
+  }
+  const totalComissao = dados.reduce((s, r) => s + Number(r.comissao_total), 0);
+  const totalPremio = dados.reduce((s, r) => s + Number(r.premio_total), 0);
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 dark:text-gray-400">
+            <th className="px-4 py-2.5">Ramo</th>
+            <th className="px-4 py-2.5 text-right">Propostas</th>
+            <th className="px-4 py-2.5 text-right">Prêmio total</th>
+            <th className="px-4 py-2.5 text-right">Comissão total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {dados.map((r) => (
+            <tr
+              key={r.ramo}
+              className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+            >
+              <td className="px-4 py-3 font-medium capitalize text-gray-900 dark:text-white">{r.ramo}</td>
+              <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{r.n_propostas}</td>
+              <td className="px-4 py-3 text-right font-mono text-gray-900 dark:text-white">{formatBRL(r.premio_total)}</td>
+              <td className="px-4 py-3 text-right font-mono text-green-700 dark:text-green-400 font-semibold">{formatBRL(r.comissao_total)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="bg-gray-50 dark:bg-gray-700/50 border-t-2 border-gray-200 dark:border-gray-700 font-semibold text-xs text-gray-600 dark:text-gray-300">
+            <td className="px-4 py-2.5">Total</td>
+            <td className="px-4 py-2.5 text-right">{dados.reduce((s, r) => s + r.n_propostas, 0)}</td>
+            <td className="px-4 py-2.5 text-right font-mono">{formatBRL(String(totalPremio))}</td>
+            <td className="px-4 py-2.5 text-right font-mono text-green-700 dark:text-green-400">{formatBRL(String(totalComissao))}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Página principal
 // ---------------------------------------------------------------------------
 
@@ -234,6 +289,7 @@ export function RelatoriosPage() {
   const [producao, setProducao] = useState<ProducaoOut[] | null>(null);
   const [funil, setFunil] = useState<FunilOut | null>(null);
   const [mix, setMix] = useState<MixOut[] | null>(null);
+  const [comissoes, setComissoes] = useState<ComissaoRamoOut[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -250,17 +306,21 @@ export function RelatoriosPage() {
           api.relatorios.producao(periodoParam, fromParam, toParam),
           api.relatorios.funil(periodoParam, fromParam, toParam),
           api.relatorios.mix(periodoParam, fromParam, toParam),
-        ]).then(([p, f, m]) => {
+          api.relatorios.comissoes(periodoParam, fromParam, toParam),
+        ]).then(([p, f, m, c]) => {
           setProducao(p);
           setFunil(f);
           setMix(m);
+          setComissoes(c);
         })
       : Promise.all([
           api.relatorios.funil(periodoParam, fromParam, toParam),
           api.relatorios.mix(periodoParam, fromParam, toParam),
-        ]).then(([f, m]) => {
+          api.relatorios.comissoes(periodoParam, fromParam, toParam),
+        ]).then(([f, m, c]) => {
           setFunil(f);
           setMix(m);
+          setComissoes(c);
         });
     requests
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Erro"))
@@ -395,6 +455,25 @@ export function RelatoriosPage() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Comissões por ramo */}
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Comissões por ramo
+              </h2>
+            </div>
+            {comissoes ? (
+              <TabelaComissoes dados={comissoes} />
+            ) : (
+              <div className="py-10 text-center">
+                <span className="text-3xl">💰</span>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-3">
+                  Sem dados no período.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
