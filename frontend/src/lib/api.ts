@@ -412,6 +412,7 @@ export interface Cotacao {
   criado_em: string;
   dados_risco: Record<string, unknown>;
   proposta_id: string | null;
+  numero_apolice: string | null;
 }
 
 export interface PaginatedCotacoes {
