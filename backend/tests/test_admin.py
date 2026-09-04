@@ -493,14 +493,14 @@ async def test_direct_listar_comissoes(db: AsyncSession) -> None:
     body = ComissaoConfigIn(pct_padrao="0.1500")
     cfg = await _upsert(cia="direct_cia", ramo="auto", _usuario=admin, db=db, body=body)
     assert cfg.cia == "direct_cia"
-    assert cfg.pct_padrao == "0.1500"
+    assert str(cfg.pct_padrao) == "0.1500"
 
     # upsert atualiza — cobre linhas 260-268 (branch if)
     body2 = ComissaoConfigIn(pct_padrao="0.2000")
     cfg2 = await _upsert(
         cia="direct_cia", ramo="auto", _usuario=admin, db=db, body=body2
     )
-    assert cfg2.pct_padrao == "0.2000"
+    assert str(cfg2.pct_padrao) == "0.2000"
 
     # get existente — cobre linha 248
     found = await _get(cia="direct_cia", ramo="auto", _usuario=admin, db=db)
