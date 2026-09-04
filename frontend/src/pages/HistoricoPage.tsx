@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Cotacao, type PaginatedCotacoes } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Pagination } from "@/components/Pagination";
 import { Tooltip } from "@/components/Tooltip";
 import { formatBRL, formatDate } from "@/lib/utils";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 function nomeProponente(dados: Record<string, unknown>): string {
   const prop = dados.proponente as Record<string, unknown> | undefined;
@@ -86,81 +86,73 @@ function RestricoesList({ restricoes }: { restricoes: { codigo: string; mensagem
 }
 
 export function HistoricoPage() {
-  const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
-  const [serverTotal, setServerTotal] = useState(0);
+  const [data, setData] = useState<PaginatedCotacoes | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [filtroRamo, setFiltroRamo] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroDias, setFiltroDias] = useState(0);
-  const [valorMin, setValorMin] = useState("");
-  const [valorMax, setValorMax] = useState("");
   const [page, setPage] = useState(1);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const fetchCotacoes = useCallback((opts: {
+    page: number;
+    ramo: string;
+    status: string;
+    dias: number;
+    q: string;
+  }) => {
+    setLoading(true);
+    setErr(null);
     api.cotacoes
-      .list({ page_size: 100 })
-      .then((r: PaginatedCotacoes) => {
-        setCotacoes(r.items);
-        setServerTotal(r.total);
+      .list({
+        page: opts.page,
+        page_size: PAGE_SIZE,
+        ramo: opts.ramo || undefined,
+        status: opts.status || undefined,
+        dias: opts.dias || undefined,
+        q: opts.q.trim() || undefined,
       })
+      .then((r: PaginatedCotacoes) => setData(r))
       .catch((e: unknown) =>
         setErr(e instanceof Error ? e.message : "Erro ao carregar histórico"),
       )
       .finally(() => setLoading(false));
   }, []);
 
+  // Re-fetch whenever filter params change (debounce busca)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchCotacoes({ page, ramo: filtroRamo, status: filtroStatus, dias: filtroDias, q: busca });
+    }, busca ? 350 : 0);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [page, filtroRamo, filtroStatus, filtroDias, busca]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset to page 1 when filters change (not page itself)
   useEffect(() => {
     setPage(1);
-  }, [busca, filtroRamo, filtroStatus, filtroDias, valorMin, valorMax]);
+  }, [busca, filtroRamo, filtroStatus, filtroDias]);
 
-  const ramos = useMemo(
-    () => [...new Set(cotacoes.map((c) => c.ramo))].sort(),
-    [cotacoes],
-  );
-
-  const filtradas = useMemo(() => {
-    const q = busca.trim().toLowerCase();
-    const corte =
-      filtroDias > 0
-        ? new Date(Date.now() - filtroDias * 86_400_000).toISOString()
-        : null;
-    const vMin = valorMin ? parseFloat(valorMin) : null;
-    const vMax = valorMax ? parseFloat(valorMax) : null;
-    return cotacoes.filter((c) => {
-      if (filtroRamo && c.ramo !== filtroRamo) return false;
-      if (filtroStatus && c.status !== filtroStatus) return false;
-      if (corte && c.criado_em < corte) return false;
-      const premio = c.premio_total ? parseFloat(c.premio_total) : null;
-      if (vMin !== null && (premio === null || premio < vMin)) return false;
-      if (vMax !== null && (premio === null || premio > vMax)) return false;
-      if (!q) return true;
-      return (
-        c.ramo.toLowerCase().includes(q) ||
-        c.status.toLowerCase().includes(q) ||
-        (c.cotacao_id_cia?.toLowerCase().includes(q) ?? false) ||
-        nomeProponente(c.dados_risco).toLowerCase().includes(q)
-      );
-    });
-  }, [cotacoes, busca, filtroRamo, filtroStatus, filtroDias, valorMin, valorMax]);
-
-  const paginated = filtradas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const temFiltroAtivo = busca || filtroRamo || filtroStatus || filtroDias > 0 || valorMin || valorMax;
+  const temFiltroAtivo = busca || filtroRamo || filtroStatus || filtroDias > 0;
 
   function limparFiltros() {
     setBusca("");
     setFiltroRamo("");
     setFiltroStatus("");
     setFiltroDias(0);
-    setValorMin("");
-    setValorMax("");
   }
 
   const selectClass =
     "border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+  const cotacoes: Cotacao[] = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const pages = data?.pages ?? 1;
 
   return (
     <div className="space-y-5">
@@ -170,11 +162,9 @@ export function HistoricoPage() {
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
             Histórico de cotações
           </h1>
-          {!loading && !err && (
+          {!loading && !err && data && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {temFiltroAtivo
-                ? `${filtradas.length} de ${cotacoes.length} carregadas`
-                : `${serverTotal} cotação${serverTotal !== 1 ? "ões" : ""} no total`}
+              {total} cotação{total !== 1 ? "ões" : ""}{temFiltroAtivo ? " encontrada" + (total !== 1 ? "s" : "") : " no total"}
             </p>
           )}
         </div>
@@ -196,7 +186,7 @@ export function HistoricoPage() {
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap gap-2">
           <Input
-            placeholder="Buscar proponente, ID, ramo…"
+            placeholder="Buscar proponente ou ID CIA…"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="min-w-[200px] flex-1"
@@ -207,7 +197,7 @@ export function HistoricoPage() {
             className={selectClass}
           >
             <option value="">Todos os ramos</option>
-            {ramos.map((r) => (
+            {["auto", "imovel", "vida", "empresarial"].map((r) => (
               <option key={r} value={r}>
                 {RAMO_ICON[r] ?? ""} {r.charAt(0).toUpperCase() + r.slice(1)}
               </option>
@@ -240,31 +230,10 @@ export function HistoricoPage() {
             <option value={90}>Últimos 90 dias</option>
             <option value={365}>Último ano</option>
           </select>
-        </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Prêmio:</span>
-          <Input
-            type="number"
-            placeholder="Mín (R$)"
-            value={valorMin}
-            onChange={(e) => setValorMin(e.target.value)}
-            className="w-32"
-            min={0}
-          />
-          <span className="text-xs text-gray-400">até</span>
-          <Input
-            type="number"
-            placeholder="Máx (R$)"
-            value={valorMax}
-            onChange={(e) => setValorMax(e.target.value)}
-            className="w-32"
-            min={0}
-          />
           {temFiltroAtivo && (
             <button
               onClick={limparFiltros}
-              className="ml-auto text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 underline"
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 underline self-center"
             >
               Limpar filtros
             </button>
@@ -278,8 +247,6 @@ export function HistoricoPage() {
             {filtroRamo && <ActiveFilterChip label={`Ramo: ${filtroRamo}`} onRemove={() => setFiltroRamo("")} />}
             {filtroStatus && <ActiveFilterChip label={`Status: ${filtroStatus}`} onRemove={() => setFiltroStatus("")} />}
             {filtroDias > 0 && <ActiveFilterChip label={filtroDias === 365 ? "Último ano" : `Últimos ${filtroDias} dias`} onRemove={() => setFiltroDias(0)} />}
-            {valorMin && <ActiveFilterChip label={`Min R$ ${valorMin}`} onRemove={() => setValorMin("")} />}
-            {valorMax && <ActiveFilterChip label={`Máx R$ ${valorMax}`} onRemove={() => setValorMax("")} />}
           </div>
         )}
       </div>
@@ -299,7 +266,7 @@ export function HistoricoPage() {
       )}
 
       {/* Empty state */}
-      {!loading && !err && filtradas.length === 0 && (
+      {!loading && !err && cotacoes.length === 0 && (
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-16 text-center">
           <p className="text-4xl mb-3">🔍</p>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -317,10 +284,10 @@ export function HistoricoPage() {
       )}
 
       {/* Lista */}
-      {!loading && !err && filtradas.length > 0 && (
+      {!loading && !err && cotacoes.length > 0 && (
         <>
           <div className="space-y-2">
-            {paginated.map((c) => {
+            {cotacoes.map((c) => {
               const nome = nomeProponente(c.dados_risco);
               return (
                 <div
@@ -328,7 +295,6 @@ export function HistoricoPage() {
                   className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                 >
                   <div className="flex items-start gap-4">
-                    {/* Ícone + info principal */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <RamoIcon ramo={c.ramo} />
@@ -375,7 +341,6 @@ export function HistoricoPage() {
                       <RestricoesList restricoes={c.restricoes} />
                     </div>
 
-                    {/* Prêmio + ações */}
                     <div className="flex-shrink-0 text-right space-y-2">
                       {c.premio_total ? (
                         <p className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
@@ -420,10 +385,15 @@ export function HistoricoPage() {
 
           <Pagination
             page={page}
-            total={filtradas.length}
+            total={total}
             perPage={PAGE_SIZE}
             onChange={setPage}
           />
+          {pages > 1 && (
+            <p className="text-xs text-center text-gray-400 dark:text-gray-500">
+              Página {page} de {pages}
+            </p>
+          )}
         </>
       )}
     </div>
