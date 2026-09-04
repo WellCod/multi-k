@@ -1,7 +1,8 @@
 """Rotas de gestão de usuários — visível apenas para admins."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,11 +10,11 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import AdminUser
+from app.api.deps import AdminUser, CurrentUser
 from app.infra import audit
 from app.infra.auth_service import hash_senha
 from app.infra.db import get_db
-from app.infra.models import Usuario
+from app.infra.models import ComissaoConfig, Usuario
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -192,4 +193,98 @@ async def reset_senha(
         dados={"usuario_id": str(usuario_id)},
         usuario_id=_usuario.id,
     )
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Gestão de Comissão por CIA
+# ---------------------------------------------------------------------------
+
+
+class ComissaoConfigOut(BaseModel):
+    cia: str
+    ramo: str
+    pct_padrao: Decimal
+    atualizado_em: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ComissaoConfigIn(BaseModel):
+    pct_padrao: Decimal
+
+    @field_validator("pct_padrao")
+    @classmethod
+    def validar_pct(cls, v: Decimal) -> Decimal:
+        if not (Decimal("0.0001") <= v <= Decimal("0.3000")):
+            raise ValueError("pct_padrao deve ser entre 0.01% e 30%")
+        return v
+
+
+@router.get("/comissoes", response_model=list[ComissaoConfigOut])
+async def listar_comissoes(
+    _usuario: AdminUser,
+    db: Db,
+) -> list[ComissaoConfigOut]:
+    result = await db.execute(
+        select(ComissaoConfig).order_by(ComissaoConfig.cia, ComissaoConfig.ramo)
+    )
+    return [ComissaoConfigOut.model_validate(c) for c in result.scalars().all()]
+
+
+@router.get("/comissoes/{cia}/{ramo}", response_model=ComissaoConfigOut)
+async def get_comissao(
+    cia: str,
+    ramo: str,
+    _usuario: CurrentUser,
+    db: Db,
+) -> ComissaoConfigOut:
+    cfg = await db.get(ComissaoConfig, (cia, ramo))
+    if cfg is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Configuração de comissão não encontrada.",
+        )
+    return ComissaoConfigOut.model_validate(cfg)
+
+
+@router.put("/comissoes/{cia}/{ramo}", response_model=ComissaoConfigOut)
+async def upsert_comissao(
+    cia: str,
+    ramo: str,
+    _usuario: AdminUser,
+    db: Db,
+    body: ComissaoConfigIn,
+) -> ComissaoConfigOut:
+    existing = await db.get(ComissaoConfig, (cia, ramo))
+    if existing is not None:
+        existing.pct_padrao = body.pct_padrao
+        existing.atualizado_em = datetime.now(UTC)
+    else:
+        existing = ComissaoConfig(
+            cia=cia, ramo=ramo, pct_padrao=body.pct_padrao
+        )
+        db.add(existing)
+    await db.commit()
+    await db.refresh(existing)
+    return ComissaoConfigOut.model_validate(existing)
+
+
+@router.delete(
+    "/comissoes/{cia}/{ramo}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_comissao(
+    cia: str,
+    ramo: str,
+    _usuario: AdminUser,
+    db: Db,
+) -> None:
+    cfg = await db.get(ComissaoConfig, (cia, ramo))
+    if cfg is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Configuração de comissão não encontrada.",
+        )
+    await db.delete(cfg)
     await db.commit()

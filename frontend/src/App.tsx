@@ -17,6 +17,7 @@ const RelatoriosPage = lazy(() => import("@/pages/RelatoriosPage").then((m) => (
 const AuditoriaPage = lazy(() => import("@/pages/AuditoriaPage").then((m) => ({ default: m.AuditoriaPage })));
 const UsuariosPage = lazy(() => import("@/pages/UsuariosPage").then((m) => ({ default: m.UsuariosPage })));
 const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
+const ComissoesPage = lazy(() => import("@/pages/ComissoesPage").then((m) => ({ default: m.ComissoesPage })));
 
 function PageLoader() {
   return (
@@ -144,6 +145,16 @@ function AppRoutes() {
           <RequireAuth>
             <Layout>
               <UsuariosPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/comissoes"
+        element={
+          <RequireAuth>
+            <Layout>
+              <ComissoesPage />
             </Layout>
           </RequireAuth>
         }
