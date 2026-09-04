@@ -329,3 +329,56 @@ async def test_mix_com_date_from_e_date_to(
     )
     assert r.status_code == 200
     assert isinstance(r.json(), list)
+
+
+# ---------------------------------------------------------------------------
+# Comissões por ramo
+# ---------------------------------------------------------------------------
+
+
+async def test_comissoes_corretor_retorna_lista(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await _login(client, db, "cor_com_list@test.com")
+    r = await client.get("/relatorios/comissoes")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+async def test_comissoes_sem_auth_retorna_401(client: AsyncClient) -> None:
+    r = await client.get("/relatorios/comissoes")
+    assert r.status_code == 401
+
+
+async def test_comissoes_com_dados_retorna_estrutura(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Comissões com proposta real devem retornar ramo, n_propostas, totais."""
+    await _criar_proposta(client, db, engine, "cor_com_dados@test.com")
+    r = await client.get("/relatorios/comissoes")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body) >= 1
+    item = body[0]
+    assert "ramo" in item
+    assert "n_propostas" in item
+    assert "comissao_total" in item
+    assert "premio_total" in item
+    assert item["n_propostas"] >= 1
+
+
+async def test_comissoes_com_date_range(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Comissões com date_from e date_to deve respeitar o intervalo."""
+    from datetime import date, timedelta
+
+    await _login(client, db, "cor_com_range@test.com")
+    date_from = (date.today() - timedelta(days=30)).isoformat()
+    date_to = date.today().isoformat()
+    r = await client.get(
+        "/relatorios/comissoes",
+        params={"date_from": date_from, "date_to": date_to},
+    )
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
