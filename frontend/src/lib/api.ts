@@ -154,10 +154,14 @@ export const api = {
         body: JSON.stringify(body),
       }),
     get: (id: string) => request<Cotacao>(`/cotacoes/${id}`),
-    list: (params?: { page?: number; page_size?: number }) => {
+    list: (params?: { page?: number; page_size?: number; ramo?: string; status?: string; q?: string; dias?: number }) => {
       const p = new URLSearchParams();
       if (params?.page) p.set("page", String(params.page));
       if (params?.page_size) p.set("page_size", String(params.page_size));
+      if (params?.ramo) p.set("ramo", params.ramo);
+      if (params?.status) p.set("status", params.status);
+      if (params?.q) p.set("q", params.q);
+      if (params?.dias) p.set("dias", String(params.dias));
       const qs = p.toString();
       return request<PaginatedCotacoes>(`/cotacoes${qs ? `?${qs}` : ""}`);
     },
