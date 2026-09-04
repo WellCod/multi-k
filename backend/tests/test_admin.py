@@ -465,3 +465,56 @@ async def test_upsert_comissao_pct_invalido_retorna_422(
         json={"pct_padrao": "0.9999"},
     )
     assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Testes diretos — cobrem corpos dos handlers sem depender de HTTP/auth
+# ---------------------------------------------------------------------------
+
+
+async def test_direct_listar_comissoes(db: AsyncSession) -> None:
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.admin_router import ComissaoConfigIn
+    from app.api.admin_router import delete_comissao as _delete
+    from app.api.admin_router import get_comissao as _get
+    from app.api.admin_router import listar_comissoes as _list
+    from app.api.admin_router import upsert_comissao as _upsert
+
+    admin = await criar_usuario(db, "direct_comissao@test.com", Papel.ADMIN)
+    await db.commit()
+
+    # listar (vazia ou não — cobre linha 232)
+    result = await _list(_usuario=admin, db=db)
+    assert isinstance(result, list)
+
+    # upsert cria — cobre linhas 260-268 (branch else)
+    body = ComissaoConfigIn(pct_padrao="0.1500")
+    cfg = await _upsert(cia="direct_cia", ramo="auto", _usuario=admin, db=db, body=body)
+    assert cfg.cia == "direct_cia"
+    assert cfg.pct_padrao == "0.1500"
+
+    # upsert atualiza — cobre linhas 260-268 (branch if)
+    body2 = ComissaoConfigIn(pct_padrao="0.2000")
+    cfg2 = await _upsert(
+        cia="direct_cia", ramo="auto", _usuario=admin, db=db, body=body2
+    )
+    assert cfg2.pct_padrao == "0.2000"
+
+    # get existente — cobre linha 248
+    found = await _get(cia="direct_cia", ramo="auto", _usuario=admin, db=db)
+    assert found.cia == "direct_cia"
+
+    # get inexistente — cobre linhas 243-247
+    with pytest.raises(HTTPException) as exc:
+        await _get(cia="nao_existe", ramo="auto", _usuario=admin, db=db)
+    assert exc.value.status_code == 404
+
+    # delete existente — cobre linhas 282-288
+    await _delete(cia="direct_cia", ramo="auto", _usuario=admin, db=db)
+
+    # delete inexistente — cobre linhas 282-285
+    with pytest.raises(HTTPException) as exc2:
+        await _delete(cia="nao_existe", ramo="auto", _usuario=admin, db=db)
+    assert exc2.value.status_code == 404
