@@ -382,3 +382,139 @@ async def test_direct_reset_senha(db: AsyncSession) -> None:
     with pytest.raises(HTTPException) as exc:
         await _reset(usuario_id=uuid.uuid4(), _usuario=admin, db=db, body=body)
     assert exc.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Gestão de Comissão por CIA — /admin/comissoes
+# ---------------------------------------------------------------------------
+
+
+async def test_listar_comissoes_admin(db: AsyncSession, client: AsyncClient) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_list@test.com")
+    r = await client.get("/admin/comissoes")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+async def test_upsert_comissao_cria(db: AsyncSession, client: AsyncClient) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_cria@test.com")
+    r = await client.put(
+        "/admin/comissoes/justos/auto",
+        json={"pct_padrao": "0.0500"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["cia"] == "justos"
+    assert body["ramo"] == "auto"
+    assert body["pct_padrao"] == "0.0500"
+
+
+async def test_upsert_comissao_atualiza(db: AsyncSession, client: AsyncClient) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_atualiza@test.com")
+    # Garante existência
+    await client.put(
+        "/admin/comissoes/yelum/imovel",
+        json={"pct_padrao": "0.0300"},
+    )
+    # Atualiza
+    r = await client.put(
+        "/admin/comissoes/yelum/imovel",
+        json={"pct_padrao": "0.0600"},
+    )
+    assert r.status_code == 200
+    assert r.json()["pct_padrao"] == "0.0600"
+
+
+async def test_delete_comissao(db: AsyncSession, client: AsyncClient) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_del@test.com")
+    await client.put(
+        "/admin/comissoes/fake/auto",
+        json={"pct_padrao": "0.1000"},
+    )
+    r = await client.delete("/admin/comissoes/fake/auto")
+    assert r.status_code == 204
+
+
+async def test_get_comissao_por_cia_ramo(db: AsyncSession, client: AsyncClient) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_get@test.com")
+    await client.put(
+        "/admin/comissoes/justos/vida",
+        json={"pct_padrao": "0.0800"},
+    )
+    r = await client.get("/admin/comissoes/justos/vida")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["cia"] == "justos"
+    assert body["ramo"] == "vida"
+
+
+async def test_get_comissao_inexistente_retorna_404(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_404@test.com")
+    r = await client.get("/admin/comissoes/inexistente/ramo")
+    assert r.status_code == 404
+
+
+async def test_upsert_comissao_pct_invalido_retorna_422(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_inv@test.com")
+    r = await client.put(
+        "/admin/comissoes/justos/auto",
+        json={"pct_padrao": "0.9999"},
+    )
+    assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Testes diretos — cobrem corpos dos handlers sem depender de HTTP/auth
+# ---------------------------------------------------------------------------
+
+
+async def test_direct_listar_comissoes(db: AsyncSession) -> None:
+    import pytest
+    from fastapi import HTTPException
+
+    from app.api.admin_router import ComissaoConfigIn
+    from app.api.admin_router import delete_comissao as _delete
+    from app.api.admin_router import get_comissao as _get
+    from app.api.admin_router import listar_comissoes as _list
+    from app.api.admin_router import upsert_comissao as _upsert
+
+    admin = await criar_usuario(db, "direct_comissao@test.com", Papel.ADMIN)
+    await db.commit()
+
+    # listar (vazia ou não — cobre linha 232)
+    result = await _list(_usuario=admin, db=db)
+    assert isinstance(result, list)
+
+    # upsert cria — cobre linhas 260-268 (branch else)
+    body = ComissaoConfigIn(pct_padrao="0.1500")
+    cfg = await _upsert(cia="direct_cia", ramo="auto", _usuario=admin, db=db, body=body)
+    assert cfg.cia == "direct_cia"
+    assert str(cfg.pct_padrao) == "0.1500"
+
+    # upsert atualiza — cobre linhas 260-268 (branch if)
+    body2 = ComissaoConfigIn(pct_padrao="0.2000")
+    cfg2 = await _upsert(
+        cia="direct_cia", ramo="auto", _usuario=admin, db=db, body=body2
+    )
+    assert str(cfg2.pct_padrao) == "0.2000"
+
+    # get existente — cobre linha 248
+    found = await _get(cia="direct_cia", ramo="auto", _usuario=admin, db=db)
+    assert found.cia == "direct_cia"
+
+    # get inexistente — cobre linhas 243-247
+    with pytest.raises(HTTPException) as exc:
+        await _get(cia="nao_existe", ramo="auto", _usuario=admin, db=db)
+    assert exc.value.status_code == 404
+
+    # delete existente — cobre linhas 282-288
+    await _delete(cia="direct_cia", ramo="auto", _usuario=admin, db=db)
+
+    # delete inexistente — cobre linhas 282-285
+    with pytest.raises(HTTPException) as exc2:
+        await _delete(cia="nao_existe", ramo="auto", _usuario=admin, db=db)
+    assert exc2.value.status_code == 404

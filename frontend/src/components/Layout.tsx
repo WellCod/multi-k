@@ -17,6 +17,7 @@ const NAV_BASE = [
 const NAV_ADMIN = [
   { to: "/auditoria", label: "Auditoria" },
   { to: "/usuarios", label: "Usuários" },
+  { to: "/comissoes", label: "Comissões" },
 ];
 
 const _APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "0.1.0";
