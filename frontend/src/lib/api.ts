@@ -258,6 +258,12 @@ export const api = {
     },
     exportUrl: (tipo: string, periodo: number, fmt: "csv" | "xlsx") =>
       `${BASE}/relatorios/export/${fmt}?tipo=${tipo}&periodo=${periodo}`,
+    comissoes: (periodo: number, dateFrom?: string, dateTo?: string) => {
+      const p = new URLSearchParams({ periodo: String(periodo) });
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      return request<ComissaoRamoOut[]>(`/relatorios/comissoes?${p}`);
+    },
   },
 
   // ---- Dashboard ----
@@ -628,6 +634,13 @@ export interface MixOut {
   ramo: string;
   count: number;
   pct: string;
+  premio_total: string;
+}
+
+export interface ComissaoRamoOut {
+  ramo: string;
+  n_propostas: number;
+  comissao_total: string;
   premio_total: string;
 }
 
