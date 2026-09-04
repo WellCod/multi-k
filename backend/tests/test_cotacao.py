@@ -486,3 +486,42 @@ async def test_worker_loop_excecao_interna_capturada() -> None:
 
     assert task in done
     assert call_count >= 2
+
+
+async def test_historico_versoes_sem_recotacao(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /cotacoes/{id}/versoes retorna lista com apenas a versão atual quando
+    não há recotações anteriores."""
+    await _login(client, db, "corretor_versoes@test.com")
+    r = await client.post("/cotacoes", json=_RISCO_AUTO)
+    assert r.status_code == 202
+    cotacao_id = r.json()["id"]
+
+    r2 = await client.get(f"/cotacoes/{cotacao_id}/versoes")
+    assert r2.status_code == 200
+    versoes = r2.json()
+    assert len(versoes) == 1
+    assert versoes[0]["id"] == cotacao_id
+    assert versoes[0]["ramo"] == "auto"
+
+
+async def test_historico_versoes_com_recotacao(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /cotacoes/{id}/versoes retorna cadeia cronológica após recotar."""
+    await _login(client, db, "corretor_versoes2@test.com")
+    r1 = await client.post("/cotacoes", json=_RISCO_AUTO)
+    assert r1.status_code == 202
+    id_original = r1.json()["id"]
+
+    r2 = await client.post(f"/cotacoes/{id_original}/recotar")
+    assert r2.status_code == 202
+    id_nova = r2.json()["id"]
+
+    r3 = await client.get(f"/cotacoes/{id_nova}/versoes")
+    assert r3.status_code == 200
+    versoes = r3.json()
+    assert len(versoes) == 2
+    assert versoes[0]["id"] == id_original  # cronológico: mais antiga primeiro
+    assert versoes[1]["id"] == id_nova
