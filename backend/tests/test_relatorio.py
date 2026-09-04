@@ -382,3 +382,37 @@ async def test_comissoes_com_date_range(
     )
     assert r.status_code == 200
     assert isinstance(r.json(), list)
+
+
+# ---------------------------------------------------------------------------
+# Export CSV de comissões
+# ---------------------------------------------------------------------------
+
+
+async def test_comissoes_csv_corretor_retorna_csv(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Corretor autenticado recebe CSV de comissões."""
+    await _login(client, db, "cor_com_csv@test.com")
+    r = await client.get("/relatorios/comissoes/csv")
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+    assert "ramo" in r.text
+
+
+async def test_comissoes_csv_sem_auth_retorna_401(client: AsyncClient) -> None:
+    r = await client.get("/relatorios/comissoes/csv")
+    assert r.status_code == 401
+
+
+async def test_comissoes_csv_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """CSV de comissões com proposta real deve ter header + linha de dados."""
+    await _criar_proposta(client, db, engine, "cor_com_csv2@test.com")
+    r = await client.get("/relatorios/comissoes/csv")
+    assert r.status_code == 200
+    lines = r.text.strip().splitlines()
+    assert "ramo" in lines[0]
+    assert "comissao_total" in lines[0]
+    assert len(lines) >= 2

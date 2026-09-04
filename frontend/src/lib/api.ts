@@ -264,6 +264,12 @@ export const api = {
       if (dateTo) p.set("date_to", dateTo);
       return request<ComissaoRamoOut[]>(`/relatorios/comissoes?${p}`);
     },
+    comissoesExportUrl: (periodo: number, dateFrom?: string, dateTo?: string) => {
+      const p = new URLSearchParams({ periodo: String(periodo) });
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      return `${BASE}/relatorios/comissoes/csv?${p}`;
+    },
   },
 
   // ---- Dashboard ----
