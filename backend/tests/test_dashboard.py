@@ -162,6 +162,33 @@ async def test_dashboard_com_proposta_calcula_taxa(
     assert body["ticket_medio"] != "0.00"
 
 
+async def test_dashboard_admin_com_proposta_cobre_cia_premio(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Admin dashboard com proposta vinculada cobre ranking_cias.propostas e
+    ranking_cias.premio_total (linhas 147-148 de dashboard_router.py)."""
+    await _login(client, db, "dash_adm_prop@test.com", Papel.ADMIN)
+
+    r_cot = await client.post("/cotacoes", json=_RISCO_AUTO)
+    assert r_cot.status_code == 202
+    cotacao_id = uuid.UUID(r_cot.json()["id"])
+    await _processar_jobs(cotacao_id, engine)
+
+    r_tx = await client.post(
+        f"/cotacoes/{cotacao_id}/transmitir",
+        json={**_TRANSMITIR_BODY, "cia": "fake"},
+    )
+    assert r_tx.status_code == 201
+
+    r = await client.get("/dashboard?periodo=365")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["ranking_cias"]) >= 1
+    cia = body["ranking_cias"][0]
+    assert cia["propostas"] >= 1
+    assert cia["premio_total"] != "0.00"
+
+
 async def test_dashboard_periodo_invalido_retorna_422(
     db: AsyncSession, client: AsyncClient
 ) -> None:

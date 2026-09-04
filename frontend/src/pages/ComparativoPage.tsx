@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, type ItemComparativo, type Parcela, type Proposta, type Cotacao } from "@/lib/api";
+import { api, type ItemComparativo, type Parcela, type Proposta, type Cotacao, type VersaoPremio } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatBRL, formatDate } from "@/lib/utils";
@@ -334,6 +334,55 @@ function ObservacoesCell({ item }: { item: ItemComparativo }) {
 }
 
 // ---------------------------------------------------------------------------
+// Painel de histórico de prêmio por versão
+// ---------------------------------------------------------------------------
+
+function PremiumHistoryPanel({ cotacaoId }: { cotacaoId: string }) {
+  const [versoes, setVersoes] = useState<VersaoPremio[] | null>(null);
+
+  useEffect(() => {
+    api.cotacoes.versoes(cotacaoId).then(setVersoes).catch(() => setVersoes([]));
+  }, [cotacaoId]);
+
+  if (!versoes || versoes.length < 2) return null;
+
+  const max = Math.max(...versoes.map((v) => Number(v.premio_total ?? "0")));
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
+      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+        Evolução do prêmio ({versoes.length} versões)
+      </h2>
+      <div className="space-y-3">
+        {versoes.map((v, i) => {
+          const val = Number(v.premio_total ?? "0");
+          const pct = max > 0 ? Math.round((val / max) * 100) : 0;
+          return (
+            <div key={v.id} className="flex items-center gap-3">
+              <span className="text-xs text-gray-500 dark:text-gray-400 w-6 shrink-0">
+                v{i + 1}
+              </span>
+              <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-2 rounded-full bg-blue-500 dark:bg-blue-400 transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="text-xs font-mono text-gray-900 dark:text-white w-24 text-right shrink-0">
+                {v.premio_total ? formatBRL(v.premio_total) : "—"}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 w-20 text-right shrink-0">
+                {formatDate(v.criado_em)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Página principal
 // ---------------------------------------------------------------------------
 
@@ -582,6 +631,9 @@ export function ComparativoPage() {
           </div>
         </div>
       )}
+
+      {/* Histórico de prêmio por recotação */}
+      <PremiumHistoryPanel cotacaoId={cotacaoId} />
 
       {/* Ações */}
       <div className="flex gap-3">

@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AdminUser
+from app.infra import audit
 from app.infra.auth_service import hash_senha
 from app.infra.db import get_db
 from app.infra.models import Usuario
@@ -79,8 +80,16 @@ class ResetSenhaInput(BaseModel):
 async def listar_usuarios(
     _usuario: AdminUser,
     db: Db,
+    page: int = 1,
+    page_size: int = 50,
 ) -> list[UsuarioAdminOut]:
-    result = await db.execute(select(Usuario).order_by(Usuario.criado_em.desc()))
+    offset = (max(page, 1) - 1) * min(page_size, 200)
+    result = await db.execute(
+        select(Usuario)
+        .order_by(Usuario.criado_em.desc())
+        .offset(offset)
+        .limit(min(page_size, 200))
+    )
     return [UsuarioAdminOut.model_validate(u) for u in result.scalars().all()]
 
 
@@ -109,6 +118,12 @@ async def criar_usuario(
     db.add(novo)
     await db.flush()
     await db.refresh(novo)
+    await audit.registrar(
+        db,
+        tipo="admin_criar_usuario",
+        dados={"email": body.email, "papel": body.papel},
+        usuario_id=_usuario.id,
+    )
     await db.commit()
     return UsuarioAdminOut.model_validate(novo)
 
@@ -132,12 +147,22 @@ async def atualizar_usuario(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuário não encontrado.",
         )
+    mudancas: dict[str, object] = {}
     if body.nome is not None:
+        mudancas["nome"] = body.nome
         alvo.nome = body.nome
     if body.papel is not None:
+        mudancas["papel"] = body.papel
         alvo.papel = body.papel
     if body.ativo is not None:
+        mudancas["ativo"] = body.ativo
         alvo.ativo = body.ativo
+    await audit.registrar(
+        db,
+        tipo="admin_atualizar_usuario",
+        dados={"usuario_id": str(usuario_id), **mudancas},
+        usuario_id=_usuario.id,
+    )
     await db.commit()
     await db.refresh(alvo)
     return UsuarioAdminOut.model_validate(alvo)
@@ -161,4 +186,10 @@ async def reset_senha(
             detail="Usuário não encontrado.",
         )
     alvo.senha_hash = hash_senha(body.nova_senha)
+    await audit.registrar(
+        db,
+        tipo="admin_reset_senha",
+        dados={"usuario_id": str(usuario_id)},
+        usuario_id=_usuario.id,
+    )
     await db.commit()

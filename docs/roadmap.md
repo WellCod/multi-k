@@ -1,6 +1,6 @@
 # multi-K — Roadmap
 
-*Atualizado: 2026-09-02*
+*Atualizado: 2026-09-03*
 
 ---
 
@@ -18,6 +18,7 @@
 ✅ SEC         Endurecimento de segurança (auditoria 2026-08-26)
 🔨 Fase 5      Adapters Yelum + Justos (scaffold + docs; gate: credenciais)
 ✅ MELHORIAS   Análise completa: segurança, perf, UX, features (2026-09-02)
+✅ SPRINT-03   Segurança, perf, UX, layout, features (2026-09-03)
 ⏳ Fase 6      Paridade (gate: ≥99% em 200 cotações)
 ⏳ Fase 7      E-Retorno (gate: Security Assessment)
 ⏳ Fase 8      Deploy GCP + endurecimento
@@ -342,6 +343,65 @@ Ações humanas necessárias:
 - Notificações WhatsApp/Email (credencial externa)
 - Multi-tenant real (Fase futura — breaking change)
 - Integração calendário Google (OAuth)
+
+---
+
+## SPRINT-03 — Segurança · Perf · UX · Features (2026-09-03) ✅
+
+*Análise 2026-09-03 — 4 sprints paralelas*
+
+### Sprint 1A — Segurança ✅
+
+| Item | Arquivo | Status |
+|---|---|---|
+| Rate-limit em `POST /auth/refresh` | `api/auth_router.py` | ✅ `checar_rate_limit(db, f"refresh:{ip}")` |
+| Audit `admin.criar_usuario` / `atualizar_usuario` / `reset_senha` | `api/admin_router.py` | ✅ `audit.registrar()` em todas as ops admin |
+| Senha demo randômica (`secrets.token_urlsafe(12)`) | `infra/seed_demo.py` | ✅ Credenciais logadas via `_log.warning` |
+
+### Sprint 1B — Performance ✅
+
+| Item | Arquivo | Status |
+|---|---|---|
+| Índice composto `(usuario_id, transmitida_em DESC)` em propostas | `alembic/versions/013_composite_indexes_perf.py` | ✅ CONCURRENTLY |
+| Índice composto `(usuario_id, criado_em DESC)` em cotacoes | `alembic/versions/013_composite_indexes_perf.py` | ✅ CONCURRENTLY |
+| Índice composto `(cotacao_id, cia, status)` em cotacao_jobs | `alembic/versions/013_composite_indexes_perf.py` | ✅ CONCURRENTLY |
+| Paginação real em `GET /admin/usuarios` (`page`/`page_size`) | `api/admin_router.py` | ✅ `.offset()` + `.limit(min(page_size,200))` |
+
+### Sprint 2A — UX ✅
+
+| Item | Arquivo | Status |
+|---|---|---|
+| `_traduzirErro()` mapeando HTTP → mensagens legíveis | `frontend/src/lib/api.ts` | ✅ 400/401/403/404/409/422/429/5xx |
+| KpiCard extraído como componente compartilhado | `frontend/src/components/KpiCard.tsx` | ✅ Usado em Home + Dashboard |
+
+### Sprint 2B — Layout ✅
+
+| Item | Arquivo | Status |
+|---|---|---|
+| Menu hamburger mobile com drawer | `frontend/src/components/Layout.tsx` | ✅ `useState(menuOpen)`, `md:hidden` |
+| Breadcrumb dinâmico por pathname | `frontend/src/components/Layout.tsx` | ✅ `Breadcrumb` component |
+| Footer com versão `VITE_APP_VERSION` | `frontend/src/components/Layout.tsx` | ✅ `import.meta.env` |
+| `aria-label` em botões de nav | `frontend/src/components/Layout.tsx` | ✅ Acessibilidade |
+
+### Sprint 3 — Features ✅
+
+| Item | Arquivo | Status |
+|---|---|---|
+| Botão "Ver métricas detalhadas →" em Home (admin) | `frontend/src/pages/HomePage.tsx` | ✅ `useNavigate("/dashboard")` |
+| SLA médio por CIA no ranking de seguradoras | `api/dashboard_router.py`, `frontend/src/pages/DashboardPage.tsx` | ✅ `latencia_media_s` em segundos |
+| Badge "Volume alto — dados parciais" no ranking | `api/dashboard_router.py`, `frontend/src/pages/DashboardPage.tsx` | ✅ `ranking_truncado` flag |
+| `GET /cotacoes/{id}/versoes` — cadeia de recotações | `api/cotacao_router.py` | ✅ Até 20 versões, ordem cronológica |
+| `PremiumHistoryPanel` — evolução do prêmio por versão | `frontend/src/pages/ComparativoPage.tsx` | ✅ CSS bars, visível com 2+ versões |
+| `api.cotacoes.versoes(id)` no cliente TS | `frontend/src/lib/api.ts` | ✅ `VersaoPremio` interface |
+
+### Fixes Justos (2026-09-03) ✅
+
+| Item | Arquivo | Status |
+|---|---|---|
+| Cache de token usa `exp` do JWT retornado | `adapters/justos/client.py` | ✅ Decodifica sem verificar assinatura |
+| `JUSTOS_PRIVATE_KEY_PATH` — chave fora do projeto (dev) | `adapters/justos/client.py`, `.env.example` | ✅ Fallback para `JUSTOS_PRIVATE_KEY` (prod/GCP) |
+| Fix E501 — 3 linhas longas no Justos adapter/client | `adapters/justos/adapter.py`, `client.py` | ✅ Dentro de 88 chars |
+| Fix duplo prefixo em `GET /clientes/{id}/ficha.pdf` | `api/cliente_router.py` | ✅ `/clientes/{id}` → `/{id}` no path local |
 
 ---
 
