@@ -220,8 +220,31 @@ async def listar_cotacoes(
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    ramo: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=100),
+    dias: int | None = Query(default=None, ge=1, le=365),
 ) -> PaginatedCotacoes:
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import cast, or_
+    from sqlalchemy.dialects.postgresql import JSONB
+
     base_where = Cotacao.usuario_id == usuario.id
+    if ramo:
+        base_where = base_where & (Cotacao.ramo == ramo)
+    if status:
+        base_where = base_where & (Cotacao.status == status)
+    if dias:
+        corte = datetime.now(UTC) - timedelta(days=dias)
+        base_where = base_where & (Cotacao.criado_em >= corte)
+    if q:
+        _nome_field = cast(Cotacao.dados_risco["proponente"]["nome"], JSONB).astext
+        nome_match = _nome_field.ilike(f"%{q}%")
+        base_where = base_where & or_(
+            nome_match,
+            Cotacao.cotacao_id_cia.ilike(f"%{q}%"),
+        )
 
     total_row = await db.execute(
         select(func.count()).select_from(Cotacao).where(base_where)
