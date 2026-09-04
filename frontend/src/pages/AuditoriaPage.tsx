@@ -28,6 +28,7 @@ const TIPO_META: Record<string, { label: string; color: string; icon: string }> 
   admin_criar_usuario:      { label: "Usuário criado",         icon: "👤", color: "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300" },
   admin_atualizar_usuario:  { label: "Usuário atualizado",     icon: "✎", color: "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300" },
   admin_reset_senha:        { label: "Reset de senha",         icon: "🔑", color: "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300" },
+  "apolice.vinculada":      { label: "Apólice vinculada",       icon: "📄", color: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" },
 };
 
 const TODOS_TIPOS = Object.keys(TIPO_META);
