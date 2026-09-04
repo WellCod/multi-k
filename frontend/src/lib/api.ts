@@ -265,6 +265,23 @@ export const api = {
     get: (periodo = 30) =>
       request<DashboardOut>(`/dashboard?periodo=${periodo}`),
   },
+
+  // ---- Comissões por CIA ----
+  comissoes: {
+    list: () => request<ComissaoConfigOut[]>("/admin/comissoes"),
+    get: (cia: string, ramo: string) =>
+      request<ComissaoConfigOut>(`/admin/comissoes/${encodeURIComponent(cia)}/${encodeURIComponent(ramo)}`),
+    set: (cia: string, ramo: string, pct_padrao: string) =>
+      request<ComissaoConfigOut>(
+        `/admin/comissoes/${encodeURIComponent(cia)}/${encodeURIComponent(ramo)}`,
+        { method: "PUT", body: JSON.stringify({ pct_padrao }) },
+      ),
+    delete: (cia: string, ramo: string) =>
+      request<void>(
+        `/admin/comissoes/${encodeURIComponent(cia)}/${encodeURIComponent(ramo)}`,
+        { method: "DELETE" },
+      ),
+  },
 };
 
 // ---- Types ----
@@ -628,6 +645,13 @@ export interface DashboardCiaOut {
   propostas: number;
   premio_total: string;
   latencia_media_s: number | null;
+}
+
+export interface ComissaoConfigOut {
+  cia: string;
+  ramo: string;
+  pct_padrao: string;
+  atualizado_em: string;
 }
 
 export interface DashboardOut {
