@@ -372,21 +372,18 @@ async def relatorio_mix(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/comissoes", response_model=list[ComissaoRamoOut])
-async def relatorio_comissoes(
-    usuario: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    periodo: int = Query(default=30, ge=1, le=365),
-    date_from: Annotated[date | None, Query()] = None,
-    date_to: Annotated[date | None, Query()] = None,
+async def _dados_comissoes(
+    db: AsyncSession,
+    inicio: datetime,
+    fim: datetime,
+    usuario_id: uuid.UUID | None = None,
 ) -> list[ComissaoRamoOut]:
-    """Comissão total emitida por ramo no período. Corretor vê só os próprios."""
-    inicio, fim = _resolve_corte(periodo, date_from, date_to)
+    """Agrega comissão e prêmio por ramo das propostas do período."""
     base = Proposta.transmitida_em >= inicio
     base = base & (Proposta.transmitida_em <= fim)
     base = base & (Proposta.tenant_id == TENANT_ID)
-    if usuario.papel != "admin":
-        base = base & (Proposta.usuario_id == usuario.id)
+    if usuario_id is not None:
+        base = base & (Proposta.usuario_id == usuario_id)
 
     comissao_expr = func.sum(Proposta.comissao_parcela * Proposta.n_parcelas)
     premio_expr = func.sum(Cotacao.premio_total)
@@ -416,6 +413,55 @@ async def relatorio_comissoes(
         )
         for row in rows
     ]
+
+
+@router.get("/comissoes", response_model=list[ComissaoRamoOut])
+async def relatorio_comissoes(
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    periodo: int = Query(default=30, ge=1, le=365),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
+) -> list[ComissaoRamoOut]:
+    """Comissão total emitida por ramo no período. Corretor vê só os próprios."""
+    uid = None if usuario.papel == "admin" else usuario.id
+    inicio, fim = _resolve_corte(periodo, date_from, date_to)
+    return await _dados_comissoes(db, inicio, fim, uid)
+
+
+@router.get("/comissoes/csv")
+async def export_comissoes_csv(
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    periodo: int = Query(default=30, ge=1, le=365),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
+) -> StreamingResponse:
+    """Exporta comissões por ramo em CSV. Corretor vê só os próprios."""
+    uid = None if usuario.papel == "admin" else usuario.id
+    inicio, fim = _resolve_corte(periodo, date_from, date_to)
+    dados = await _dados_comissoes(db, inicio, fim, uid)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["ramo", "n_propostas", "comissao_total", "premio_total"])
+    for d in dados:
+        writer.writerow(
+            [
+                _csv_escape(d.ramo),
+                _csv_escape(d.n_propostas),
+                _csv_escape(d.comissao_total),
+                _csv_escape(d.premio_total),
+            ]
+        )
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=comissoes_{periodo}d.csv"
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
