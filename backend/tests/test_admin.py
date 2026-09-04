@@ -382,3 +382,94 @@ async def test_direct_reset_senha(db: AsyncSession) -> None:
     with pytest.raises(HTTPException) as exc:
         await _reset(usuario_id=uuid.uuid4(), _usuario=admin, db=db, body=body)
     assert exc.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Gestão de Comissão por CIA — /admin/comissoes
+# ---------------------------------------------------------------------------
+
+
+async def test_listar_comissoes_admin(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_list@test.com")
+    r = await client.get("/admin/comissoes")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+async def test_upsert_comissao_cria(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_cria@test.com")
+    r = await client.put(
+        "/admin/comissoes/justos/auto",
+        json={"pct_padrao": "0.0500"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["cia"] == "justos"
+    assert body["ramo"] == "auto"
+    assert body["pct_padrao"] == "0.0500"
+
+
+async def test_upsert_comissao_atualiza(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_atualiza@test.com")
+    # Garante existência
+    await client.put(
+        "/admin/comissoes/yelum/imovel",
+        json={"pct_padrao": "0.0300"},
+    )
+    # Atualiza
+    r = await client.put(
+        "/admin/comissoes/yelum/imovel",
+        json={"pct_padrao": "0.0600"},
+    )
+    assert r.status_code == 200
+    assert r.json()["pct_padrao"] == "0.0600"
+
+
+async def test_delete_comissao(db: AsyncSession, client: AsyncClient) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_del@test.com")
+    await client.put(
+        "/admin/comissoes/fake/auto",
+        json={"pct_padrao": "0.1000"},
+    )
+    r = await client.delete("/admin/comissoes/fake/auto")
+    assert r.status_code == 204
+
+
+async def test_get_comissao_por_cia_ramo(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_get@test.com")
+    await client.put(
+        "/admin/comissoes/justos/vida",
+        json={"pct_padrao": "0.0800"},
+    )
+    r = await client.get("/admin/comissoes/justos/vida")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["cia"] == "justos"
+    assert body["ramo"] == "vida"
+
+
+async def test_get_comissao_inexistente_retorna_404(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_404@test.com")
+    r = await client.get("/admin/comissoes/inexistente/ramo")
+    assert r.status_code == 404
+
+
+async def test_upsert_comissao_pct_invalido_retorna_422(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_inv@test.com")
+    r = await client.put(
+        "/admin/comissoes/justos/auto",
+        json={"pct_padrao": "0.9999"},
+    )
+    assert r.status_code == 422
