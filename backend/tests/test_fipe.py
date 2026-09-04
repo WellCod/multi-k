@@ -206,3 +206,17 @@ async def test_fipe_preco_502_quando_upstream_falha(client: AsyncClient) -> None
         },
     )
     assert r.status_code == 502
+
+
+def test_fipe_cache_set_chave_existente_atualiza() -> None:
+    """set() com chave já presente cobre linha 44 (move_to_end)."""
+    from app.infra import fipe_cache
+
+    chave = f"_dup_{id(object())}"
+    data1 = [{"codigo": "1", "nome": "Primeiro"}]
+    data2 = [{"codigo": "2", "nome": "Segundo"}]
+    fipe_cache.set(chave, data1)
+    fipe_cache.set(chave, data2)  # cobre _cache.move_to_end(chave) — linha 44
+    result = fipe_cache.get(chave)
+    assert result == data2
+    del fipe_cache._cache[chave]
