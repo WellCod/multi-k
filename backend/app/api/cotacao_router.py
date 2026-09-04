@@ -227,8 +227,7 @@ async def listar_cotacoes(
 ) -> PaginatedCotacoes:
     from datetime import UTC, datetime, timedelta
 
-    from sqlalchemy import cast, or_
-    from sqlalchemy.dialects.postgresql import JSONB
+    from sqlalchemy import or_
 
     base_where = Cotacao.usuario_id == usuario.id
     if ramo:
@@ -239,8 +238,8 @@ async def listar_cotacoes(
         corte = datetime.now(UTC) - timedelta(days=dias)
         base_where = base_where & (Cotacao.criado_em >= corte)
     if q:
-        _nome_field = cast(Cotacao.dados_risco["proponente"]["nome"], JSONB).astext
-        nome_match = _nome_field.ilike(f"%{q}%")
+        # dados_risco["proponente"]["nome"].astext acessa o JSONB aninhado como texto
+        nome_match = Cotacao.dados_risco["proponente"]["nome"].astext.ilike(f"%{q}%")
         base_where = base_where & or_(
             nome_match,
             Cotacao.cotacao_id_cia.ilike(f"%{q}%"),
