@@ -255,3 +255,16 @@ class CotacaoJob(Base):
     status_resultado: Mapped[str | None] = mapped_column(String(20), default=None)
     # Payload bruto devolvido pelo adapter (ex: coverages_selected da Justos)
     payload_resposta: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
+
+
+class ComissaoConfig(Base):
+    """Comissão padrão por CIA e ramo — chave composta (cia, ramo)."""
+
+    __tablename__ = "comissao_config"
+
+    cia: Mapped[str] = mapped_column(String(50), primary_key=True)
+    ramo: Mapped[str] = mapped_column(String(20), primary_key=True)
+    pct_padrao: Mapped[Decimal] = mapped_column(Numeric(5, 4))
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
