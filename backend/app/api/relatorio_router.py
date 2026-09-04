@@ -475,6 +475,8 @@ async def export_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     tipo: str = Query(pattern="^(producao|funil|mix)$"),
     periodo: int = Query(default=30, ge=7, le=365),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=5000)] = 1000,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> StreamingResponse:
@@ -482,7 +484,7 @@ async def export_csv(
     buf = io.StringIO()
     writer = csv.writer(buf)
 
-    inicio, fim = _resolve_corte(periodo, None, None)
+    inicio, fim = _resolve_corte(periodo, date_from, date_to)
     if tipo == "producao":
         dados = await _dados_producao(db, inicio, fim, limit=limit, offset=offset)
         writer.writerow(
@@ -563,6 +565,8 @@ async def export_xlsx(
     db: Annotated[AsyncSession, Depends(get_db)],
     tipo: str = Query(pattern="^(producao|funil|mix)$"),
     periodo: int = Query(default=30, ge=7, le=365),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=5000)] = 1000,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> StreamingResponse:
@@ -580,7 +584,7 @@ async def export_xlsx(
     wb = openpyxl.Workbook()
     ws = wb.active
 
-    inicio, fim = _resolve_corte(periodo, None, None)
+    inicio, fim = _resolve_corte(periodo, date_from, date_to)
     if tipo == "producao":
         ws.title = "Producao"
         dados = await _dados_producao(db, inicio, fim, limit=limit, offset=offset)
