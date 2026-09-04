@@ -1360,6 +1360,7 @@ export function CotacaoPage() {
   const [pollCancelled, setPollCancelled] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingSecRef = useRef(0);
+  const sseRef = useRef<EventSource | null>(null);
 
   // Criação de cotação
   const [criando, setCriando] = useState(false);
@@ -1436,11 +1437,18 @@ export function CotacaoPage() {
       clearTimeout(pollRef.current);
       pollRef.current = null;
     }
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
     setPolling(false);
   }, []);
 
-  // Cleanup do polling ao desmontar o componente
-  useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
+  // Cleanup ao desmontar o componente
+  useEffect(() => () => {
+    if (pollRef.current) clearTimeout(pollRef.current);
+    if (sseRef.current) sseRef.current.close();
+  }, []);
 
   const startPolling = useCallback(
     (id: string) => {
@@ -1450,6 +1458,27 @@ export function CotacaoPage() {
       setPollingSeconds(0);
       setPolling(true);
       setPollCancelled(false);
+
+      // SSE: recebe notificação instantânea quando a cotação finaliza
+      if (typeof EventSource !== "undefined") {
+        const apiBase = import.meta.env.VITE_API_URL ?? "/api";
+        const es = new EventSource(`${apiBase}/events`, { withCredentials: true });
+        sseRef.current = es;
+        es.onmessage = async (ev) => {
+          try {
+            const data = JSON.parse(ev.data as string) as { tipo?: string; cotacao_id?: string };
+            if (data.tipo === "cotacao.pronta" && data.cotacao_id === id) {
+              const c = await api.cotacoes.get(id);
+              setCotacao(c);
+              if (c.status !== "aguardando" && c.status !== "processando") {
+                stopPolling();
+                clearRascunho();
+              }
+            }
+          } catch { /* ignora erros de parse ou rede */ }
+        };
+        es.onerror = () => { sseRef.current?.close(); sseRef.current = null; };
+      }
 
       const tick = async () => {
         if (Date.now() - start > POLL_TIMEOUT_MS) {
