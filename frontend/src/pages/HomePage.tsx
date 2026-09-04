@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { KpiCard } from "@/components/KpiCard";
 import {
   api,
   type HomeAdminOut,
@@ -338,17 +339,6 @@ function HomeCorretor() {
 // ---------------------------------------------------------------------------
 // Admin — KPIs
 // ---------------------------------------------------------------------------
-
-function KpiCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-5 py-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-        {label}
-      </p>
-      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1.5">{value}</p>
-    </div>
-  );
-}
 
 function BarraHorizontal({
   items,

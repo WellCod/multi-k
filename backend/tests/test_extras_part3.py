@@ -155,6 +155,7 @@ async def test_calcular_dashboard_admin_com_jobs(engine: AsyncEngine) -> None:
         )
         session.add(cot)
         await session.flush()
+        _now = datetime.now(UTC)
         session.add(
             CotacaoJob(
                 id=job_id,
@@ -163,9 +164,10 @@ async def test_calcular_dashboard_admin_com_jobs(engine: AsyncEngine) -> None:
                 status="concluido",
                 premio_total=Decimal("1800.00"),
                 payload_resposta={},
+                processado_em=_now,  # garante latencia_media_s (linhas 147-148)
             )
         )
-        # Proposta vinculada — faz ids_com_prop conter cot_id → cobre linhas 136-137
+        # Proposta com transmitida_em explícito — garante ids_com_prop (linhas 151-152)
         session.add(
             Proposta(
                 cotacao_id=cot_id,
@@ -177,6 +179,7 @@ async def test_calcular_dashboard_admin_com_jobs(engine: AsyncEngine) -> None:
                 comissao_parcela=Decimal("270.00"),
                 usuario_id=uid,
                 tenant_id=TENANT_ID,
+                transmitida_em=_now,
             )
         )
         await session.commit()
@@ -188,7 +191,10 @@ async def test_calcular_dashboard_admin_com_jobs(engine: AsyncEngine) -> None:
 
     assert isinstance(result.ranking_cias, list)
     assert len(result.ranking_cias) >= 1
-    assert result.ranking_cias[0].cia == "fake"
+    cia = result.ranking_cias[0]
+    assert cia.cia == "fake"
+    assert cia.propostas >= 1
+    assert cia.latencia_media_s is not None  # cobre linhas 147-148
 
 
 # ---------------------------------------------------------------------------
