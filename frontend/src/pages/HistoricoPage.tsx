@@ -85,6 +85,58 @@ function RestricoesList({ restricoes }: { restricoes: { codigo: string; mensagem
   );
 }
 
+function VincularApolice({ propostaId, onVinculado }: { propostaId: string; onVinculado: (n: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [numero, setNumero] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [errLocal, setErrLocal] = useState<string | null>(null);
+
+  function submit() {
+    const trimmed = numero.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    setErrLocal(null);
+    api.propostas
+      .vincularApolice(propostaId, trimmed)
+      .then(() => { onVinculado(trimmed); setOpen(false); })
+      .catch((e: unknown) => setErrLocal(e instanceof Error ? e.message : "Erro"))
+      .finally(() => setSaving(false));
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs px-2.5 py-1 rounded-lg border border-dashed border-emerald-400 dark:border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+      >
+        + Apólice
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 mt-1">
+      <input
+        autoFocus
+        value={numero}
+        onChange={(e) => setNumero(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setOpen(false); }}
+        placeholder="Nº apólice"
+        className="text-xs px-2 py-1 rounded-lg border border-emerald-300 dark:border-emerald-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28"
+      />
+      <button
+        onClick={submit}
+        disabled={saving || !numero.trim()}
+        className="text-xs px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+      >
+        {saving ? "…" : "OK"}
+      </button>
+      <button onClick={() => setOpen(false)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">✕</button>
+      {errLocal && <span className="text-xs text-red-500">{errLocal}</span>}
+    </div>
+  );
+}
+
 export function HistoricoPage() {
   const [data, setData] = useState<PaginatedCotacoes | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,6 +146,7 @@ export function HistoricoPage() {
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroDias, setFiltroDias] = useState(0);
   const [page, setPage] = useState(1);
+  const [apolicesPendentes, setApolicesPendentes] = useState<Record<string, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
 
@@ -312,9 +365,9 @@ export function HistoricoPage() {
                             ✓ Emitida
                           </span>
                         )}
-                        {c.numero_apolice && (
+                        {(c.numero_apolice ?? apolicesPendentes[c.id]) && (
                           <span className="text-xs font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-full px-2 py-0.5">
-                            Apólice {c.numero_apolice}
+                            Apólice {c.numero_apolice ?? apolicesPendentes[c.id]}
                           </span>
                         )}
                         {c.versao_anterior_id && (
@@ -380,6 +433,12 @@ export function HistoricoPage() {
                             Refazer
                           </button>
                         </Tooltip>
+                        {c.proposta_id && !c.numero_apolice && !apolicesPendentes[c.id] && (
+                          <VincularApolice
+                            propostaId={c.proposta_id}
+                            onVinculado={(n) => setApolicesPendentes((prev) => ({ ...prev, [c.id]: n }))}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
