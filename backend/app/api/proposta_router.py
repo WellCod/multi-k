@@ -286,6 +286,12 @@ async def vincular_apolice(
             detail="Proposta já possui apólice vinculada.",
         )
     p.numero_apolice = body.numero_apolice
+    await audit.registrar(
+        db,
+        "apolice.vinculada",
+        {"proposta_id": str(proposta_id), "numero_apolice": body.numero_apolice},
+        usuario_id=usuario.id,
+    )
     await db.commit()
     await db.refresh(p)
     return _proposta_out(p)
