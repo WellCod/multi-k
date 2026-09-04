@@ -459,10 +459,16 @@ export function RelatoriosPage() {
 
           {/* Comissões por ramo */}
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
               <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
                 Comissões por ramo
               </h2>
+              <a
+                href={api.relatorios.comissoesExportUrl(periodoParam, fromParam, toParam)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                ↓ CSV
+              </a>
             </div>
             {comissoes ? (
               <TabelaComissoes dados={comissoes} />
