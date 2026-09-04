@@ -389,18 +389,14 @@ async def test_direct_reset_senha(db: AsyncSession) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_listar_comissoes_admin(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_listar_comissoes_admin(db: AsyncSession, client: AsyncClient) -> None:
     await _login(client, db, Papel.ADMIN, "admin_comissao_list@test.com")
     r = await client.get("/admin/comissoes")
     assert r.status_code == 200
     assert isinstance(r.json(), list)
 
 
-async def test_upsert_comissao_cria(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_upsert_comissao_cria(db: AsyncSession, client: AsyncClient) -> None:
     await _login(client, db, Papel.ADMIN, "admin_comissao_cria@test.com")
     r = await client.put(
         "/admin/comissoes/justos/auto",
@@ -413,9 +409,7 @@ async def test_upsert_comissao_cria(
     assert body["pct_padrao"] == "0.0500"
 
 
-async def test_upsert_comissao_atualiza(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_upsert_comissao_atualiza(db: AsyncSession, client: AsyncClient) -> None:
     await _login(client, db, Papel.ADMIN, "admin_comissao_atualiza@test.com")
     # Garante existência
     await client.put(
@@ -441,9 +435,7 @@ async def test_delete_comissao(db: AsyncSession, client: AsyncClient) -> None:
     assert r.status_code == 204
 
 
-async def test_get_comissao_por_cia_ramo(
-    db: AsyncSession, client: AsyncClient
-) -> None:
+async def test_get_comissao_por_cia_ramo(db: AsyncSession, client: AsyncClient) -> None:
     await _login(client, db, Papel.ADMIN, "admin_comissao_get@test.com")
     await client.put(
         "/admin/comissoes/justos/vida",

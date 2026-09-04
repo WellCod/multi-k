@@ -261,9 +261,7 @@ async def upsert_comissao(
         existing.pct_padrao = body.pct_padrao
         existing.atualizado_em = datetime.now(UTC)
     else:
-        existing = ComissaoConfig(
-            cia=cia, ramo=ramo, pct_padrao=body.pct_padrao
-        )
+        existing = ComissaoConfig(cia=cia, ramo=ramo, pct_padrao=body.pct_padrao)
         db.add(existing)
     await db.commit()
     await db.refresh(existing)
