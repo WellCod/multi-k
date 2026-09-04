@@ -101,9 +101,14 @@ class CotacaoOut(BaseModel):
     criado_em: str
     dados_risco: dict[str, Any]
     proposta_id: uuid.UUID | None = None
+    numero_apolice: str | None = None
 
 
-def _cotacao_out(c: Cotacao, proposta_id: uuid.UUID | None = None) -> CotacaoOut:
+def _cotacao_out(
+    c: Cotacao,
+    proposta_id: uuid.UUID | None = None,
+    numero_apolice: str | None = None,
+) -> CotacaoOut:
     restricoes: list[dict[str, str]] = [
         {"codigo": r["codigo"], "mensagem": r.get("mensagem") or r.get("descricao", "")}
         for r in (c.restricoes or [])
@@ -123,6 +128,7 @@ def _cotacao_out(c: Cotacao, proposta_id: uuid.UUID | None = None) -> CotacaoOut
         criado_em=c.criado_em.isoformat(),
         dados_risco=c.dados_risco,
         proposta_id=proposta_id,
+        numero_apolice=numero_apolice,
     )
 
 
@@ -197,13 +203,15 @@ async def obter_cotacao(
 ) -> CotacaoOut:
     c = await _get_cotacao_ou_404(cotacao_id, usuario.id, db)
     p_row = await db.execute(
-        select(Proposta.id)
+        select(Proposta.id, Proposta.numero_apolice)
         .where(Proposta.cotacao_id == cotacao_id)
         .order_by(Proposta.transmitida_em.desc())
         .limit(1)
     )
-    proposta_id: uuid.UUID | None = p_row.scalar_one_or_none()
-    return _cotacao_out(c, proposta_id)
+    p_tuple = p_row.first()
+    proposta_id: uuid.UUID | None = p_tuple[0] if p_tuple else None
+    numero_apolice: str | None = p_tuple[1] if p_tuple else None
+    return _cotacao_out(c, proposta_id, numero_apolice)
 
 
 class PaginatedCotacoes(BaseModel):
@@ -259,20 +267,22 @@ async def listar_cotacoes(
     )
     cotacoes = list(result.scalars().all())
 
-    proposta_map: dict[uuid.UUID, uuid.UUID] = {}
+    proposta_map: dict[uuid.UUID, tuple[uuid.UUID, str | None]] = {}
     if cotacoes:
         ids = [c.id for c in cotacoes]
         p_rows = await db.execute(
-            select(Proposta.cotacao_id, Proposta.id)
+            select(Proposta.cotacao_id, Proposta.id, Proposta.numero_apolice)
             .where(Proposta.cotacao_id.in_(ids))
             .distinct(Proposta.cotacao_id)
             .order_by(Proposta.cotacao_id, Proposta.transmitida_em.desc())
         )
-        proposta_map = {row[0]: row[1] for row in p_rows}
+        proposta_map = {row[0]: (row[1], row[2]) for row in p_rows}
 
     pages = max(1, -(-total // page_size))  # ceiling division
     return PaginatedCotacoes(
-        items=[_cotacao_out(c, proposta_map.get(c.id)) for c in cotacoes],
+        items=[
+            _cotacao_out(c, *proposta_map.get(c.id, (None, None))) for c in cotacoes
+        ],
         total=total,
         page=page,
         page_size=page_size,

@@ -312,6 +312,11 @@ export function HistoricoPage() {
                             ✓ Emitida
                           </span>
                         )}
+                        {c.numero_apolice && (
+                          <span className="text-xs font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-full px-2 py-0.5">
+                            Apólice {c.numero_apolice}
+                          </span>
+                        )}
                         {c.versao_anterior_id && (
                           <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-700 rounded-full px-2 py-0.5">
                             Revisão

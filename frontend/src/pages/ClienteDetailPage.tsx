@@ -47,6 +47,9 @@ function TimelineCard({ item, isLast }: { item: TimelineItem; isLast: boolean })
             <>
               <p>Protocolo: <span className="font-mono font-medium text-gray-800 dark:text-gray-200">{String(item.dados.protocolo)}</span></p>
               <p>Parcelas: <span className="font-medium text-gray-800 dark:text-gray-200">{Number(item.dados.n_parcelas)}× de {formatBRL(item.dados.valor_parcela as string)}</span></p>
+              {item.dados.numero_apolice && (
+                <p>Apólice: <span className="font-mono font-medium text-emerald-700 dark:text-emerald-400">{String(item.dados.numero_apolice)}</span></p>
+              )}
             </>
           )}
         </div>
