@@ -245,6 +245,7 @@ const PARCELAMENTOS = ["AVISTA", "2X", "3X", "6X", "10X"];
 
 interface TransmitirModalProps {
   cotacaoId: string;
+  ramo?: string;
   cia?: string;
   vigenciaInicio?: string;
   onClose: () => void;
@@ -253,6 +254,7 @@ interface TransmitirModalProps {
 
 function TransmitirModal({
   cotacaoId,
+  ramo,
   cia = "fake",
   vigenciaInicio,
   onClose,
@@ -271,6 +273,14 @@ function TransmitirModal({
   const [comissaoErr, setComissaoErr] = useState<string | null>(null);
 
   const isJustos = cia === "justos";
+
+  // Auto-preenchimento: busca comissão padrão configurada para esta CIA+ramo
+  useEffect(() => {
+    if (!ramo) return;
+    api.comissoes.get(cia, ramo)
+      .then((cfg) => { setComissao(cfg.pct_padrao); })
+      .catch(() => { /* mantém padrão 15% */ });
+  }, [cia, ramo]);
 
   const handleComissaoChange = (pct: number) => {
     if (pct < 0 || pct > 30) {
@@ -1812,6 +1822,7 @@ export function CotacaoPage() {
       {showTransmitir && cotacaoId && (
         <TransmitirModal
           cotacaoId={cotacaoId}
+          ramo={cotacao?.ramo}
           cia={transmitirCia}
           vigenciaInicio={step4Data?.inicio_vigencia}
           onClose={() => setShowTransmitir(false)}
