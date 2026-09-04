@@ -464,6 +464,7 @@ async def timeline_cliente(
                         "protocolo": proposta.protocolo,
                         "n_parcelas": proposta.n_parcelas,
                         "valor_parcela": str(proposta.valor_parcela),
+                        "numero_apolice": proposta.numero_apolice,
                     },
                 )
             )
