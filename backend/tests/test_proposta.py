@@ -562,7 +562,10 @@ async def test_vincular_apolice_registra_audit(
     assert r.status_code == 200
 
     result = await db.execute(
-        select(Auditoria).where(Auditoria.tipo == "apolice.vinculada")
+        select(Auditoria).where(
+            Auditoria.tipo == "apolice.vinculada",
+            Auditoria.dados["proposta_id"].astext == proposta_id,
+        )
     )
     log = result.scalars().first()
     assert log is not None
