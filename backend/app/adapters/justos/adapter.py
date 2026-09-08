@@ -59,15 +59,27 @@ def _dec(valor: float) -> Decimal:
     return Decimal(str(valor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+# Perils considerados obrigatórios/core quando a API staging retorna mandatory=False
+# para todos (quirk do ambiente de testes). Em produção os flags mandatory corretos
+# chegam da API e esse conjunto é ignorado.
+_PERILS_CORE = {
+    "colisao-e-desastres-naturais",
+    "roubo-e-furto",
+    "incendio",
+    "danos-materiais",
+    "danos-corporais",
+}
+
+
 def _selecionar_coberturas(
     coverages_available: dict[str, Any],
 ) -> dict[str, str | None]:
     """Monta coverages_selected seguindo as regras da API Justos:
 
     - peril mandatory → opção mais barata
-    - peril optional → null quando há perils mandatory; opção mais barata quando
-      nenhum peril é mandatory (staging Justos: todos retornam mandatory=False —
-      enviar tudo null causa invalid_selected_coverages)
+    - peril optional + há mandatory → null
+    - staging quirk (nenhum mandatory): seleciona mais barato só para _PERILS_CORE;
+      demais ficam null (evita inflar o prêmio com add-ons opcionais)
     - peril sem opções → omitido
     """
     perils_com_opcoes = {
@@ -80,7 +92,8 @@ def _selecionar_coberturas(
     selected: dict[str, str | None] = {}
     for slug, peril in perils_com_opcoes.items():
         options: list[dict[str, Any]] = peril["peril_options"]
-        if peril.get("mandatory") or not tem_mandatory:
+        is_core = slug in _PERILS_CORE
+        if peril.get("mandatory") or (not tem_mandatory and is_core):
             cheapest = min(options, key=lambda o: float(o.get("price", 0)))
             selected[slug] = str(cheapest["slug"])
         else:
