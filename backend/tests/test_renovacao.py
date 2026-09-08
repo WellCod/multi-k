@@ -32,14 +32,14 @@ async def _login(client: AsyncClient, db: AsyncSession, email: str) -> "str":
 
 
 async def _criar_proposta_vencendo(
-    db: AsyncSession, usuario_id: str, dias_para_vencer: int
+    db: AsyncSession, usuario_id: str, dias_para_vencer: int, ramo: str = "auto"
 ) -> None:
     """Cria cotação + proposta que vencerá em `dias_para_vencer` dias."""
     uid = _uuid.UUID(usuario_id)
     cotacao = Cotacao(
         id=_uuid.uuid4(),
         usuario_id=uid,
-        ramo="auto",
+        ramo=ramo,
         status="sucesso",
         dados_risco={},
         premio_total=Decimal("1200.00"),
@@ -171,3 +171,52 @@ async def test_count_total_e_soma_das_janelas(
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == body["D30"] + body["D45"] + body["D60"]
+
+
+async def test_filtro_ramo(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    usuario_id = await _login(client, db, "ren_filtro_ramo@test.com")
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=10, ramo="auto")
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=10, ramo="imovel")
+
+    r = await client.get("/renovacoes?ramo=auto")
+    assert r.status_code == 200
+    items = r.json()
+    assert len(items) >= 1
+    assert all(i["ramo"] == "auto" for i in items)
+
+
+async def test_filtro_janela(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    usuario_id = await _login(client, db, "ren_filtro_janela@test.com")
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=10)  # D30
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=55)  # D60
+
+    r = await client.get("/renovacoes?dias=60&janela=D30")
+    assert r.status_code == 200
+    items = r.json()
+    assert len(items) >= 1
+    assert all(i["janela"] == "D30" for i in items)
+
+
+async def test_exportar_csv(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    usuario_id = await _login(client, db, "ren_csv@test.com")
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=10)
+
+    r = await client.get("/renovacoes/csv")
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+    lines = r.text.strip().split("\n")
+    assert lines[0].startswith("protocolo,ramo")
+    assert len(lines) >= 2
+
+
+async def test_csv_sem_auth_retorna_401(
+    client: AsyncClient, engine: AsyncEngine
+) -> None:
+    r = await client.get("/renovacoes/csv")
+    assert r.status_code == 401
