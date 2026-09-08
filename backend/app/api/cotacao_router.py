@@ -329,6 +329,61 @@ async def exportar_historico_csv(
     )
 
 
+class RecotarLoteInput(BaseModel):
+    cotacao_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
+
+
+@router.post("/recotar-lote", response_model=list[CotacaoCriadaOut], status_code=202)
+async def recotar_em_lote(
+    body: RecotarLoteInput,
+    request: Request,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[CotacaoCriadaOut]:
+    """Cria novas versões para uma lista de cotações (máximo 20)."""
+    originais_r = await db.execute(
+        select(Cotacao)
+        .where(Cotacao.id.in_(body.cotacao_ids))
+        .where(Cotacao.usuario_id == usuario.id)
+    )
+    originais = {c.id: c for c in originais_r.scalars().all()}
+
+    ip = request.client.host if request.client else None
+    novas: list[CotacaoCriadaOut] = []
+    for cid in body.cotacao_ids:
+        original = originais.get(cid)
+        if original is None:
+            continue
+        nova = Cotacao(
+            id=uuid.uuid4(),
+            cliente_id=original.cliente_id,
+            ramo=original.ramo,
+            status="aguardando",
+            dados_risco=dict(original.dados_risco),
+            versao_anterior_id=cid,
+            usuario_id=usuario.id,
+        )
+        db.add(nova)
+        await db.flush()
+        for cia in cias_para_ramo(nova.ramo):
+            db.add(
+                CotacaoJob(
+                    id=uuid.uuid4(), cotacao_id=nova.id, cia=cia, status="pendente"
+                )
+            )
+        await audit.registrar(
+            db,
+            "cotacao.recotada",
+            {"cotacao_anterior": str(cid), "nova_cotacao": str(nova.id)},
+            usuario_id=usuario.id,
+            ip_origem=ip,
+        )
+        novas.append(CotacaoCriadaOut(id=nova.id, status=nova.status, ramo=nova.ramo))
+
+    await db.commit()
+    return novas
+
+
 @router.post("/{cotacao_id}/recotar", response_model=CotacaoCriadaOut, status_code=202)
 async def recotar(
     cotacao_id: uuid.UUID,
