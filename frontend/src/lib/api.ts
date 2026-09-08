@@ -169,6 +169,11 @@ export const api = {
     },
     recotar: (id: string) =>
       request<CotacaoCriada>(`/cotacoes/${id}/recotar`, { method: "POST" }),
+    recotarLote: (cotacao_ids: string[]) =>
+      request<CotacaoCriada[]>("/cotacoes/recotar-lote", {
+        method: "POST",
+        body: JSON.stringify({ cotacao_ids }),
+      }),
     versoes: (id: string) =>
       request<VersaoPremio[]>(`/cotacoes/${id}/versoes`),
     comparativo: (id: string) =>
