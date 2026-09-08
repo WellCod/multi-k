@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, type Cliente, type ClientePatch, type Dominio, type Imovel, type TimelineItem, type Veiculo } from "@/lib/api";
+import { api, type Cliente, type ClientePatch, type CotacaoResumo, type Dominio, type Imovel, type TimelineItem, type Veiculo } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatBRL } from "@/lib/utils";
@@ -245,6 +245,60 @@ function VeiculosSection({ clienteId }: { clienteId: string }) {
   );
 }
 
+const STATUS_CLS: Record<string, string> = {
+  sucesso: "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300",
+  aguardando: "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300",
+  processando: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
+  restricao: "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300",
+  erro: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
+};
+
+function CotacoesSection({ clienteId }: { clienteId: string }) {
+  const [cotacoes, setCotacoes] = useState<CotacaoResumo[] | null>(null);
+
+  useEffect(() => {
+    api.clientes.cotacoes(clienteId).then(setCotacoes).catch(() => setCotacoes([]));
+  }, [clienteId]);
+
+  if (cotacoes === null || cotacoes.length === 0) return null;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
+        Cotações ({cotacoes.length})
+      </h2>
+      <div className="space-y-2">
+        {cotacoes.map((c) => (
+          <div
+            key={c.id}
+            className="flex items-center justify-between text-sm border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STATUS_CLS[c.status] ?? "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"}`}>
+                {c.status}
+              </span>
+              <span className="font-medium text-gray-900 dark:text-white capitalize">{c.ramo}</span>
+              {c.numero_apolice && (
+                <span className="text-xs font-mono text-emerald-700 dark:text-emerald-400 truncate">
+                  #{c.numero_apolice}
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-3 items-center flex-shrink-0">
+              {c.premio_total && (
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {formatBRL(c.premio_total)}
+                </span>
+              )}
+              <span>{new Date(c.criado_em).toLocaleDateString("pt-BR")}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ImoveisSection({ clienteId }: { clienteId: string }) {
   const [imoveis, setImoveis] = useState<Imovel[] | null>(null);
 
@@ -468,6 +522,7 @@ export function ClienteDetailPage() {
 
       {clienteId && <VeiculosSection clienteId={clienteId} />}
       {clienteId && <ImoveisSection clienteId={clienteId} />}
+      {clienteId && <CotacoesSection clienteId={clienteId} />}
 
       <div>
         <div className="flex items-center justify-between mb-4">

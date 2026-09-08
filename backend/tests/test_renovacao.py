@@ -112,3 +112,50 @@ async def test_janela_d45(
     assert r.status_code == 200
     items = r.json()
     assert any(i["janela"] == "D45" for i in items)
+
+
+async def test_count_sem_auth_retorna_401(
+    client: AsyncClient, engine: AsyncEngine
+) -> None:
+    r = await client.get("/renovacoes/count")
+    assert r.status_code == 401
+
+
+async def test_count_sem_propostas_retorna_zeros(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await _login(client, db, "ren_count_vazia@test.com")
+    r = await client.get("/renovacoes/count")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["D30"] == 0
+    assert body["D45"] == 0
+    assert body["D60"] == 0
+    assert body["total"] == 0
+
+
+async def test_count_com_d30(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    usuario_id = await _login(client, db, "ren_count_d30@test.com")
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=15)
+
+    r = await client.get("/renovacoes/count")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["D30"] >= 1
+    assert body["total"] >= 1
+
+
+async def test_count_total_e_soma_das_janelas(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    usuario_id = await _login(client, db, "ren_count_total@test.com")
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=10)
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=40)
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=55)
+
+    r = await client.get("/renovacoes/count")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] == body["D30"] + body["D45"] + body["D60"]
