@@ -566,3 +566,46 @@ async def test_historico_versoes_com_recotacao(
     assert len(versoes) == 2
     assert versoes[0]["id"] == id_original  # cronológico: mais antiga primeiro
     assert versoes[1]["id"] == id_nova
+
+
+async def _criar_cotacao(client: AsyncClient) -> None:
+    """Cria uma cotação simples e retorna a resposta HTTP."""
+    return await client.post("/cotacoes", json=_RISCO_AUTO)
+
+
+async def test_recotar_lote_cria_novas_cotacoes(client: AsyncClient, db: AsyncSession) -> None:
+    await _login(client, db, "corretor_lote@test.com")
+    # cria 2 cotacoes originais
+    id1 = (await _criar_cotacao(client)).json()["id"]
+    id2 = (await _criar_cotacao(client)).json()["id"]
+    r = await client.post("/cotacoes/recotar-lote", json={"cotacao_ids": [id1, id2]})
+    assert r.status_code == 202
+    data = r.json()
+    assert len(data) == 2
+    assert all(item["status"] == "aguardando" for item in data)
+
+
+async def test_recotar_lote_ignora_ids_desconhecidos(client: AsyncClient, db: AsyncSession) -> None:
+    await _login(client, db, "corretor_lote2@test.com")
+    id_valido = (await _criar_cotacao(client)).json()["id"]
+    id_invalido = str(uuid.uuid4())
+    r = await client.post(
+        "/cotacoes/recotar-lote",
+        json={"cotacao_ids": [id_valido, id_invalido]},
+    )
+    assert r.status_code == 202
+    assert len(r.json()) == 1
+
+
+async def test_recotar_lote_sem_auth_retorna_401(client: AsyncClient, db: AsyncSession) -> None:
+    r = await client.post(
+        "/cotacoes/recotar-lote",
+        json={"cotacao_ids": [str(uuid.uuid4())]},
+    )
+    assert r.status_code == 401
+
+
+async def test_recotar_lote_lista_vazia_retorna_422(client: AsyncClient, db: AsyncSession) -> None:
+    await _login(client, db, "corretor_lote3@test.com")
+    r = await client.post("/cotacoes/recotar-lote", json={"cotacao_ids": []})
+    assert r.status_code == 422
