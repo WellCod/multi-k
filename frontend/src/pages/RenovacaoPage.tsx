@@ -153,20 +153,27 @@ function GrupoCard({ janela, grupo }: { janela: Janela; grupo: Renovacao[] }) {
   );
 }
 
+const SELECT_CLS =
+  "rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400";
+
 export function RenovacaoPage() {
   const [renovacoes, setRenovacoes] = useState<Renovacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [ramo, setRamo] = useState("");
+  const [janela, setJanela] = useState("");
+  const [csvLoading, setCsvLoading] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     api.renovacoes
-      .list(60)
+      .list(60, ramo || undefined, janela || undefined)
       .then(setRenovacoes)
       .catch((e: unknown) =>
         setErr(e instanceof Error ? e.message : "Erro ao carregar renovações"),
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [ramo, janela]);
 
   const grouped = {
     D30: renovacoes.filter((r) => r.janela === "D30"),
@@ -176,18 +183,80 @@ export function RenovacaoPage() {
 
   const total = renovacoes.length;
 
+  const handleExportCsv = async () => {
+    setCsvLoading(true);
+    try {
+      const blob = await api.renovacoes.exportCsv(60, ramo || undefined, janela || undefined);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "renovacoes.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently ignore — user can retry
+    } finally {
+      setCsvLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-          Renovações
-        </h1>
-        {!loading && !err && total > 0 && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {total} apólice{total !== 1 ? "s" : ""} vencem nos próximos 60 dias
-          </p>
-        )}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Renovações
+          </h1>
+          {!loading && !err && total > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {total} apólice{total !== 1 ? "s" : ""} vencem nos próximos 60 dias
+            </p>
+          )}
+        </div>
+
+        {/* Filtros + CSV */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={ramo}
+            onChange={(e) => setRamo(e.target.value)}
+            aria-label="Filtrar por ramo"
+            className={SELECT_CLS}
+          >
+            <option value="">Todos os ramos</option>
+            <option value="auto">Auto</option>
+            <option value="imovel">Imóvel</option>
+          </select>
+
+          <select
+            value={janela}
+            onChange={(e) => setJanela(e.target.value)}
+            aria-label="Filtrar por janela"
+            className={SELECT_CLS}
+          >
+            <option value="">Todas as janelas</option>
+            <option value="D30">≤ 30 dias</option>
+            <option value="D45">31–45 dias</option>
+            <option value="D60">46–60 dias</option>
+          </select>
+
+          <button
+            onClick={handleExportCsv}
+            disabled={csvLoading || loading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {csvLoading ? (
+              <span className="h-3.5 w-3.5 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            )}
+            Exportar CSV
+          </button>
+        </div>
       </div>
 
       {/* Erro */}
@@ -211,10 +280,12 @@ export function RenovacaoPage() {
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-16 text-center">
           <p className="text-4xl mb-3">📋</p>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Nenhuma apólice vence nos próximos 60 dias
+            Nenhuma apólice encontrada
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Volte mais tarde para acompanhar os vencimentos
+            {ramo || janela
+              ? "Tente remover os filtros aplicados"
+              : "Volte mais tarde para acompanhar os vencimentos"}
           </p>
         </div>
       )}
@@ -222,10 +293,10 @@ export function RenovacaoPage() {
       {/* Cards de grupos */}
       {!loading && !err && total > 0 && (
         <div className="space-y-4">
-          {(["D30", "D45", "D60"] as const).map((janela) => {
-            const grupo = grouped[janela];
+          {(["D30", "D45", "D60"] as const).map((j) => {
+            const grupo = grouped[j];
             if (grupo.length === 0) return null;
-            return <GrupoCard key={janela} janela={janela} grupo={grupo} />;
+            return <GrupoCard key={j} janela={j} grupo={grupo} />;
           })}
         </div>
       )}
