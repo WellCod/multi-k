@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, nullsfirst, nullslast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.registry import cias_para_ramo
@@ -222,6 +222,13 @@ class PaginatedCotacoes(BaseModel):
     pages: int
 
 
+_ORDER_COLS = {
+    "data_asc": lambda: Cotacao.criado_em.asc(),
+    "premio_desc": lambda: nullslast(Cotacao.premio_total.desc()),
+    "premio_asc": lambda: nullsfirst(Cotacao.premio_total.asc()),
+}
+
+
 @router.get("", response_model=PaginatedCotacoes)
 async def listar_cotacoes(
     usuario: CurrentUser,
@@ -232,6 +239,10 @@ async def listar_cotacoes(
     status: str | None = Query(default=None),
     q: str | None = Query(default=None, max_length=100),
     dias: int | None = Query(default=None, ge=1, le=365),
+    cia: Annotated[str | None, Query(max_length=50)] = None,
+    order_by: Annotated[
+        str | None, Query(pattern="^(data_asc|premio_desc|premio_asc)$")
+    ] = None,
 ) -> PaginatedCotacoes:
     from datetime import UTC, datetime, timedelta
 
@@ -245,6 +256,10 @@ async def listar_cotacoes(
     if dias:
         corte = datetime.now(UTC) - timedelta(days=dias)
         base_where = base_where & (Cotacao.criado_em >= corte)
+    if cia:
+        base_where = base_where & Cotacao.id.in_(
+            select(CotacaoJob.cotacao_id).where(CotacaoJob.cia == cia)
+        )
     if q:
         # dados_risco["proponente"]["nome"].astext acessa o JSONB aninhado como texto
         nome_match = Cotacao.dados_risco["proponente"]["nome"].astext.ilike(f"%{q}%")
@@ -258,10 +273,13 @@ async def listar_cotacoes(
     )
     total: int = total_row.scalar_one()
 
+    order_col = (
+        _ORDER_COLS[order_by]() if order_by in _ORDER_COLS else Cotacao.criado_em.desc()
+    )
     result = await db.execute(
         select(Cotacao)
         .where(base_where)
-        .order_by(Cotacao.criado_em.desc())
+        .order_by(order_col)
         .limit(page_size)
         .offset((page - 1) * page_size)
     )

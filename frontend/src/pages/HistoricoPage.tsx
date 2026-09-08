@@ -145,6 +145,8 @@ export function HistoricoPage() {
   const [filtroRamo, setFiltroRamo] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroDias, setFiltroDias] = useState(0);
+  const [filtroCia, setFiltroCia] = useState("");
+  const [orderBy, setOrderBy] = useState("");
   const [page, setPage] = useState(1);
   const [apolicesPendentes, setApolicesPendentes] = useState<Record<string, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -156,6 +158,8 @@ export function HistoricoPage() {
     status: string;
     dias: number;
     q: string;
+    cia: string;
+    order_by: string;
   }) => {
     setLoading(true);
     setErr(null);
@@ -167,6 +171,8 @@ export function HistoricoPage() {
         status: opts.status || undefined,
         dias: opts.dias || undefined,
         q: opts.q.trim() || undefined,
+        cia: opts.cia || undefined,
+        order_by: opts.order_by || undefined,
       })
       .then((r: PaginatedCotacoes) => setData(r))
       .catch((e: unknown) =>
@@ -179,25 +185,27 @@ export function HistoricoPage() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      fetchCotacoes({ page, ramo: filtroRamo, status: filtroStatus, dias: filtroDias, q: busca });
+      fetchCotacoes({ page, ramo: filtroRamo, status: filtroStatus, dias: filtroDias, q: busca, cia: filtroCia, order_by: orderBy });
     }, busca ? 350 : 0);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [page, filtroRamo, filtroStatus, filtroDias, busca]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, filtroRamo, filtroStatus, filtroDias, busca, filtroCia, orderBy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset to page 1 when filters change (not page itself)
   useEffect(() => {
     setPage(1);
-  }, [busca, filtroRamo, filtroStatus, filtroDias]);
+  }, [busca, filtroRamo, filtroStatus, filtroDias, filtroCia, orderBy]);
 
-  const temFiltroAtivo = busca || filtroRamo || filtroStatus || filtroDias > 0;
+  const temFiltroAtivo = busca || filtroRamo || filtroStatus || filtroDias > 0 || filtroCia;
 
   function limparFiltros() {
     setBusca("");
     setFiltroRamo("");
     setFiltroStatus("");
     setFiltroDias(0);
+    setFiltroCia("");
+    setOrderBy("");
   }
 
   const selectClass =
@@ -283,6 +291,27 @@ export function HistoricoPage() {
             <option value={90}>Últimos 90 dias</option>
             <option value={365}>Último ano</option>
           </select>
+          <select
+            value={filtroCia}
+            onChange={(e) => setFiltroCia(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">Todas as CIAs</option>
+            <option value="fake">Simulação</option>
+            <option value="justos">Justos</option>
+            <option value="yelum">Yelum</option>
+          </select>
+          <select
+            value={orderBy}
+            onChange={(e) => setOrderBy(e.target.value)}
+            className={selectClass}
+            aria-label="Ordenar por"
+          >
+            <option value="">Mais recentes</option>
+            <option value="data_asc">Mais antigas</option>
+            <option value="premio_desc">Maior prêmio</option>
+            <option value="premio_asc">Menor prêmio</option>
+          </select>
           {temFiltroAtivo && (
             <button
               onClick={limparFiltros}
@@ -300,6 +329,8 @@ export function HistoricoPage() {
             {filtroRamo && <ActiveFilterChip label={`Ramo: ${filtroRamo}`} onRemove={() => setFiltroRamo("")} />}
             {filtroStatus && <ActiveFilterChip label={`Status: ${filtroStatus}`} onRemove={() => setFiltroStatus("")} />}
             {filtroDias > 0 && <ActiveFilterChip label={filtroDias === 365 ? "Último ano" : `Últimos ${filtroDias} dias`} onRemove={() => setFiltroDias(0)} />}
+            {filtroCia && <ActiveFilterChip label={`CIA: ${filtroCia}`} onRemove={() => setFiltroCia("")} />}
+            {orderBy && <ActiveFilterChip label={{ data_asc: "Mais antigas", premio_desc: "Maior prêmio", premio_asc: "Menor prêmio" }[orderBy] ?? orderBy} onRemove={() => setOrderBy("")} />}
           </div>
         )}
       </div>
