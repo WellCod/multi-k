@@ -195,11 +195,27 @@ export const api = {
 
   // ---- Renovações ----
   renovacoes: {
-    list: (dias?: number) => {
-      const params = dias ? `?dias=${dias}` : "";
-      return request<Renovacao[]>(`/renovacoes${params}`);
+    list: (dias?: number, ramo?: string, janela?: string) => {
+      const p = new URLSearchParams();
+      if (dias) p.set("dias", String(dias));
+      if (ramo) p.set("ramo", ramo);
+      if (janela) p.set("janela", janela);
+      const qs = p.toString();
+      return request<Renovacao[]>(`/renovacoes${qs ? `?${qs}` : ""}`);
     },
     count: () => request<RenovacaoCount>("/renovacoes/count"),
+    exportCsv: async (dias?: number, ramo?: string, janela?: string): Promise<Blob> => {
+      const p = new URLSearchParams();
+      if (dias) p.set("dias", String(dias));
+      if (ramo) p.set("ramo", ramo);
+      if (janela) p.set("janela", janela);
+      const qs = p.toString();
+      const res = await fetch(`${BASE}/renovacoes/csv${qs ? `?${qs}` : ""}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Erro ao exportar CSV");
+      return res.blob();
+    },
   },
 
   // ---- Auditoria ----
