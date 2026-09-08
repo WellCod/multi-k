@@ -33,6 +33,20 @@ class ItemComparativoOut(BaseModel):
     mensagens: list[str]
     necessita_vistoria: bool
     status: str
+    coverages_available: dict[str, Any] | None = None
+    coverages_selected: dict[str, str | None] | None = None
+
+
+class RepricingInput(BaseModel):
+    cia: str
+    coverages_selected: dict[str, str | None]
+
+
+class RepricingOutput(BaseModel):
+    monthly_total: Decimal
+    annual_total: Decimal
+    info: str
+    coverages_selected: dict[str, str | None]
 
 
 async def _get_cotacao_ou_404(
@@ -84,6 +98,8 @@ def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparati
             mensagens=[str(m) for m in (j.mensagens or [])],
             necessita_vistoria=j.necessita_vistoria,
             status=j.status_resultado or "erro",
+            coverages_available=(j.payload_resposta or {}).get("coverages_available"),
+            coverages_selected=(j.payload_resposta or {}).get("coverages_selected"),
         )
         for j in concluidos
     ]
@@ -170,6 +186,47 @@ async def comparativo_json(
     )
     jobs = list(jobs_r.scalars().all())
     return _build_itens(cotacao, jobs)
+
+
+@router.post(
+    "/cotacoes/{cotacao_id}/repricing",
+    response_model=RepricingOutput,
+)
+async def repricing(
+    cotacao_id: uuid.UUID,
+    body: RepricingInput,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RepricingOutput:
+    """Recalcula o preço de uma cotação Justos com novas coberturas selecionadas."""
+    await _get_cotacao_ou_404(cotacao_id, usuario.id, db)
+
+    result = await db.execute(
+        select(CotacaoJob)
+        .where(CotacaoJob.cotacao_id == cotacao_id, CotacaoJob.cia == body.cia)
+        .order_by(CotacaoJob.criado_em.desc())
+        .limit(1)
+    )
+    job = result.scalar_one_or_none()
+    if not job or not job.payload_resposta:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job não encontrado.")
+
+    quote_id: str | None = job.payload_resposta.get("quote_id")
+    if not quote_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="quote_id não disponível.")
+
+    from app.adapters.justos import client as justos_client
+
+    pricing = await justos_client.calcular_preco(quote_id, body.coverages_selected)
+    monthly = Decimal(str(pricing.get("monthly", {}).get("total", 0))).quantize(Decimal("0.01"))
+    annual = Decimal(str(pricing.get("annual", {}).get("total", 0))).quantize(Decimal("0.01"))
+
+    return RepricingOutput(
+        monthly_total=monthly,
+        annual_total=annual,
+        info=pricing.get("info", ""),
+        coverages_selected=body.coverages_selected,
+    )
 
 
 @router.get("/cotacoes/{cotacao_id}/comparativo/pdf")
