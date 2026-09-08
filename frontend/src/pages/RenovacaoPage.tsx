@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type Renovacao } from "@/lib/api";
+import { api, type CotacaoCriada, type Renovacao } from "@/lib/api";
 import { Tooltip } from "@/components/Tooltip";
 import { formatBRL, formatDate } from "@/lib/utils";
 
@@ -69,7 +69,17 @@ function SkeletonGroupCard() {
   );
 }
 
-function GrupoCard({ janela, grupo }: { janela: Janela; grupo: Renovacao[] }) {
+function GrupoCard({
+  janela,
+  grupo,
+  selecionadas,
+  onToggle,
+}: {
+  janela: Janela;
+  grupo: Renovacao[];
+  selecionadas: Set<string>;
+  onToggle: (cotacaoId: string) => void;
+}) {
   const navigate = useNavigate();
   const cfg = JANELA_CONFIG[janela];
 
@@ -90,6 +100,7 @@ function GrupoCard({ janela, grupo }: { janela: Janela; grupo: Renovacao[] }) {
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-gray-50 dark:bg-gray-700/60 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              <th className="px-3 py-2.5 w-8" />
               <th className="px-4 py-2.5">Protocolo</th>
               <th className="px-4 py-2.5">Ramo</th>
               <th className="px-4 py-2.5">Prêmio</th>
@@ -102,8 +113,21 @@ function GrupoCard({ janela, grupo }: { janela: Janela; grupo: Renovacao[] }) {
             {grupo.map((r) => (
               <tr
                 key={r.proposta_id}
-                className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                className={`border-b border-gray-100 dark:border-gray-700 transition-colors ${
+                  selecionadas.has(r.cotacao_id)
+                    ? "bg-indigo-50 dark:bg-indigo-900/20"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                }`}
               >
+                <td className="px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selecionadas.has(r.cotacao_id)}
+                    onChange={() => onToggle(r.cotacao_id)}
+                    className="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                    aria-label={`Selecionar ${r.protocolo}`}
+                  />
+                </td>
                 <td className="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
                   {r.protocolo}
                 </td>
@@ -157,12 +181,16 @@ const SELECT_CLS =
   "rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400";
 
 export function RenovacaoPage() {
+  const navigate = useNavigate();
   const [renovacoes, setRenovacoes] = useState<Renovacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [ramo, setRamo] = useState("");
   const [janela, setJanela] = useState("");
   const [csvLoading, setCsvLoading] = useState(false);
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [loteLoading, setLoteLoading] = useState(false);
+  const [loteResultado, setLoteResultado] = useState<CotacaoCriada[] | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -173,6 +201,7 @@ export function RenovacaoPage() {
         setErr(e instanceof Error ? e.message : "Erro ao carregar renovações"),
       )
       .finally(() => setLoading(false));
+    setSelecionadas(new Set());
   }, [ramo, janela]);
 
   const grouped = {
@@ -182,6 +211,36 @@ export function RenovacaoPage() {
   };
 
   const total = renovacoes.length;
+
+  const handleToggle = (cotacaoId: string) => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      next.has(cotacaoId) ? next.delete(cotacaoId) : next.add(cotacaoId);
+      return next;
+    });
+  };
+
+  const handleSelecionarTodas = () => {
+    if (selecionadas.size === renovacoes.length) {
+      setSelecionadas(new Set());
+    } else {
+      setSelecionadas(new Set(renovacoes.map((r) => r.cotacao_id)));
+    }
+  };
+
+  const handleRecotarLote = async () => {
+    if (selecionadas.size === 0) return;
+    setLoteLoading(true);
+    try {
+      const resultado = await api.cotacoes.recotarLote([...selecionadas]);
+      setLoteResultado(resultado);
+      setSelecionadas(new Set());
+    } catch {
+      // silently ignore
+    } finally {
+      setLoteLoading(false);
+    }
+  };
 
   const handleExportCsv = async () => {
     setCsvLoading(true);
@@ -290,13 +349,76 @@ export function RenovacaoPage() {
         </div>
       )}
 
+      {/* Barra de seleção em lote */}
+      {!loading && !err && total > 0 && (
+        <div className="flex flex-wrap items-center gap-3 px-1">
+          <button
+            onClick={handleSelecionarTodas}
+            className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
+          >
+            {selecionadas.size === renovacoes.length ? "Desmarcar todas" : "Selecionar todas"}
+          </button>
+          {selecionadas.size > 0 && (
+            <button
+              onClick={handleRecotarLote}
+              disabled={loteLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            >
+              {loteLoading ? (
+                <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              ) : null}
+              Recotar {selecionadas.size} selecionada{selecionadas.size !== 1 ? "s" : ""}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Modal resultado lote */}
+      {loteResultado && (
+        <div className="rounded-xl border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
+                {loteResultado.length} cotaç{loteResultado.length !== 1 ? "ões criadas" : "ão criada"} com sucesso
+              </p>
+              <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
+                Processamento em andamento — acompanhe no histórico
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={() => navigate("/historico")}
+                className="text-xs px-2.5 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+              >
+                Ver histórico
+              </button>
+              <button
+                onClick={() => setLoteResultado(null)}
+                className="text-xs text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300"
+                aria-label="fechar"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cards de grupos */}
       {!loading && !err && total > 0 && (
         <div className="space-y-4">
           {(["D30", "D45", "D60"] as const).map((j) => {
             const grupo = grouped[j];
             if (grupo.length === 0) return null;
-            return <GrupoCard key={j} janela={j} grupo={grupo} />;
+            return (
+              <GrupoCard
+                key={j}
+                janela={j}
+                grupo={grupo}
+                selecionadas={selecionadas}
+                onToggle={handleToggle}
+              />
+            );
           })}
         </div>
       )}
