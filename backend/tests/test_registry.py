@@ -32,19 +32,19 @@ def test_cias_para_ramo_sem_credenciais_retorna_apenas_fake() -> None:
 
 
 def test_cias_para_ramo_auto_com_justos(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Com JUSTOS_PARTNER_NAME definido, 'justos' deve aparecer para ramo auto."""
+    """Com JUSTOS_PARTNER_NAME definido, apenas 'justos' deve aparecer (sem fake)."""
     monkeypatch.setenv("JUSTOS_PARTNER_NAME", "corretor-teste")
     cias = cias_para_ramo("auto")
-    assert "fake" in cias
     assert "justos" in cias
+    assert "fake" not in cias
 
 
 def test_cias_para_ramo_imovel_com_yelum(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Com YELUM_CLIENT_ID definido, 'yelum' deve aparecer para ramo imovel."""
+    """Com YELUM_CLIENT_ID definido, apenas 'yelum' deve aparecer (sem fake)."""
     monkeypatch.setenv("YELUM_CLIENT_ID", "client-id-teste")
     cias = cias_para_ramo("imovel")
-    assert "fake" in cias
     assert "yelum" in cias
+    assert "fake" not in cias
 
 
 def test_cias_para_ramo_imovel_sem_yelum_nao_inclui_yelum(
