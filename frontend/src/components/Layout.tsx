@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { api, type RenovacaoCount } from "@/lib/api";
 import { useDarkMode } from "@/lib/use-dark-mode";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -86,6 +87,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { dark, toggle } = useDarkMode();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [renovCount, setRenovCount] = useState<RenovacaoCount | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    api.renovacoes.count().then(setRenovCount).catch(() => undefined);
+  }, [user]);
 
   const navItems = [...NAV_BASE, ...(user?.papel === "admin" ? NAV_ADMIN : [])];
 
@@ -108,13 +115,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   key={to}
                   to={to}
                   className={cn(
-                    "px-3 py-1.5 rounded text-sm transition-colors",
+                    "px-3 py-1.5 rounded text-sm transition-colors inline-flex items-center gap-1",
                     pathname.startsWith(to)
                       ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300"
                       : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700",
                   )}
                 >
                   {label}
+                  {to === "/renovacoes" && renovCount && renovCount.D30 > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                      {renovCount.D30 > 9 ? "9+" : renovCount.D30}
+                    </span>
+                  )}
                 </Link>
               ))}
             </nav>
@@ -161,13 +173,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 to={to}
                 onClick={() => setMenuOpen(false)}
                 className={cn(
-                  "block px-3 py-2 rounded-lg text-sm transition-colors",
+                  "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
                   pathname.startsWith(to)
                     ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300"
                     : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
                 )}
               >
                 {label}
+                {to === "/renovacoes" && renovCount && renovCount.D30 > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                    {renovCount.D30 > 9 ? "9+" : renovCount.D30}
+                  </span>
+                )}
               </Link>
             ))}
             <button
