@@ -566,3 +566,168 @@ async def test_historico_versoes_com_recotacao(
     assert len(versoes) == 2
     assert versoes[0]["id"] == id_original  # cronológico: mais antiga primeiro
     assert versoes[1]["id"] == id_nova
+
+
+async def _criar_cotacao(client: AsyncClient) -> None:
+    """Cria uma cotação simples e retorna a resposta HTTP."""
+    return await client.post("/cotacoes", json=_RISCO_AUTO)
+
+
+async def test_recotar_lote_cria_novas_cotacoes(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    await _login(client, db, "corretor_lote@test.com")
+    id1 = (await _criar_cotacao(client)).json()["id"]
+    id2 = (await _criar_cotacao(client)).json()["id"]
+    r = await client.post("/cotacoes/recotar-lote", json={"cotacao_ids": [id1, id2]})
+    assert r.status_code == 202
+    data = r.json()
+    assert len(data) == 2
+    assert all(item["status"] == "aguardando" for item in data)
+
+
+async def test_recotar_lote_ignora_ids_desconhecidos(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    await _login(client, db, "corretor_lote2@test.com")
+    id_valido = (await _criar_cotacao(client)).json()["id"]
+    id_invalido = str(uuid.uuid4())
+    r = await client.post(
+        "/cotacoes/recotar-lote",
+        json={"cotacao_ids": [id_valido, id_invalido]},
+    )
+    assert r.status_code == 202
+    assert len(r.json()) == 1
+
+
+async def test_recotar_lote_sem_auth_retorna_401(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    r = await client.post(
+        "/cotacoes/recotar-lote",
+        json={"cotacao_ids": [str(uuid.uuid4())]},
+    )
+    assert r.status_code == 401
+
+
+async def test_recotar_lote_lista_vazia_retorna_422(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    await _login(client, db, "corretor_lote3@test.com")
+    r = await client.post("/cotacoes/recotar-lote", json={"cotacao_ids": []})
+    assert r.status_code == 422
+
+
+async def test_recotar_lote_direto_cobre_corpo(engine: AsyncEngine) -> None:
+    """Chama recotar_em_lote diretamente para garantir cobertura do corpo."""
+    from decimal import Decimal
+    from unittest.mock import MagicMock
+
+    from sqlalchemy import text
+
+    from app.api.cotacao_router import RecotarLoteInput, recotar_em_lote
+    from app.domain.auth import TENANT_ID
+    from app.infra.auth_service import hash_senha
+    from app.infra.models import Cotacao, Usuario
+
+    uid = uuid.uuid4()
+    cot_id = uuid.uuid4()
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        await session.execute(
+            text(f"SELECT set_config('app.usuario_id', '{uid}', true)")
+        )
+        await session.execute(text("SELECT set_config('app.papel', 'corretor', true)"))
+        session.add(
+            Usuario(
+                id=uid,
+                email=f"lote_dir_{uid.hex[:8]}@test.com",
+                nome="Lote Dir",
+                senha_hash=hash_senha("Test@123"),
+                papel="corretor",
+                tenant_id=TENANT_ID,
+            )
+        )
+        await session.flush()
+        session.add(
+            Cotacao(
+                id=cot_id,
+                usuario_id=uid,
+                tenant_id=TENANT_ID,
+                ramo="auto",
+                status="sucesso",
+                dados_risco={"codigo_fipe": "001004-9"},
+                premio_total=Decimal("500.00"),
+            )
+        )
+        await session.commit()
+
+    mock_user = MagicMock()
+    mock_user.id = uid
+    mock_req = MagicMock()
+    mock_req.client.host = "127.0.0.1"
+
+    body = RecotarLoteInput(cotacao_ids=[cot_id])
+    async with factory() as session:
+        await session.execute(
+            text(f"SELECT set_config('app.usuario_id', '{uid}', true)")
+        )
+        await session.execute(text("SELECT set_config('app.papel', 'corretor', true)"))
+        result = await recotar_em_lote(
+            body=body, request=mock_req, usuario=mock_user, db=session
+        )
+    assert len(result) == 1
+    assert result[0].ramo == "auto"
+
+
+async def test_recotar_lote_direto_ignora_id_desconhecido(
+    engine: AsyncEngine,
+) -> None:
+    """recotar_em_lote com ID inválido retorna lista vazia (cobre branch continue)."""
+    from unittest.mock import MagicMock
+
+    from sqlalchemy import text
+
+    from app.api.cotacao_router import RecotarLoteInput, recotar_em_lote
+    from app.domain.auth import TENANT_ID
+    from app.infra.auth_service import hash_senha
+    from app.infra.models import Usuario
+
+    uid = uuid.uuid4()
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        await session.execute(
+            text(f"SELECT set_config('app.usuario_id', '{uid}', true)")
+        )
+        await session.execute(text("SELECT set_config('app.papel', 'corretor', true)"))
+        session.add(
+            Usuario(
+                id=uid,
+                email=f"lote_dir2_{uid.hex[:8]}@test.com",
+                nome="Lote Dir2",
+                senha_hash=hash_senha("Test@123"),
+                papel="corretor",
+                tenant_id=TENANT_ID,
+            )
+        )
+        await session.commit()
+
+    mock_user = MagicMock()
+    mock_user.id = uid
+    mock_req = MagicMock()
+    mock_req.client = None
+
+    body = RecotarLoteInput(cotacao_ids=[uuid.uuid4()])
+    async with factory() as session:
+        await session.execute(
+            text(f"SELECT set_config('app.usuario_id', '{uid}', true)")
+        )
+        await session.execute(text("SELECT set_config('app.papel', 'corretor', true)"))
+        result = await recotar_em_lote(
+            body=body, request=mock_req, usuario=mock_user, db=session
+        )
+    assert result == []
