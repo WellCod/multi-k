@@ -180,6 +180,11 @@ export const api = {
       request<ItemComparativo[]>(`/cotacoes/${id}/comparativo`),
     comparativoPdfUrl: (id: string) =>
       `${BASE}/cotacoes/${id}/comparativo/pdf`,
+    repricing: (id: string, cia: string, coverages_selected: Record<string, string | null>) =>
+      request<RepricingResult>(`/cotacoes/${id}/repricing`, {
+        method: "POST",
+        body: JSON.stringify({ cia, coverages_selected }),
+      }),
     transmitir: (id: string, body: TransmitirInput) =>
       request<Proposta>(`/cotacoes/${id}/transmitir`, {
         method: "POST",
@@ -500,6 +505,23 @@ export interface VersaoPremio {
   ramo: string;
 }
 
+export interface PerilOption {
+  slug: string;
+  name: string;
+  description: string;
+  price: number;
+  deductible: number;
+  coverage_amount: number;
+  used_parts: boolean;
+}
+
+export interface Peril {
+  name: string;
+  description: string;
+  mandatory: boolean;
+  peril_options: PerilOption[];
+}
+
 export interface ItemComparativo {
   cia: string;
   cotacao_id_cia: string | null;
@@ -509,6 +531,15 @@ export interface ItemComparativo {
   mensagens: string[];
   necessita_vistoria: boolean;
   status: string;
+  coverages_available: Record<string, Peril> | null;
+  coverages_selected: Record<string, string | null> | null;
+}
+
+export interface RepricingResult {
+  monthly_total: string;
+  annual_total: string;
+  info: string;
+  coverages_selected: Record<string, string | null>;
 }
 
 export interface RenovacaoCount {
