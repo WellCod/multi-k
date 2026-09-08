@@ -425,9 +425,7 @@ async def listar_cotacoes_cliente(
     apolice_por_cotacao: dict[uuid.UUID, str | None] = {}
     if cotacoes:
         props_r = await db.execute(
-            select(Proposta).where(
-                Proposta.cotacao_id.in_([c.id for c in cotacoes])
-            )
+            select(Proposta).where(Proposta.cotacao_id.in_([c.id for c in cotacoes]))
         )
         for p in props_r.scalars().all():
             apolice_por_cotacao[p.cotacao_id] = p.numero_apolice
