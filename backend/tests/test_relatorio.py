@@ -416,3 +416,42 @@ async def test_comissoes_csv_com_dados(
     assert "ramo" in lines[0]
     assert "comissao_total" in lines[0]
     assert len(lines) >= 2
+
+
+# ---------------------------------------------------------------------------
+# Export CSV/XLSX com date_from/date_to
+# ---------------------------------------------------------------------------
+
+
+async def test_export_csv_com_date_range(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Export CSV deve aceitar date_from e date_to."""
+    from datetime import date, timedelta
+
+    await _login(client, db, "adm_csv_drange@test.com", Papel.ADMIN)
+    date_from = (date.today() - timedelta(days=7)).isoformat()
+    date_to = date.today().isoformat()
+    r = await client.get(
+        "/relatorios/export/csv",
+        params={"tipo": "funil", "date_from": date_from, "date_to": date_to},
+    )
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+
+
+async def test_export_xlsx_com_date_range(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Export XLSX deve aceitar date_from e date_to."""
+    from datetime import date, timedelta
+
+    await _login(client, db, "adm_xlsx_drange@test.com", Papel.ADMIN)
+    date_from = (date.today() - timedelta(days=7)).isoformat()
+    date_to = date.today().isoformat()
+    r = await client.get(
+        "/relatorios/export/xlsx",
+        params={"tipo": "mix", "date_from": date_from, "date_to": date_to},
+    )
+    assert r.status_code == 200
+    assert "spreadsheet" in r.headers["content-type"]
