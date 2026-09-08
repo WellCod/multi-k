@@ -40,6 +40,39 @@ def _janela(dias: int) -> str:
     return "D60"
 
 
+class RenovacaoCountOut(BaseModel):
+    D30: int
+    D45: int
+    D60: int
+    total: int
+
+
+@router.get("/count", response_model=RenovacaoCountOut)
+async def contar_renovacoes(
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RenovacaoCountOut:
+    """Contagem de renovações por janela — usado pelo badge do sidebar."""
+    result = await db.execute(
+        select(Proposta, Cotacao)
+        .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
+        .where(Proposta.usuario_id == usuario.id)
+        .where(Proposta.inicio_vigencia.is_not(None))
+    )
+    hoje = date.today()
+    d30 = d45 = d60 = 0
+    for proposta, _cotacao in result.all():
+        fim = proposta.inicio_vigencia + timedelta(days=_VIGENCIA_DIAS)
+        dias = (fim - hoje).days
+        if 0 <= dias <= 30:
+            d30 += 1
+        elif dias <= 45:
+            d45 += 1
+        elif dias <= 60:
+            d60 += 1
+    return RenovacaoCountOut(D30=d30, D45=d45, D60=d60, total=d30 + d45 + d60)
+
+
 @router.get("", response_model=list[RenovacaoOut])
 async def listar_renovacoes(
     usuario: CurrentUser,
