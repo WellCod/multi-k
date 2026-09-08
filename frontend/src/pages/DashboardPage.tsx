@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, type DashboardOut } from "@/lib/api";
+import { useNavigate } from "react-router-dom";
+import { api, type DashboardOut, type RenovacaoCount } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatBRL } from "@/lib/utils";
 import { KpiCard } from "@/components/KpiCard";
@@ -63,12 +64,20 @@ function Skeleton() {
   );
 }
 
+const JANELA_STYLE = {
+  D30: { bar: "bg-red-500 dark:bg-red-400", label: "≤ 30 dias", text: "text-red-700 dark:text-red-300" },
+  D45: { bar: "bg-orange-500 dark:bg-orange-400", label: "31–45 dias", text: "text-orange-700 dark:text-orange-300" },
+  D60: { bar: "bg-yellow-500 dark:bg-yellow-400", label: "46–60 dias", text: "text-yellow-700 dark:text-yellow-300" },
+};
+
 export function DashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [periodo, setPeriodo] = useState(30);
+  const [renovCount, setRenovCount] = useState<RenovacaoCount | null>(null);
 
   const isAdmin = user?.papel === "admin";
 
@@ -81,6 +90,10 @@ export function DashboardPage() {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Erro ao carregar"))
       .finally(() => setLoading(false));
   }, [periodo]);
+
+  useEffect(() => {
+    api.renovacoes.count().then(setRenovCount).catch(() => undefined);
+  }, []);
 
   return (
     <div className="space-y-6 pb-8">
@@ -130,6 +143,49 @@ export function DashboardPage() {
               sub="prêmio médio aprovado"
             />
           </div>
+
+          {/* Renovações a vencer */}
+          {renovCount && renovCount.total > 0 && (
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Renovações a vencer (próximos 60 dias)
+                </h2>
+                <button
+                  onClick={() => navigate("/renovacoes")}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Ver todas →
+                </button>
+              </div>
+              <div className="space-y-3">
+                {(["D30", "D45", "D60"] as const).map((j) => {
+                  const count = renovCount[j];
+                  const style = JANELA_STYLE[j];
+                  const pct = renovCount.total > 0 ? Math.round((count / renovCount.total) * 100) : 0;
+                  return (
+                    <div key={j} className="flex items-center gap-3">
+                      <span className={`w-24 text-xs font-medium shrink-0 ${style.text}`}>
+                        {style.label}
+                      </span>
+                      <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all ${style.bar}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-mono text-gray-700 dark:text-gray-200 w-10 text-right shrink-0">
+                        {count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                Total: {renovCount.total} apólice{renovCount.total !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
 
           {/* Por ramo */}
           {data.por_ramo.length > 0 && (
