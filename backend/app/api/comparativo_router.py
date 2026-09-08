@@ -222,12 +222,12 @@ async def repricing(
         )
 
     pricing = await justos_client.calcular_preco(quote_id, body.coverages_selected)
-    monthly = Decimal(
-        str(pricing.get("monthly", {}).get("total", 0))
-    ).quantize(Decimal("0.01"))
-    annual = Decimal(
-        str(pricing.get("annual", {}).get("total", 0))
-    ).quantize(Decimal("0.01"))
+    monthly = Decimal(str(pricing.get("monthly", {}).get("total", 0))).quantize(
+        Decimal("0.01")
+    )
+    annual = Decimal(str(pricing.get("annual", {}).get("total", 0))).quantize(
+        Decimal("0.01")
+    )
 
     return RepricingOutput(
         monthly_total=monthly,
