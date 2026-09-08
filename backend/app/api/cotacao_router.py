@@ -4,7 +4,7 @@ import csv
 import io
 import uuid
 from decimal import Decimal
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Callable, Literal, cast
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
@@ -222,10 +222,10 @@ class PaginatedCotacoes(BaseModel):
     pages: int
 
 
-_ORDER_COLS = {
+_ORDER_COLS: dict[str, Callable[[], Any]] = {
     "data_asc": lambda: Cotacao.criado_em.asc(),
-    "premio_desc": lambda: nullslast(Cotacao.premio_total.desc()),
-    "premio_asc": lambda: nullsfirst(Cotacao.premio_total.asc()),
+    "premio_desc": lambda: cast(Any, nullslast)(Cotacao.premio_total.desc()),
+    "premio_asc": lambda: cast(Any, nullsfirst)(Cotacao.premio_total.asc()),
 }
 
 
@@ -273,7 +273,7 @@ async def listar_cotacoes(
     )
     total: int = total_row.scalar_one()
 
-    order_col = (
+    order_col: Any = (
         _ORDER_COLS[order_by]() if order_by in _ORDER_COLS else Cotacao.criado_em.desc()
     )
     result = await db.execute(
