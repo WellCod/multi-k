@@ -263,6 +263,7 @@ async def test_listar_cotacoes_cliente_com_dados(
 
     # Cria cotação diretamente no DB vinculada ao cliente
     from sqlalchemy import select as _select
+
     from app.infra.models import Cliente as ClienteModel
 
     cli_r = await db.execute(
