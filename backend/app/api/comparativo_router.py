@@ -17,6 +17,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.justos import client as justos_client
 from app.api.deps import CurrentUser
 from app.infra.db import get_db
 from app.infra.models import Cotacao, CotacaoJob
@@ -209,17 +210,24 @@ async def repricing(
     )
     job = result.scalar_one_or_none()
     if not job or not job.payload_resposta:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job não encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job não encontrado."
+        )
 
     quote_id: str | None = job.payload_resposta.get("quote_id")
     if not quote_id:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="quote_id não disponível.")
-
-    from app.adapters.justos import client as justos_client
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="quote_id não disponível.",
+        )
 
     pricing = await justos_client.calcular_preco(quote_id, body.coverages_selected)
-    monthly = Decimal(str(pricing.get("monthly", {}).get("total", 0))).quantize(Decimal("0.01"))
-    annual = Decimal(str(pricing.get("annual", {}).get("total", 0))).quantize(Decimal("0.01"))
+    monthly = Decimal(
+        str(pricing.get("monthly", {}).get("total", 0))
+    ).quantize(Decimal("0.01"))
+    annual = Decimal(
+        str(pricing.get("annual", {}).get("total", 0))
+    ).quantize(Decimal("0.01"))
 
     return RepricingOutput(
         monthly_total=monthly,
