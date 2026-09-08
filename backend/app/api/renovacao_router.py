@@ -126,8 +126,8 @@ async def exportar_renovacoes_csv(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     dias: int = Query(default=60, ge=1, le=180),
-    ramo: str | None = Query(default=None),
-    janela: str | None = Query(default=None, pattern="^(D30|D45|D60)$"),
+    ramo: Annotated[str | None, Query()] = None,
+    janela: Annotated[str | None, Query(pattern="^(D30|D45|D60)$")] = None,
 ) -> StreamingResponse:
     """Exporta renovações filtradas como CSV."""
     renovacoes = await _query_renovacoes(usuario.id, db, dias, ramo, janela)
@@ -171,8 +171,8 @@ async def listar_renovacoes(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     dias: int = Query(default=60, ge=1, le=180),
-    ramo: str | None = Query(default=None),
-    janela: str | None = Query(default=None, pattern="^(D30|D45|D60)$"),
+    ramo: Annotated[str | None, Query()] = None,
+    janela: Annotated[str | None, Query(pattern="^(D30|D45|D60)$")] = None,
 ) -> list[RenovacaoOut]:
     """Retorna propostas com vigência expirando nos próximos `dias` dias."""
     return await _query_renovacoes(usuario.id, db, dias, ramo, janela)
