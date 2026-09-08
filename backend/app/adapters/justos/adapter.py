@@ -64,18 +64,23 @@ def _selecionar_coberturas(
 ) -> dict[str, str | None]:
     """Monta coverages_selected seguindo as regras da API Justos:
 
-    - peril mandatory → opção mais barata (string com o slug)
-    - peril optional com opções → null (não contratar, mas deve constar no dict)
+    - peril mandatory → opção mais barata
+    - peril optional → null quando há perils mandatory; opção mais barata quando
+      nenhum peril é mandatory (comportamento do staging Justos, onde todos os
+      perils retornam mandatory=False — enviar tudo null causa invalid_selected_coverages)
     - peril sem opções → omitido
-
-    Justos rejeita dict vazio e rejeita se perils com opções ficarem ausentes.
     """
+    perils_com_opcoes = {
+        slug: peril
+        for slug, peril in coverages_available.items()
+        if peril.get("peril_options")
+    }
+    tem_mandatory = any(p.get("mandatory") for p in perils_com_opcoes.values())
+
     selected: dict[str, str | None] = {}
-    for slug, peril in coverages_available.items():
-        options: list[dict[str, Any]] = peril.get("peril_options", [])
-        if not options:
-            continue
-        if peril.get("mandatory"):
+    for slug, peril in perils_com_opcoes.items():
+        options: list[dict[str, Any]] = peril["peril_options"]
+        if peril.get("mandatory") or not tem_mandatory:
             cheapest = min(options, key=lambda o: float(o.get("price", 0)))
             selected[slug] = str(cheapest["slug"])
         else:
