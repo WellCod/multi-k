@@ -35,16 +35,22 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - .env.example   # .env sobrescreve se existir
+      - path: .env.example
+      - path: .env
+        required: false   # carrega credenciais reais em dev local
     environment:
       DATABASE_URL: postgresql://multik:${POSTGRES_PASSWORD:-multik_dev}@db:5432/multik
       DEBUG: "true"
+      # Sobrescreve o path do .env com o path dentro do container
+      JUSTOS_PRIVATE_KEY_PATH: /run/secrets/private-key.pem
     depends_on:
       db:
         condition: service_healthy
     volumes:
       # Hot reload em dev — não use em produção
       - ./backend:/app
+      # Chave privada Justos: define JUSTOS_KEY_HOST_PATH no .env apontando para a pasta da chave
+      - ${JUSTOS_KEY_HOST_PATH:-./docker}:/run/secrets:ro
 
 volumes:
   postgres_data:

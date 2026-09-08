@@ -35,11 +35,14 @@ Campos opcionais em dados_negocio:
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 import httpx
+
+_log = logging.getLogger(__name__)
 
 from app.adapters.base import (
     Capacidades,
@@ -59,12 +62,18 @@ def _dec(valor: float) -> Decimal:
 def _selecionar_coberturas(
     coverages_available: dict[str, Any],
 ) -> dict[str, str | None]:
-    """Para perils obrigatórios escolhe a opção mais barata; opcional → null."""
+    """Monta coverages_selected seguindo as regras da API Justos:
+
+    - peril mandatory → opção mais barata (string com o slug)
+    - peril optional com opções → null (não contratar, mas deve constar no dict)
+    - peril sem opções → omitido
+
+    Justos rejeita dict vazio e rejeita se perils com opções ficarem ausentes.
+    """
     selected: dict[str, str | None] = {}
     for slug, peril in coverages_available.items():
         options: list[dict[str, Any]] = peril.get("peril_options", [])
         if not options:
-            selected[slug] = None
             continue
         if peril.get("mandatory"):
             cheapest = min(options, key=lambda o: float(o.get("price", 0)))
@@ -216,9 +225,15 @@ class JustosSeguradora:
                 "coverages_available", {}
             )
             coverages_selected = _selecionar_coberturas(coverages_available)
+            _log.info(
+                "justos.pricing quote_id=%s available_keys=%s selected=%s",
+                quote_id,
+                list(coverages_available.keys()),
+                coverages_selected,
+            )
             pricing_resp = await client.calcular_preco(quote_id, coverages_selected)
         except httpx.HTTPStatusError as exc:
-            trecho = exc.response.text[:300]
+            trecho = exc.response.text[:400]
             return ResultadoCotacao(
                 sucesso=False,
                 cotacao_id=None,
