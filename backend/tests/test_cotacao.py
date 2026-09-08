@@ -573,9 +573,10 @@ async def _criar_cotacao(client: AsyncClient) -> None:
     return await client.post("/cotacoes", json=_RISCO_AUTO)
 
 
-async def test_recotar_lote_cria_novas_cotacoes(client: AsyncClient, db: AsyncSession) -> None:
+async def test_recotar_lote_cria_novas_cotacoes(
+    client: AsyncClient, db: AsyncSession
+) -> None:
     await _login(client, db, "corretor_lote@test.com")
-    # cria 2 cotacoes originais
     id1 = (await _criar_cotacao(client)).json()["id"]
     id2 = (await _criar_cotacao(client)).json()["id"]
     r = await client.post("/cotacoes/recotar-lote", json={"cotacao_ids": [id1, id2]})
@@ -585,7 +586,9 @@ async def test_recotar_lote_cria_novas_cotacoes(client: AsyncClient, db: AsyncSe
     assert all(item["status"] == "aguardando" for item in data)
 
 
-async def test_recotar_lote_ignora_ids_desconhecidos(client: AsyncClient, db: AsyncSession) -> None:
+async def test_recotar_lote_ignora_ids_desconhecidos(
+    client: AsyncClient, db: AsyncSession
+) -> None:
     await _login(client, db, "corretor_lote2@test.com")
     id_valido = (await _criar_cotacao(client)).json()["id"]
     id_invalido = str(uuid.uuid4())
@@ -597,7 +600,9 @@ async def test_recotar_lote_ignora_ids_desconhecidos(client: AsyncClient, db: As
     assert len(r.json()) == 1
 
 
-async def test_recotar_lote_sem_auth_retorna_401(client: AsyncClient, db: AsyncSession) -> None:
+async def test_recotar_lote_sem_auth_retorna_401(
+    client: AsyncClient, db: AsyncSession
+) -> None:
     r = await client.post(
         "/cotacoes/recotar-lote",
         json={"cotacao_ids": [str(uuid.uuid4())]},
@@ -605,7 +610,9 @@ async def test_recotar_lote_sem_auth_retorna_401(client: AsyncClient, db: AsyncS
     assert r.status_code == 401
 
 
-async def test_recotar_lote_lista_vazia_retorna_422(client: AsyncClient, db: AsyncSession) -> None:
+async def test_recotar_lote_lista_vazia_retorna_422(
+    client: AsyncClient, db: AsyncSession
+) -> None:
     await _login(client, db, "corretor_lote3@test.com")
     r = await client.post("/cotacoes/recotar-lote", json={"cotacao_ids": []})
     assert r.status_code == 422
