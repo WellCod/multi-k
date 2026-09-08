@@ -357,3 +357,36 @@ async def test_listar_cotacoes_cliente_nao_encontrado(
     await _login(client, db, "cor_cli_cot_404@test.com")
     r = await client.get(f"/clientes/{uuid.uuid4()}/cotacoes")
     assert r.status_code == 404
+
+
+async def test_ficha_pdf_retorna_pdf(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /clientes/{id}/ficha.pdf retorna PDF com content-type correto."""
+    await _login(client, db, "cor_cli_pdf@test.com")
+    r_cli = await client.post(
+        "/clientes",
+        json={"nome": "Pedro PDF", "cpf": "77777777771"},
+    )
+    assert r_cli.status_code == 201
+    cid = r_cli.json()["id"]
+
+    r = await client.get(f"/clientes/{cid}/ficha.pdf")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert len(r.content) > 0
+
+
+async def test_ficha_pdf_sem_auth_retorna_401(
+    client: AsyncClient, engine: AsyncEngine
+) -> None:
+    r = await client.get(f"/clientes/{uuid.uuid4()}/ficha.pdf")
+    assert r.status_code == 401
+
+
+async def test_ficha_pdf_nao_encontrado_retorna_404(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await _login(client, db, "cor_cli_pdf_404@test.com")
+    r = await client.get(f"/clientes/{uuid.uuid4()}/ficha.pdf")
+    assert r.status_code == 404

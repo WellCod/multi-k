@@ -114,6 +114,18 @@ async def test_janela_d45(
     assert any(i["janela"] == "D45" for i in items)
 
 
+async def test_janela_d60(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    usuario_id = await _login(client, db, "ren_d60@test.com")
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=55)
+
+    r = await client.get("/renovacoes?dias=60")
+    assert r.status_code == 200
+    items = r.json()
+    assert any(i["janela"] == "D60" for i in items)
+
+
 async def test_count_sem_auth_retorna_401(
     client: AsyncClient, engine: AsyncEngine
 ) -> None:
