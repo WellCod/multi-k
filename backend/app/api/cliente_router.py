@@ -3,6 +3,7 @@
 import io
 import uuid
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
@@ -395,6 +396,53 @@ async def adicionar_imovel(
     await db.commit()
     await db.refresh(i)
     return _imovel_out(i)
+
+
+class CotacaoResumoOut(BaseModel):
+    id: uuid.UUID
+    ramo: str
+    status: str
+    premio_total: Decimal | None
+    criado_em: str
+    numero_apolice: str | None
+
+
+@router.get("/{cliente_id}/cotacoes", response_model=list[CotacaoResumoOut])
+async def listar_cotacoes_cliente(
+    cliente_id: uuid.UUID,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[CotacaoResumoOut]:
+    """Cotações associadas ao cliente, mais recentes primeiro."""
+    await _get_cliente_ou_404(cliente_id, usuario.id, db)
+    result = await db.execute(
+        select(Cotacao)
+        .where(Cotacao.cliente_id == cliente_id)
+        .order_by(Cotacao.criado_em.desc())
+    )
+    cotacoes = result.scalars().all()
+
+    apolice_por_cotacao: dict[uuid.UUID, str | None] = {}
+    if cotacoes:
+        props_r = await db.execute(
+            select(Proposta).where(
+                Proposta.cotacao_id.in_([c.id for c in cotacoes])
+            )
+        )
+        for p in props_r.scalars().all():
+            apolice_por_cotacao[p.cotacao_id] = p.numero_apolice
+
+    return [
+        CotacaoResumoOut(
+            id=c.id,
+            ramo=c.ramo,
+            status=c.status,
+            premio_total=c.premio_total,
+            criado_em=c.criado_em.isoformat(),
+            numero_apolice=apolice_por_cotacao.get(c.id),
+        )
+        for c in cotacoes
+    ]
 
 
 class TimelineItem(BaseModel):

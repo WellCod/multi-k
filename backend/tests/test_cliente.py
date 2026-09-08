@@ -1,10 +1,14 @@
 """Testes de CRUD de cliente e busca por CPF."""
 
+import uuid
+from decimal import Decimal
+
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.domain.auth import Papel
+from app.infra.models import Cotacao
 from app.main import app
 from tests.conftest import CsrfAuth, criar_usuario
 
@@ -230,3 +234,73 @@ async def test_listar_imoveis_cliente(
     r = await client.get(f"/clientes/{cid}/imoveis")
     assert r.status_code == 200
     assert len(r.json()) == 1
+
+
+async def test_listar_cotacoes_cliente_vazia(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /clientes/{id}/cotacoes sem cotações retorna lista vazia."""
+    await _login(client, db, "cor_cli_cot_vazia@test.com")
+    r_cli = await client.post(
+        "/clientes", json={"nome": "Sem Cotacoes", "cpf": "99999999991"}
+    )
+    cid = r_cli.json()["id"]
+
+    r = await client.get(f"/clientes/{cid}/cotacoes")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+async def test_listar_cotacoes_cliente_com_dados(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """GET /clientes/{id}/cotacoes retorna cotações associadas ao cliente."""
+    await _login(client, db, "cor_cli_cot_dados@test.com")
+    r_cli = await client.post(
+        "/clientes", json={"nome": "Com Cotacoes", "cpf": "99999999992"}
+    )
+    cid = r_cli.json()["id"]
+
+    # Cria cotação diretamente no DB vinculada ao cliente
+    from sqlalchemy import select as _select
+    from app.infra.models import Cliente as ClienteModel
+
+    cli_r = await db.execute(
+        _select(ClienteModel).where(ClienteModel.id == uuid.UUID(cid))
+    )
+    cli = cli_r.scalar_one()
+    cotacao = Cotacao(
+        id=uuid.uuid4(),
+        cliente_id=cli.id,
+        usuario_id=cli.usuario_id,
+        ramo="auto",
+        status="sucesso",
+        dados_risco={},
+        premio_total=Decimal("980.00"),
+    )
+    db.add(cotacao)
+    await db.commit()
+
+    r = await client.get(f"/clientes/{cid}/cotacoes")
+    assert r.status_code == 200
+    items = r.json()
+    assert len(items) == 1
+    assert items[0]["ramo"] == "auto"
+    assert items[0]["status"] == "sucesso"
+    assert items[0]["premio_total"] == "980.00"
+    assert items[0]["numero_apolice"] is None
+
+
+async def test_listar_cotacoes_cliente_sem_auth(
+    client: AsyncClient, engine: AsyncEngine
+) -> None:
+    r = await client.get(f"/clientes/{uuid.uuid4()}/cotacoes")
+    assert r.status_code == 401
+
+
+async def test_listar_cotacoes_cliente_nao_encontrado(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    await _login(client, db, "cor_cli_cot_404@test.com")
+    r = await client.get(f"/clientes/{uuid.uuid4()}/cotacoes")
+    assert r.status_code == 404
