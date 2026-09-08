@@ -42,8 +42,6 @@ from typing import Any
 
 import httpx
 
-_log = logging.getLogger(__name__)
-
 from app.adapters.base import (
     Capacidades,
     MovimentoCanonico,
@@ -53,6 +51,8 @@ from app.adapters.base import (
     RiscoCanonico,
 )
 from app.adapters.justos import client
+
+_log = logging.getLogger(__name__)
 
 
 def _dec(valor: float) -> Decimal:
@@ -66,8 +66,8 @@ def _selecionar_coberturas(
 
     - peril mandatory → opção mais barata
     - peril optional → null quando há perils mandatory; opção mais barata quando
-      nenhum peril é mandatory (comportamento do staging Justos, onde todos os
-      perils retornam mandatory=False — enviar tudo null causa invalid_selected_coverages)
+      nenhum peril é mandatory (staging Justos: todos retornam mandatory=False —
+      enviar tudo null causa invalid_selected_coverages)
     - peril sem opções → omitido
     """
     perils_com_opcoes = {
