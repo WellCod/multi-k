@@ -62,8 +62,6 @@ async def contar_renovacoes(
     hoje = date.today()
     d30 = d45 = d60 = 0
     for proposta, _cotacao in result.all():
-        if proposta.inicio_vigencia is None:
-            continue
         fim = proposta.inicio_vigencia + timedelta(days=_VIGENCIA_DIAS)
         dias = (fim - hoje).days
         if 0 <= dias <= 30:
