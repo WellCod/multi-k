@@ -58,35 +58,51 @@ function clearRascunho() {
 // Step schemas
 // ---------------------------------------------------------------------------
 
-const step1Schema = z.object({
-  nome: z.string().min(2, "Nome muito curto"),
-  cpf: z
-    .string()
-    .transform(stripCPF)
-    .pipe(z.string().length(11, "CPF deve ter 11 dígitos")),
-  email: z.string().email("E-mail inválido").optional().or(z.literal("")),
-  telefone: z.string().optional(),
-  data_nascimento: z
-    .string()
-    .optional()
-    .refine(
-      (val) => {
-        if (!val) return true;
-        const d = new Date(val);
-        if (isNaN(d.getTime())) return false;
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        if (d > hoje) return false;
-        const minDate = new Date();
-        minDate.setFullYear(minDate.getFullYear() - 100);
-        return d >= minDate;
-      },
-      { message: "Data inválida (deve ser entre hoje e 100 anos atrás)" }
-    ),
-  sexo: z.enum(["M", "F", ""]).optional(),
-  estado_civil: z.string().optional(),
-  profissao: z.string().optional(),
-});
+const _dataNascimentoValida = (val: string) => {
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return false;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  if (d > hoje) return false;
+  const minDate = new Date();
+  minDate.setFullYear(minDate.getFullYear() - 100);
+  return d >= minDate;
+};
+
+const makeStep1Schema = (ramo: string) =>
+  z.object({
+    nome: z.string().min(2, "Nome muito curto"),
+    cpf: z
+      .string()
+      .transform(stripCPF)
+      .pipe(z.string().length(11, "CPF deve ter 11 dígitos")),
+    email: z.string().email("E-mail inválido").optional().or(z.literal("")),
+    telefone: z.string().optional(),
+    data_nascimento:
+      ramo === "auto"
+        ? z
+            .string()
+            .min(1, "Obrigatório")
+            .refine(_dataNascimentoValida, {
+              message: "Data inválida (deve ser entre hoje e 100 anos atrás)",
+            })
+        : z
+            .string()
+            .optional()
+            .refine((val) => !val || _dataNascimentoValida(val), {
+              message: "Data inválida (deve ser entre hoje e 100 anos atrás)",
+            }),
+    sexo:
+      ramo === "auto"
+        ? z.enum(["M", "F"], {
+            errorMap: () => ({ message: "Obrigatório" }),
+          })
+        : z.enum(["M", "F", ""]).optional(),
+    estado_civil: z.string().optional(),
+    profissao: z.string().optional(),
+  });
+
+const step1Schema = makeStep1Schema("auto");
 
 const step2AutoSchema = z.object({
   cep_pernoite: z
@@ -667,10 +683,12 @@ function Field({
 // ---------------------------------------------------------------------------
 
 function Step1({
+  ramo,
   dominios,
   defaultValues,
   onNext,
 }: {
+  ramo: string;
   dominios: Dominio[];
   defaultValues?: Partial<Step1Data & { cpf?: string }>;
   onNext: (data: Step1Data, cliente: Cliente | null) => void;
@@ -679,13 +697,15 @@ function Step1({
   const [foundCliente, setFoundCliente] = useState<Cliente | null>(null);
   const [cpfSearchError, setCpfSearchError] = useState<string | null>(null);
 
+  const schema = makeStep1Schema(ramo);
+
   const {
     register,
     handleSubmit,
     setValue,
     formState: { errors },
   } = useForm<Step1Data & { cpf?: string }>({
-    resolver: zodResolver(step1Schema),
+    resolver: zodResolver(schema),
     defaultValues: defaultValues ?? {},
   });
 
@@ -777,12 +797,18 @@ function Step1({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Data de nascimento" error={errors.data_nascimento?.message}>
+        <Field
+          label={ramo === "auto" ? "Data de nascimento *" : "Data de nascimento"}
+          error={errors.data_nascimento?.message}
+        >
           <Input type="date" {...register("data_nascimento")} />
         </Field>
-        <Field label="Sexo">
+        <Field
+          label={ramo === "auto" ? "Sexo *" : "Sexo"}
+          error={errors.sexo?.message}
+        >
           <Select {...register("sexo")}>
-            <option value="">—</option>
+            {ramo !== "auto" && <option value="">—</option>}
             <option value="M">Masculino</option>
             <option value="F">Feminino</option>
           </Select>
@@ -1722,6 +1748,7 @@ export function CotacaoPage() {
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
         {step === 1 && (
           <Step1
+            ramo={ramo}
             dominios={dominios}
             defaultValues={step1Data}
             onNext={handleStep1}
