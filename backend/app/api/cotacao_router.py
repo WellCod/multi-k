@@ -3,8 +3,9 @@
 import csv
 import io
 import uuid
+from collections.abc import Callable
 from decimal import Decimal
-from typing import Annotated, Any, Callable, Literal, cast
+from typing import Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
