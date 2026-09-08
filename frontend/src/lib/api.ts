@@ -143,6 +143,8 @@ export const api = {
     fichaUrl: (id: string) => `${BASE}/clientes/${id}/ficha.pdf`,
     timeline: (id: string) =>
       request<TimelineItem[]>(`/clientes/${id}/timeline`),
+    cotacoes: (id: string) =>
+      request<CotacaoResumo[]>(`/clientes/${id}/cotacoes`),
   },
 
   // ---- Cotações ----
@@ -197,6 +199,7 @@ export const api = {
       const params = dias ? `?dias=${dias}` : "";
       return request<Renovacao[]>(`/renovacoes${params}`);
     },
+    count: () => request<RenovacaoCount>("/renovacoes/count"),
   },
 
   // ---- Auditoria ----
@@ -485,6 +488,22 @@ export interface ItemComparativo {
   mensagens: string[];
   necessita_vistoria: boolean;
   status: string;
+}
+
+export interface RenovacaoCount {
+  D30: number;
+  D45: number;
+  D60: number;
+  total: number;
+}
+
+export interface CotacaoResumo {
+  id: string;
+  ramo: string;
+  status: string;
+  premio_total: string | null;
+  criado_em: string;
+  numero_apolice: string | null;
 }
 
 export interface Renovacao {
