@@ -30,9 +30,11 @@ def _justos_configurado() -> bool:
 
 
 def cias_para_ramo(ramo: str) -> list[str]:
-    cias: list[str] = ["fake"]
+    cias: list[str] = []
     if ramo == "auto" and _justos_configurado():
         cias.append("justos")
     if ramo == "imovel" and _yelum_configurado():
         cias.append("yelum")
+    if not cias:
+        cias.append("fake")
     return cias

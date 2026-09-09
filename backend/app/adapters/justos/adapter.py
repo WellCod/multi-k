@@ -35,6 +35,7 @@ Campos opcionais em dados_negocio:
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
@@ -51,22 +52,48 @@ from app.adapters.base import (
 )
 from app.adapters.justos import client
 
+_log = logging.getLogger(__name__)
+
 
 def _dec(valor: float) -> Decimal:
     return Decimal(str(valor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+# Perils considerados obrigatórios/core quando a API staging retorna mandatory=False
+# para todos (quirk do ambiente de testes). Em produção os flags mandatory corretos
+# chegam da API e esse conjunto é ignorado.
+_PERILS_CORE = {
+    "colisao-e-desastres-naturais",
+    "roubo-e-furto",
+    "incendio",
+    "danos-materiais",
+    "danos-corporais",
+}
+
+
 def _selecionar_coberturas(
     coverages_available: dict[str, Any],
 ) -> dict[str, str | None]:
-    """Para perils obrigatórios escolhe a opção mais barata; opcional → null."""
+    """Monta coverages_selected seguindo as regras da API Justos:
+
+    - peril mandatory → opção mais barata
+    - peril optional + há mandatory → null
+    - staging quirk (nenhum mandatory): seleciona mais barato só para _PERILS_CORE;
+      demais ficam null (evita inflar o prêmio com add-ons opcionais)
+    - peril sem opções → omitido
+    """
+    perils_com_opcoes = {
+        slug: peril
+        for slug, peril in coverages_available.items()
+        if peril.get("peril_options")
+    }
+    tem_mandatory = any(p.get("mandatory") for p in perils_com_opcoes.values())
+
     selected: dict[str, str | None] = {}
-    for slug, peril in coverages_available.items():
-        options: list[dict[str, Any]] = peril.get("peril_options", [])
-        if not options:
-            selected[slug] = None
-            continue
-        if peril.get("mandatory"):
+    for slug, peril in perils_com_opcoes.items():
+        options: list[dict[str, Any]] = peril["peril_options"]
+        is_core = slug in _PERILS_CORE
+        if peril.get("mandatory") or (not tem_mandatory and is_core):
             cheapest = min(options, key=lambda o: float(o.get("price", 0)))
             selected[slug] = str(cheapest["slug"])
         else:
@@ -216,9 +243,15 @@ class JustosSeguradora:
                 "coverages_available", {}
             )
             coverages_selected = _selecionar_coberturas(coverages_available)
+            _log.info(
+                "justos.pricing quote_id=%s available_keys=%s selected=%s",
+                quote_id,
+                list(coverages_available.keys()),
+                coverages_selected,
+            )
             pricing_resp = await client.calcular_preco(quote_id, coverages_selected)
         except httpx.HTTPStatusError as exc:
-            trecho = exc.response.text[:300]
+            trecho = exc.response.text[:400]
             return ResultadoCotacao(
                 sucesso=False,
                 cotacao_id=None,

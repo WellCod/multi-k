@@ -1,9 +1,18 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, type Cotacao, type ItemComparativo, type Proposta } from "@/lib/api";
+import { api, type Cotacao, type ItemComparativo, type Proposta, type RepricingResult } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/Tooltip";
 import { formatBRL } from "@/lib/utils";
 import { StatusBadge } from "./shared";
+import { CoverageConfigurator } from "./CoverageConfigurator";
+
+interface PriceOverride {
+  monthly: string;
+  annual: string;
+  info: string;
+  coverages_selected: Record<string, string | null>;
+}
 
 interface ComparativoInlineProps {
   cotacao: Cotacao;
@@ -23,6 +32,20 @@ export function ComparativoInline({
   onRecotar,
 }: ComparativoInlineProps) {
   const navigate = useNavigate();
+  const [configurando, setConfigurando] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<Record<string, PriceOverride>>({});
+
+  const handleApplyRepricing = (cia: string, result: RepricingResult) => {
+    setOverrides((o) => ({
+      ...o,
+      [cia]: {
+        monthly: result.monthly_total,
+        annual: result.annual_total,
+        info: result.info,
+        coverages_selected: result.coverages_selected,
+      },
+    }));
+  };
 
   if (proposta) {
     return (
@@ -66,6 +89,14 @@ export function ComparativoInline({
     );
   }
 
+  const effectivePrice = (item: ItemComparativo) => {
+    const ov = overrides[item.cia];
+    if (ov) return { monthly: ov.monthly, annual: ov.annual, info: ov.info };
+    return { monthly: item.premio_total, annual: item.annual_total, info: item.mensagens[0] ?? "" };
+  };
+
+  const itemConfigurando = configurando ? itens.find((it) => it.cia === configurando) : null;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -101,17 +132,20 @@ export function ComparativoInline({
             <tbody>
               {(() => {
                 const aprovados = itens.filter(
-                  (it) => (it.status === "sucesso" || it.status === "restricao") && it.premio_total,
+                  (it) => (it.status === "sucesso" || it.status === "restricao") && effectivePrice(it).monthly,
                 );
                 const minPreco =
                   aprovados.length > 0
-                    ? Math.min(...aprovados.map((it) => parseFloat(it.premio_total!)))
+                    ? Math.min(...aprovados.map((it) => parseFloat(effectivePrice(it).monthly!)))
                     : null;
                 return itens.map((item, i) => {
+                  const { monthly, annual, info } = effectivePrice(item);
+                  const hasOverride = !!overrides[item.cia];
                   const isBest =
                     minPreco !== null &&
-                    item.premio_total !== null &&
-                    parseFloat(item.premio_total) === minPreco;
+                    monthly !== null &&
+                    parseFloat(monthly) === minPreco;
+                  const hasCoverages = !!(item.coverages_available && Object.keys(item.coverages_available).length > 0);
                   return (
                     <tr
                       key={i}
@@ -128,13 +162,18 @@ export function ComparativoInline({
                             Melhor preço
                           </span>
                         )}
+                        {hasOverride && (
+                          <span className="ml-2 inline-block text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded px-1.5 py-0.5">
+                            Personalizado
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 font-mono">{formatBRL(item.premio_total)}</td>
+                      <td className="px-4 py-3 font-mono">{formatBRL(monthly)}</td>
                       <td className="px-4 py-3 font-mono text-gray-500 dark:text-gray-400">
-                        {item.annual_total ? formatBRL(item.annual_total) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                        {annual ? formatBRL(annual) : <span className="text-gray-300 dark:text-gray-600">—</span>}
                       </td>
                       <td className="px-4 py-3 max-w-xs">
-                        {item.restricoes.length === 0 && item.mensagens.length === 0 ? (
+                        {item.restricoes.length === 0 && !info ? (
                           <span className="text-gray-400">—</span>
                         ) : (
                           <>
@@ -143,11 +182,9 @@ export function ComparativoInline({
                                 {r.codigo}: {r.mensagem}
                               </span>
                             ))}
-                            {item.mensagens.map((m, j) => (
-                              <span key={j} className="block text-xs text-blue-600 dark:text-blue-400">
-                                {m}
-                              </span>
-                            ))}
+                            {info && (
+                              <span className="block text-xs text-blue-600 dark:text-blue-400">{info}</span>
+                            )}
                           </>
                         )}
                       </td>
@@ -162,15 +199,27 @@ export function ComparativoInline({
                         <StatusBadge status={item.status} />
                       </td>
                       <td className="px-4 py-3">
-                        {(item.status === "sucesso" || item.status === "restricao") && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onEmitir(item.cia)}
-                          >
-                            Emitir
-                          </Button>
-                        )}
+                        <div className="flex flex-col gap-1.5">
+                          {hasCoverages && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setConfigurando(item.cia)}
+                              className="whitespace-nowrap text-xs"
+                            >
+                              Coberturas
+                            </Button>
+                          )}
+                          {(item.status === "sucesso" || item.status === "restricao") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onEmitir(item.cia)}
+                            >
+                              Emitir
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -196,6 +245,24 @@ export function ComparativoInline({
           </Button>
         </Tooltip>
       </div>
+
+      {configurando && itemConfigurando?.coverages_available && (
+        <CoverageConfigurator
+          cotacaoId={cotacaoId}
+          cia={configurando}
+          coveragesAvailable={itemConfigurando.coverages_available}
+          initialSelected={
+            overrides[configurando]?.coverages_selected ??
+            itemConfigurando.coverages_selected ??
+            {}
+          }
+          onClose={() => setConfigurando(null)}
+          onApply={(result) => {
+            handleApplyRepricing(configurando, result);
+            setConfigurando(null);
+          }}
+        />
+      )}
     </div>
   );
 }
