@@ -731,3 +731,109 @@ async def test_recotar_lote_direto_ignora_id_desconhecido(
             body=body, request=mock_req, usuario=mock_user, db=session
         )
     assert result == []
+
+
+# ---------------------------------------------------------------------------
+# PDF endpoint — GET /cotacoes/{id}/pdf
+# ---------------------------------------------------------------------------
+
+
+async def _criar_cotacao_com_job_justos(
+    client: AsyncClient,
+    db: AsyncSession,
+    engine: AsyncEngine,
+    email: str,
+) -> uuid.UUID:
+    """Cria cotação e injeta um CotacaoJob Justos concluído diretamente no DB."""
+    await _login(client, db, email)
+    r = await client.post("/cotacoes", json=_RISCO_AUTO)
+    assert r.status_code == 202
+    cotacao_id = uuid.UUID(r.json()["id"])
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as sess:
+        sess.add(
+            CotacaoJob(
+                id=uuid.uuid4(),
+                cotacao_id=cotacao_id,
+                cia="justos",
+                status="concluido",
+                cotacao_id_cia="Q-PDF-001",
+            )
+        )
+        await sess.commit()
+
+    return cotacao_id
+
+
+async def test_pdf_cotacao_sem_job_justos(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """404 quando não existe job Justos concluído para a cotação."""
+    await _login(client, db, "pdf_nojob@test.com")
+    r = await client.post("/cotacoes", json=_RISCO_AUTO)
+    cotacao_id = r.json()["id"]
+
+    r2 = await client.get(f"/cotacoes/{cotacao_id}/pdf")
+    assert r2.status_code == 404
+
+
+async def test_pdf_cotacao_sucesso(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """200 com bytes PDF quando job Justos concluído existe."""
+    cotacao_id = await _criar_cotacao_com_job_justos(
+        client, db, engine, "pdf_ok@test.com"
+    )
+    fake_pdf = b"%PDF-1.4 cotacao"
+
+    with patch(
+        "app.adapters.justos.client.gerar_pdf_cotacao",
+        AsyncMock(return_value=fake_pdf),
+    ):
+        r = await client.get(f"/cotacoes/{cotacao_id}/pdf")
+
+    assert r.status_code == 200
+    assert r.content == fake_pdf
+    assert "application/pdf" in r.headers["content-type"]
+    assert f"cotacao-{cotacao_id}" in r.headers["content-disposition"]
+
+
+async def test_pdf_proposta_sucesso(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """200 com bytes PDF para tipo=proposta."""
+    cotacao_id = await _criar_cotacao_com_job_justos(
+        client, db, engine, "pdf_prop@test.com"
+    )
+    fake_pdf = b"%PDF-1.4 proposta"
+
+    with patch(
+        "app.adapters.justos.client.gerar_pdf_proposta",
+        AsyncMock(return_value=fake_pdf),
+    ):
+        r = await client.get(f"/cotacoes/{cotacao_id}/pdf", params={"tipo": "proposta"})
+
+    assert r.status_code == 200
+    assert r.content == fake_pdf
+    assert f"proposta-{cotacao_id}" in r.headers["content-disposition"]
+
+
+async def test_pdf_cotacao_erro_gcf(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """502 quando o cliente GCF levanta exceção."""
+    cotacao_id = await _criar_cotacao_com_job_justos(
+        client, db, engine, "pdf_err@test.com"
+    )
+
+    with patch(
+        "app.adapters.justos.client.gerar_pdf_cotacao",
+        AsyncMock(side_effect=Exception("GCF timeout")),
+    ):
+        r = await client.get(f"/cotacoes/{cotacao_id}/pdf")
+
+    assert r.status_code == 502
+    assert "GCF timeout" in r.json()["detail"]
