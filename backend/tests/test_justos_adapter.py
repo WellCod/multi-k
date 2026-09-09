@@ -324,9 +324,9 @@ async def test_gerar_pdf_cotacao_producao(
         captured_urls.append(str(req.url))
         return Response(200, content=b"%PDF-prod")
 
-    _AUTH_PROD = "https://api.justos.com.br/brokers/auth/api-token"
+    auth_prod_url = "https://api.justos.com.br/brokers/auth/api-token"
     with respx.mock as r:
-        r.post(_AUTH_PROD).mock(return_value=Response(200, json=_RESP_AUTH))
+        r.post(auth_prod_url).mock(return_value=Response(200, json=_RESP_AUTH))
         r.get(_PDF_COTACAO_URL).mock(side_effect=_captura)
 
         from app.adapters.justos import client as jclient
