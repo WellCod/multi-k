@@ -28,6 +28,10 @@ _COVERAGES_URL = f"{_BASE}/brokers/quote/Q-001/coverages"
 _CONVERT_URL = f"{_BASE}/brokers/quote/convert-formal-quote"
 _CHECKOUT_URL = f"{_BASE}/brokers/quote/Q-001/checkout-link"
 
+_GCF_BASE = "https://us-central1-luna-9425e.cloudfunctions.net"
+_PDF_COTACAO_URL = f"{_GCF_BASE}/corretor-pdfCotacao"
+_PDF_PROPOSTA_URL = f"{_GCF_BASE}/corretor-pdfProposta"
+
 _FAKE_TOKEN = "apitoken123"
 
 _TEST_EC_KEY = (
@@ -260,3 +264,74 @@ async def test_transmitir_com_ci_code() -> None:
 
     assert len(captured) == 1
     assert captured[0]["ci_code"] == "CI-2025-999"
+
+
+# ---------------------------------------------------------------------------
+# PDF — gerar_pdf_cotacao / gerar_pdf_proposta
+# ---------------------------------------------------------------------------
+
+
+async def test_gerar_pdf_cotacao_staging() -> None:
+    """staging=true é adicionado ao parâmetro quando JUSTOS_ENV=staging."""
+    captured_urls: list[str] = []
+
+    def _captura(req: respx.patterns.M) -> Response:  # type: ignore[name-defined]
+        captured_urls.append(str(req.url))
+        return Response(200, content=b"%PDF-1.4")
+
+    with respx.mock as r:
+        _mock_auth(r)
+        r.get(_PDF_COTACAO_URL).mock(side_effect=_captura)
+
+        from app.adapters.justos import client as jclient
+
+        result = await jclient.gerar_pdf_cotacao("Q-001")
+
+    assert result == b"%PDF-1.4"
+    assert captured_urls and "staging=true" in captured_urls[-1]
+
+
+async def test_gerar_pdf_proposta_staging() -> None:
+    """gerar_pdf_proposta chama corretor-pdfProposta com staging=true."""
+    captured_urls: list[str] = []
+
+    def _captura(req: respx.patterns.M) -> Response:  # type: ignore[name-defined]
+        captured_urls.append(str(req.url))
+        return Response(200, content=b"%PDF-1.4 proposta")
+
+    with respx.mock as r:
+        _mock_auth(r)
+        r.get(_PDF_PROPOSTA_URL).mock(side_effect=_captura)
+
+        from app.adapters.justos import client as jclient
+
+        result = await jclient.gerar_pdf_proposta("Q-001")
+
+    assert result == b"%PDF-1.4 proposta"
+    assert captured_urls and "staging=true" in captured_urls[-1]
+
+
+async def test_gerar_pdf_cotacao_producao(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Em production, staging=true não é enviado."""
+    monkeypatch.setenv("JUSTOS_ENV", "production")
+    set_provider(EnvSecretProvider())
+
+    captured_urls: list[str] = []
+
+    def _captura(req: respx.patterns.M) -> Response:  # type: ignore[name-defined]
+        captured_urls.append(str(req.url))
+        return Response(200, content=b"%PDF-prod")
+
+    auth_prod_url = "https://api.justos.com.br/brokers/auth/api-token"
+    with respx.mock as r:
+        r.post(auth_prod_url).mock(return_value=Response(200, json=_RESP_AUTH))
+        r.get(_PDF_COTACAO_URL).mock(side_effect=_captura)
+
+        from app.adapters.justos import client as jclient
+
+        result = await jclient.gerar_pdf_cotacao("Q-001")
+
+    assert result == b"%PDF-prod"
+    assert captured_urls and "staging" not in captured_urls[-1]

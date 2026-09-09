@@ -7,7 +7,8 @@ from collections.abc import Callable
 from decimal import Decimal
 from typing import Annotated, Any, Literal, cast
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import Response as HttpResponse
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, nullsfirst, nullslast, select
@@ -345,6 +346,57 @@ async def exportar_historico_csv(
         iter([buf.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=historico.csv"},
+    )
+
+
+@router.get("/{cotacao_id}/pdf")
+async def baixar_pdf_cotacao(
+    cotacao_id: uuid.UUID,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    tipo: Literal["cotacao", "proposta"] = Query(default="cotacao"),
+) -> HttpResponse:
+    """Retorna PDF de cotação ou proposta gerado pela Justos (GCF)."""
+    from app.adapters.justos import client as justos_client
+
+    c = await _get_cotacao_ou_404(cotacao_id, usuario.id, db)
+
+    job_r = await db.execute(
+        select(CotacaoJob)
+        .where(CotacaoJob.cotacao_id == cotacao_id)
+        .where(CotacaoJob.cia == "justos")
+        .where(CotacaoJob.status == "concluido")
+    )
+    job = job_r.scalar_one_or_none()
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Cotação Justos não encontrada ou pendente.",
+        )
+
+    quote_id = str(job.cotacao_id_cia or c.cotacao_id_cia or "")
+    if not quote_id:
+        raise HTTPException(
+            status_code=404,
+            detail="ID da cotação na seguradora não disponível.",
+        )
+
+    try:
+        if tipo == "proposta":
+            pdf_bytes = await justos_client.gerar_pdf_proposta(quote_id)
+        else:
+            pdf_bytes = await justos_client.gerar_pdf_cotacao(quote_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erro ao gerar PDF na Justos: {exc}",
+        ) from exc
+
+    filename = f"{tipo}-{cotacao_id}.pdf"
+    return HttpResponse(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

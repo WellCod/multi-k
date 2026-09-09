@@ -190,6 +190,50 @@ async def obter_checkout_link(quote_id: str) -> dict[str, Any]:
         return dict(resp.json())
 
 
+_GCF_BASE = "https://us-central1-luna-9425e.cloudfunctions.net"
+
+
+async def gerar_pdf_cotacao(quote_id: str) -> bytes:
+    """GCF corretor-pdfCotacao — retorna PDF da cotação em bytes.
+
+    Requer que as coberturas já tenham sido selecionadas (PUT /coverages).
+    Produção: sem parâmetro extra. Staging: adiciona ?staging=true.
+    Ref: https://justos.notion.site/Gerador-de-PDF-a655524fb78a4ade834cc5947a944e41
+    """
+    token = await _obter_token()
+    env = get_optional_secret("JUSTOS_ENV", "staging")
+    params = {"id": quote_id}
+    if env != "production":
+        params["staging"] = "true"
+    async with httpx.AsyncClient() as c:
+        resp = await c.get(
+            f"{_GCF_BASE}/corretor-pdfCotacao",
+            params=params,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        return resp.content
+
+
+async def gerar_pdf_proposta(quote_id: str) -> bytes:
+    """GCF corretor-pdfProposta — retorna PDF da proposta formalizada em bytes."""
+    token = await _obter_token()
+    env = get_optional_secret("JUSTOS_ENV", "staging")
+    params = {"id": quote_id}
+    if env != "production":
+        params["staging"] = "true"
+    async with httpx.AsyncClient() as c:
+        resp = await c.get(
+            f"{_GCF_BASE}/corretor-pdfProposta",
+            params=params,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        return resp.content
+
+
 async def exportar_apolices(
     updated_since: datetime,
     skip: int = 0,
