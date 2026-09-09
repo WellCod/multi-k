@@ -6,6 +6,17 @@ import { useDarkMode } from "@/lib/use-dark-mode";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+function StagingBadge() {
+  return (
+    <span
+      title="Ambiente de staging Justos — preços não refletem produção"
+      className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
+    >
+      STAGING
+    </span>
+  );
+}
+
 const NAV_BASE = [
   { to: "/home", label: "Home" },
   { to: "/cotacao", label: "Nova cotação" },
@@ -88,10 +99,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { dark, toggle } = useDarkMode();
   const [menuOpen, setMenuOpen] = useState(false);
   const [renovCount, setRenovCount] = useState<RenovacaoCount | null>(null);
+  const [isStaging, setIsStaging] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     api.renovacoes.count().then(setRenovCount).catch(() => undefined);
+    api.health().then((h) => setIsStaging(h.justos_env === "staging")).catch(() => undefined);
   }, [user]);
 
   const navItems = [...NAV_BASE, ...(user?.papel === "admin" ? NAV_ADMIN : [])];
@@ -109,6 +122,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Logo + nav desktop */}
           <div className="flex items-center gap-6">
             <span className="font-semibold text-gray-900 dark:text-white text-sm">multi-K</span>
+            {isStaging && <StagingBadge />}
             <nav className="hidden md:flex gap-1" aria-label="Navegação principal">
               {navItems.map(({ to, label }) => (
                 <Link
