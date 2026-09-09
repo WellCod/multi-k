@@ -182,6 +182,8 @@ export const api = {
       request<ItemComparativo[]>(`/cotacoes/${id}/comparativo`),
     comparativoPdfUrl: (id: string) =>
       `${BASE}/cotacoes/${id}/comparativo/pdf`,
+    pdfUrl: (id: string, tipo: "cotacao" | "proposta" = "cotacao") =>
+      `${BASE}/cotacoes/${id}/pdf?tipo=${tipo}`,
     repricing: (id: string, cia: string, coverages_selected: Record<string, string | null>) =>
       request<RepricingResult>(`/cotacoes/${id}/repricing`, {
         method: "POST",
@@ -313,6 +315,9 @@ export const api = {
       request<DashboardOut>(`/dashboard?periodo=${periodo}`),
   },
 
+  // ---- Infra ----
+  health: () => request<HealthResponse>("/health"),
+
   // ---- Comissões por CIA ----
   comissoes: {
     list: () => request<ComissaoConfigOut[]>("/admin/comissoes"),
@@ -332,6 +337,12 @@ export const api = {
 };
 
 // ---- Types ----
+
+export interface HealthResponse {
+  status: string;
+  version: string;
+  justos_env: string;
+}
 
 export interface Dominio {
   tipo: string;
