@@ -1,6 +1,6 @@
 # multi-K — Roadmap
 
-*Atualizado: 2026-09-03*
+*Atualizado: 2026-09-08*
 
 ---
 
@@ -12,14 +12,15 @@
 ✅ Fase 2      Cotação end-to-end
 ✅ Fase 3      Comparativo, PDF, gestão
 ✅ Fase 4      Dashboard, relatórios, seed demo
-✅ Justos      Adapter Justos (aguarda credenciais)
+✅ Justos      Adapter Justos (staging funcional 2026-09-08)
 ✅ FIPE        Proxy Parallelum + FipeSelector combobox
 ✅ UX-SEC      Qualidade e segurança do funil de cotação
 ✅ SEC         Endurecimento de segurança (auditoria 2026-08-26)
-🔨 Fase 5      Adapters Yelum + Justos (scaffold + docs; gate: credenciais)
+✅ Fase 5      Adapters Yelum + Justos (Justos staging OK; Yelum gate: credencial)
 ✅ MELHORIAS   Análise completa: segurança, perf, UX, features (2026-09-02)
 ✅ SPRINT-03   Segurança, perf, UX, layout, features (2026-09-03)
-⏳ Fase 6      Paridade (gate: ≥99% em 200 cotações)
+✅ SPRINT-04   Justos staging, configurador coberturas, recotar lote (2026-09-08)
+⏳ Fase 6      Paridade (gate: ≥99% em 200 cotações reais Justos)
 ⏳ Fase 7      E-Retorno (gate: Security Assessment)
 ⏳ Fase 8      Deploy GCP + endurecimento
 ⏳ Fase 9      MCP para o bot
@@ -27,7 +28,41 @@
 
 ---
 
-## Estado atual (2026-08-25)
+## SPRINT-04 — concluída ✅
+
+*Entregue em 2026-09-08*
+
+### Justos staging funcional (end-to-end)
+
+| Entrega | Detalhes |
+|---|---|
+| Fix `invalid_selected_coverages` | Staging retorna todos os perils como `mandatory=False`; adapter agora seleciona opção mais barata para todos quando nenhum é mandatory |
+| Fake adapter removido de produção | `cias_para_ramo()` só inclui `fake` quando nenhuma CIA real está configurada |
+| Migração 013 corrigida | `CREATE INDEX CONCURRENTLY` substituído por `CREATE INDEX` simples (compatível com alembic transacional) |
+| Migração 014 aplicada | Tabela `comissao_config` criada no banco |
+| Docker compose seguro | `.env` carregado com `required: false`; chave privada montada via volume; `JUSTOS_PRIVATE_KEY_PATH` sobrescrito para path do container |
+
+### Configurador de coberturas
+
+| Entrega | Detalhes |
+|---|---|
+| Endpoint `POST /cotacoes/{id}/repricing` | Recalcula preço com coberturas personalizadas via Justos pricing API |
+| Comparativo expõe `coverages_available` e `coverages_selected` | Dados retornados do `payload_resposta` do job Justos |
+| Modal `CoverageConfigurator` | Radio por opção, preço individual `/mês`, franquia, "Não contratar" para opcionais |
+| Badge "Personalizado" | Aparece na tabela quando coberturas diferem do padrão |
+| Formulário: campos obrigatórios Justos | `data_nascimento` e `sexo` obrigatórios para ramo auto (exigidos para precificação PF) |
+
+### Recotação em lote
+
+| Entrega | Detalhes |
+|---|---|
+| Endpoint `POST /cotacoes/recotar-lote` | Recota múltiplas cotações em paralelo com SKIP LOCKED |
+| RenovacaoPage — checkboxes | Seleção múltipla + botão "Recotar selecionadas" |
+| Cobertura de testes ≥ 85% | Testes diretos para `recotar_em_lote` contornam limitação do pytest-cov com ASGITransport |
+
+---
+
+## Estado atual (2026-09-08)
 
 ### O que está funcionando
 
