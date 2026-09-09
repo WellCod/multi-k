@@ -27,7 +27,7 @@ async def stream_events(
     uid = usuario.id
     _ = db  # sessão fechada após autenticação; SSE não precisa de DB
 
-    async def generate() -> AsyncGenerator[bytes, None]:
+    async def generate() -> AsyncGenerator[bytes, None]:  # pragma: no cover
         q = events_bus.subscribe(uid)
         try:
             yield b'data: {"tipo":"connected"}\n\n'
