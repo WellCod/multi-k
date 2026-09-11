@@ -15,7 +15,7 @@ export function Pagination({ page, total, perPage, onChange }: PaginationProps) 
 
   return (
     <div className="flex items-center justify-between mt-3">
-      <span className="text-xs text-gray-500 dark:text-gray-400">
+      <span className="text-xs text-muted ">
         {start}–{end} de {total}
       </span>
       <div className="flex gap-1">

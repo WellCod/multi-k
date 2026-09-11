@@ -537,6 +537,7 @@ export interface Peril {
 
 export interface ItemComparativo {
   cia: string;
+  nome?: string;
   cotacao_id_cia: string | null;
   premio_total: string | null;
   annual_total: string | null;
@@ -546,6 +547,7 @@ export interface ItemComparativo {
   status: string;
   coverages_available: Record<string, Peril> | null;
   coverages_selected: Record<string, string | null> | null;
+  coberturas_comparaveis?: { conceito_id: string; nome_canonico: string; nome_original: string; limite: string | null }[];
 }
 
 export interface RepricingResult {
