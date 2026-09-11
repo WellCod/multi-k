@@ -38,3 +38,51 @@ def cias_para_ramo(ramo: str) -> list[str]:
     if not cias:
         cias.append("fake")
     return cias
+
+
+def catalogo_seguradoras() -> list[dict[str, object]]:
+    """Presentation metadata stays at the integration boundary, not in React."""
+    names = {"justos": "Justos", "yelum": "Yelum", "fake": "Simulação"}
+    result: list[dict[str, object]] = []
+    cias = dict.fromkeys(
+        cia for ramo in ("auto", "moto", "imovel") for cia in cias_para_ramo(ramo)
+    )
+    for cia in cias:
+        caps = get_adapter(cia).capacidades()
+        modes: list[dict[str, object]] = []
+        if cia == "justos":
+            modes = [
+                {
+                    "id": "monthly",
+                    "label": "Mensal",
+                    "dados_negocio": {"policy_type": "monthly"},
+                    "campo_parcelas": None,
+                },
+                {
+                    "id": "annual",
+                    "label": "Anual",
+                    "dados_negocio": {"policy_type": "annual"},
+                    "campo_parcelas": "installments",
+                },
+            ]
+        result.append(
+            {
+                "id": cia,
+                "nome": names.get(cia, cia),
+                "logo_url": None,
+                "ramos": [ramo for ramo in caps.ramos if cia in cias_para_ramo(ramo)],
+                "coberturas": caps.coberturas,
+                "franquias": caps.franquias,
+                "parcelamentos": caps.parcelamentos,
+                "planos": [
+                    {
+                        "codigo": p,
+                        "descricao": "À vista" if p == "AVISTA" else p,
+                        "parcelas": 1 if p == "AVISTA" else int(p.removesuffix("X")),
+                    }
+                    for p in caps.parcelamentos
+                ],
+                "modos_transmissao": modes,
+            }
+        )
+    return result
