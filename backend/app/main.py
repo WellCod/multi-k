@@ -24,6 +24,7 @@ from app.api.fipe_router import router as fipe_router
 from app.api.health import router as health_router
 from app.api.home_router import router as home_router
 from app.api.proposta_router import router as proposta_router
+from app.api.rascunho_router import router as rascunho_router
 from app.api.relatorio_router import router as relatorio_router
 from app.api.renovacao_router import router as renovacao_router
 from app.infra.db import AsyncSessionLocal
@@ -162,6 +163,7 @@ async def correlation_id_middleware(
     return response
 
 
+app.include_router(rascunho_router)
 app.include_router(health_router)
 app.include_router(admin_router)
 app.include_router(auditoria_router)

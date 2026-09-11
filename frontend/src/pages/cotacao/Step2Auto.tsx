@@ -1,3 +1,4 @@
+import { DomainOptions } from "@/components/DomainOptions";
 import { useId } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,14 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import FipeSelector, { type FipeResult } from "@/components/FipeSelector";
-import { step2AutoSchema, type Step2Data } from "./types";
+import { step2AutoSchema, riskStepSchemas, type Step2Data } from "./types";
 import { Field } from "./shared";
 
 export function Step2Auto({
+  stage = "object",
   defaultValues,
   onBack,
   onNext,
 }: {
+  stage?: "object" | "profile";
   defaultValues?: Step2Data;
   onBack: () => void;
   onNext: (data: Step2Data) => void;
@@ -26,7 +29,7 @@ export function Step2Auto({
     watch,
     formState: { errors },
   } = useForm<z.infer<typeof step2AutoSchema>>({
-    resolver: zodResolver(step2AutoSchema),
+    resolver: zodResolver(riskStepSchemas.auto[stage]),
     defaultValues: defaultValues as z.infer<typeof step2AutoSchema>,
   });
 
@@ -43,8 +46,13 @@ export function Step2Auto({
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-4">
+      {stage === "object" && <>
       <FipeSelector
         tipo="carros"
+        savedVehicle={defaultValues}
+        onInvalidate={() => {
+          for (const field of ["codigo_fipe", "marca", "modelo", "ano_modelo", "combustivel", "valor_fipe"] as const) setValue(field, "", { shouldValidate: true });
+        }}
         onChange={handleFipe}
         error={errors.codigo_fipe?.message}
       />
@@ -60,30 +68,29 @@ export function Step2Auto({
         <Input placeholder="00000-000" {...register("cep_pernoite")} />
       </Field>
 
+      </>}
+      {stage === "profile" && <>
       <Field label="Finalidade" error={errors.finalidade?.message}>
         <Select {...register("finalidade")}>
           <option value="">—</option>
-          <option value="pessoal">Pessoal / Lazer</option>
-          <option value="comercial">Comercial</option>
-          <option value="app">Uber / App de transporte</option>
-          <option value="taxi">Táxi</option>
+          <DomainOptions tipo="finalidade_auto" />
         </Select>
       </Field>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+        <label className="flex items-center gap-2 text-sm text-ink ">
           <input type="checkbox" {...register("blindado")} />
           Blindado
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+        <label className="flex items-center gap-2 text-sm text-ink ">
           <input type="checkbox" {...register("garagem")} />
           Tem garagem
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+        <label className="flex items-center gap-2 text-sm text-ink ">
           <input type="checkbox" {...register("zero_km")} />
           0 km
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+        <label className="flex items-center gap-2 text-sm text-ink ">
           <input type="checkbox" {...register("ja_segurado")} />
           Já tem seguro
         </label>
@@ -91,18 +98,14 @@ export function Step2Auto({
 
       <Field label="Bônus atual (0–10)" error={undefined}>
         <Select {...register("bonus_anterior")}>
-          {Array.from({ length: 11 }, (_, i) => (
-            <option key={i} value={i}>
-              {i === 0 ? "0 — Sem bônus" : `${i}`}
-            </option>
-          ))}
+          <DomainOptions tipo="bonus" />
         </Select>
       </Field>
 
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+      <div className="border border-line rounded p-4 space-y-3">
         <label
           htmlFor={condutorId}
-          className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+          className="flex items-center gap-2 text-sm font-medium text-ink cursor-pointer"
         >
           <input
             id={condutorId}
@@ -126,8 +129,7 @@ export function Step2Auto({
               <Field label="Sexo">
                 <Select {...register("condutor_sexo")}>
                   <option value="">—</option>
-                  <option value="M">Masculino</option>
-                  <option value="F">Feminino</option>
+                  <DomainOptions tipo="sexo" />
                 </Select>
               </Field>
               <Field label="Nascimento">
@@ -136,11 +138,7 @@ export function Step2Auto({
               <Field label="Parentesco">
                 <Select {...register("condutor_parentesco")}>
                   <option value="">—</option>
-                  <option value="conjuge">Cônjuge</option>
-                  <option value="filho">Filho(a)</option>
-                  <option value="pai">Pai / Mãe</option>
-                  <option value="irmao">Irmão(ã)</option>
-                  <option value="outro">Outro</option>
+                  <DomainOptions tipo="parentesco" />
                 </Select>
               </Field>
             </div>
@@ -148,6 +146,7 @@ export function Step2Auto({
         )}
       </div>
 
+      </>}
       <div className="pt-2 flex justify-between">
         <Button type="button" variant="outline" onClick={onBack}>
           ← Voltar

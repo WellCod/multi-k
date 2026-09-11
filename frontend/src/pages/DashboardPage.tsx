@@ -32,16 +32,16 @@ function BarH({
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
     <div className="flex items-center gap-3">
-      <span className="w-24 text-sm text-gray-600 dark:text-gray-300 truncate shrink-0 uppercase font-medium">
+      <span className="w-24 text-sm text-muted truncate shrink-0 uppercase font-medium">
         {label}
       </span>
-      <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+      <div className="flex-1 bg-canvas rounded-full h-2 overflow-hidden">
         <div
-          className="h-2 rounded-full bg-blue-500 dark:bg-blue-400 transition-all"
+          className="h-2 rounded-full bg-action transition-all"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-sm font-mono text-gray-700 dark:text-gray-200 w-20 text-right shrink-0">
+      <span className="text-sm font-mono text-ink w-20 text-right shrink-0">
         {extra ?? value}
       </span>
     </div>
@@ -55,19 +55,19 @@ function Skeleton() {
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="h-24 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+            className="h-24 rounded border border-line bg-surface "
           />
         ))}
       </div>
-      <div className="h-48 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800" />
+      <div className="h-48 rounded border border-line bg-surface " />
     </div>
   );
 }
 
 const JANELA_STYLE = {
-  D30: { bar: "bg-red-500 dark:bg-red-400", label: "≤ 30 dias", text: "text-red-700 dark:text-red-300" },
-  D45: { bar: "bg-orange-500 dark:bg-orange-400", label: "31–45 dias", text: "text-orange-700 dark:text-orange-300" },
-  D60: { bar: "bg-yellow-500 dark:bg-yellow-400", label: "46–60 dias", text: "text-yellow-700 dark:text-yellow-300" },
+  D30: { bar: "bg-danger ", label: "≤ 30 dias", text: "text-danger " },
+  D45: { bar: "bg-warning ", label: "31–45 dias", text: "text-warning " },
+  D60: { bar: "bg-warning ", label: "46–60 dias", text: "text-warning " },
 };
 
 export function DashboardPage() {
@@ -98,7 +98,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6 pb-8">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <h1 className="text-xl font-semibold text-ink ">
           Dashboard de Métricas
         </h1>
         <div className="flex gap-1">
@@ -106,10 +106,10 @@ export function DashboardPage() {
             <button
               key={p.value}
               onClick={() => setPeriodo(p.value)}
-              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+              className={`px-3 py-2 text-xs rounded border transition-colors ${
                 periodo === p.value
-                  ? "bg-blue-600 border-blue-600 text-white"
-                  : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  ? "bg-action border-line text-ink"
+                  : "border-line text-muted hover:bg-canvas "
               }`}
             >
               {p.label}
@@ -119,7 +119,7 @@ export function DashboardPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-300">
+        <div className="rounded border border-line bg-canvas p-4 text-sm text-danger ">
           {error}
         </div>
       )}
@@ -146,14 +146,14 @@ export function DashboardPage() {
 
           {/* Renovações a vencer */}
           {renovCount && renovCount.total > 0 && (
-            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
+            <div className="rounded border border-line bg-surface p-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <h2 className="text-sm font-semibold text-ink ">
                   Renovações a vencer (próximos 60 dias)
                 </h2>
                 <button
                   onClick={() => navigate("/renovacoes")}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-xs text-action hover:underline"
                 >
                   Ver todas →
                 </button>
@@ -168,20 +168,20 @@ export function DashboardPage() {
                       <span className={`w-24 text-xs font-medium shrink-0 ${style.text}`}>
                         {style.label}
                       </span>
-                      <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                      <div className="flex-1 bg-canvas rounded-full h-2 overflow-hidden">
                         <div
                           className={`h-2 rounded-full transition-all ${style.bar}`}
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="text-sm font-mono text-gray-700 dark:text-gray-200 w-10 text-right shrink-0">
+                      <span className="text-sm font-mono text-ink w-10 text-right shrink-0">
                         {count}
                       </span>
                     </div>
                   );
                 })}
               </div>
-              <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+              <p className="mt-3 text-xs text-muted ">
                 Total: {renovCount.total} apólice{renovCount.total !== 1 ? "s" : ""}
               </p>
             </div>
@@ -189,8 +189,8 @@ export function DashboardPage() {
 
           {/* Por ramo */}
           {data.por_ramo.length > 0 && (
-            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+            <div className="rounded border border-line bg-surface p-4">
+              <h2 className="text-sm font-semibold text-ink mb-4">
                 Cotações por ramo
               </h2>
               <div className="space-y-3">
@@ -212,13 +212,13 @@ export function DashboardPage() {
 
           {/* Ranking CIAs — admin only */}
           {isAdmin && data.ranking_cias.length > 0 && (
-            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
+            <div className="rounded border border-line bg-surface p-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <h2 className="text-sm font-semibold text-ink ">
                   Ranking de seguradoras
                 </h2>
                 {data.ranking_truncado && (
-                  <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded px-2 py-0.5">
+                  <span className="text-xs text-warning bg-canvas border border-line rounded px-2 py-1">
                     Volume alto — dados parciais
                   </span>
                 )}
@@ -228,12 +228,12 @@ export function DashboardPage() {
                   <div key={c.cia}>
                     <BarH
                       label={c.cia}
-                      value={Number(c.premio_total)}
-                      max={Math.max(...data.ranking_cias.map((x) => Number(x.premio_total)))}
+                      value={Number(c.barra_pct ?? "0")}
+                      max={100}
                       extra={`${formatBRL(c.premio_total)} · ${c.propostas} prop.`}
                     />
                     {c.latencia_media_s !== null && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 ml-28 mt-0.5">
+                      <p className="text-xs text-muted ml-28 mt-1">
                         SLA médio: {c.latencia_media_s < 60
                           ? `${c.latencia_media_s}s`
                           : `${(c.latencia_media_s / 60).toFixed(1)}min`}
@@ -246,7 +246,7 @@ export function DashboardPage() {
           )}
 
           {data.total_cotacoes === 0 && (
-            <p className="text-sm text-gray-400 text-center py-8">
+            <p className="text-sm text-muted text-center py-8">
               Nenhuma cotação nos últimos {periodo} dias.
             </p>
           )}

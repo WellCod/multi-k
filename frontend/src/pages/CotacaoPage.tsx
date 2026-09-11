@@ -10,60 +10,73 @@ import {
   ApiError,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/Dialog";
 import { Step1 } from "./cotacao/Step1";
 import { Step2Auto } from "./cotacao/Step2Auto";
 import { Step2Moto } from "./cotacao/Step2Moto";
 import { Step2Imovel } from "./cotacao/Step2Imovel";
-import { Step3 } from "./cotacao/Step3";
 import { Step4 } from "./cotacao/Step4";
 import { TransmitirModal } from "./cotacao/TransmitirModal";
 import { ComparativoInline } from "./cotacao/ComparativoInline";
-import { LoadingPanel } from "./cotacao/shared";
+import { useInsurers } from "@/hooks/useInsurers";
 import { type Step1Data, type Step2Data, type Step3Data, type Step4Data } from "./cotacao/types";
 
-const STORAGE_KEY = "mk_cotacao_rascunho";
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 120_000;
 
 interface Rascunho {
+  flowVersion?: number;
   ramo: string;
   step: number;
+  step1?: Step1Data;
   step2?: Step2Data;
   step3?: Step3Data;
   step4?: Step4Data;
   clienteId?: string;
 }
 
-function saveRascunho(r: Rascunho) {
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(r));
-}
-
-function loadRascunho(): Rascunho | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Rascunho) : null;
-  } catch {
-    return null;
-  }
-}
-
-function clearRascunho() {
-  sessionStorage.removeItem(STORAGE_KEY);
-}
-
 const STEP_LABELS = [
-  "Proponente",
-  "Dados do risco",
+  "Identificação",
+  "Objeto",
+  "Perfil",
   "Coberturas",
-  "Vigência",
   "Resultado",
 ];
 
 export function CotacaoPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const draftRef = useRef<Rascunho | null>(null);
+  const versionRef = useRef(0);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const [draftReady, setDraftReady] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("Carregando rascunho…");
+  function loadRascunho() { return draftRef.current; }
+  function saveRascunho(value: Rascunho) {
+    value = { ...value, flowVersion: 2 };
+    draftRef.current = value;
+    setSaveStatus("Salvando…");
+    saveQueue.current = saveQueue.current.then(async () => {
+      try {
+        const response = await api.rascunho.save(value, versionRef.current);
+        versionRef.current = response.versao;
+        setSaveStatus("Passo salvo no servidor");
+      } catch {
+        setSaveStatus("Não foi possível salvar. Mantenha esta tela aberta e tente avançar novamente.");
+      }
+    });
+  }
+  function clearRascunho() {
+    draftRef.current = null;
+    saveQueue.current = saveQueue.current.then(async () => {
+      try { await api.rascunho.clear(); versionRef.current = 0; setSaveStatus("Novo rascunho"); }
+      catch { setSaveStatus("Não foi possível limpar o rascunho no servidor."); }
+    });
+  }
 
   const [dominios, setDominios] = useState<Dominio[]>([]);
+  const { items: insurers, error: insurersError } = useInsurers();
+  const [selectedInsurers, setSelectedInsurers] = useState<string[]>([]);
   const [ramo, setRamo] = useState<string>(() => {
     return loadRascunho()?.ramo ?? "auto";
   });
@@ -99,13 +112,44 @@ export function CotacaoPage() {
   const [itensComparativo, setItensComparativo] = useState<ItemComparativo[]>([]);
   const [proposta, setProposta] = useState<Proposta | null>(null);
   const [showTransmitir, setShowTransmitir] = useState(false);
-  const [transmitirCia, setTransmitirCia] = useState("fake");
+  const [transmitirCia, setTransmitirCia] = useState("");
 
   const [recotarError, setRecotarError] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const recotar = searchParams.get("recotar");
   const clienteParam = searchParams.get("cliente");
+
+  useEffect(() => { setSelectedInsurers(insurers.filter(item => item.ramos.includes(ramo)).map(item => item.id)); }, [insurers, ramo]);
+
+  useEffect(() => {
+    let disposed = false;
+    api.rascunho.get().then(response => {
+      if (disposed) return;
+      versionRef.current = response.versao;
+      if (response.dados && !recotar && !clienteParam) {
+        const draft = response.dados as unknown as Rascunho;
+        draftRef.current = draft;
+        setRamo(draft.ramo);
+        setStep(draft.flowVersion === 2 ? Math.max(1, Math.min(draft.step, 4)) : 1);
+        setStep1Data(draft.step1);
+        setStep2Data(draft.step2);
+        setStep3Data(draft.step3);
+        setStep4Data(draft.step4);
+        setClienteId(draft.clienteId);
+        setSaveStatus("Rascunho recuperado do servidor");
+      } else setSaveStatus("Novo rascunho");
+    }).catch(() => { if (!disposed) setSaveStatus("Autosave indisponível. O rascunho não está protegido contra perda de sessão."); })
+      .finally(() => { if (!disposed) setDraftReady(true); });
+    return () => { disposed = true; };
+  }, [recotar, clienteParam]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    const frame = requestAnimationFrame(() => document.querySelector<HTMLElement>("#quotation-step input, #quotation-step select, #quotation-step button")?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [step, draftReady]);
+
 
   useEffect(() => {
     api.dominios.list().then(setDominios).catch(() => {});
@@ -136,13 +180,12 @@ export function CotacaoPage() {
   }, [recotar]);
 
   useEffect(() => {
-    if (!cotacaoId || !cotacao || polling) return;
-    if (cotacao.status !== "sucesso" && cotacao.status !== "restricao") return;
+    if (!cotacaoId || !cotacao) return;
     let cancelled = false;
     api.cotacoes
       .comparativo(cotacaoId)
       .then((items) => { if (!cancelled) setItensComparativo(items); })
-      .catch(() => { if (!cancelled) setItensComparativo([]); });
+      .catch(() => { /* Preserve partial results during temporary network failures. */ });
     return () => { cancelled = true; };
   }, [cotacaoId, cotacao, polling]);
 
@@ -203,6 +246,7 @@ export function CotacaoPage() {
       const tick = async () => {
         if (Date.now() - start > POLL_TIMEOUT_MS) {
           stopPolling();
+          setPollCancelled(true);
           return;
         }
         pollingSecRef.current += POLL_INTERVAL_MS / 1000;
@@ -229,27 +273,33 @@ export function CotacaoPage() {
   );
 
   const handleRamoChange = (r: string) => {
+    if (r === ramo) return;
     setRamo(r);
-    persistRascunho({ ramo: r });
+    setStep2Data(undefined);
+    setStep3Data(undefined);
+    setStep4Data(undefined);
+    persistRascunho({ ramo: r, step2: undefined, step3: undefined, step4: undefined });
   };
 
   const handleStep1 = (data: Step1Data, cliente: Cliente | null) => {
     setStep1Data(data);
     setClienteId(cliente?.id);
     setStep(2);
-    persistRascunho({ step: 2, clienteId: cliente?.id });
+    persistRascunho({ step1: data, step: 2, clienteId: cliente?.id });
   };
 
   const handleStep2 = (data: Step2Data) => {
-    setStep2Data(data);
+    const merged = { ...step2Data, ...data };
+    setStep2Data(merged);
     setStep(3);
-    persistRascunho({ step2: data, step: 3 });
+    persistRascunho({ step2: merged, step: 3 });
   };
 
-  const handleStep3 = (data: Step3Data) => {
-    setStep3Data(data);
+  const handleStep3 = (data: Step2Data) => {
+    const merged = { ...step2Data, ...data };
+    setStep2Data(merged);
     setStep(4);
-    persistRascunho({ step3: data, step: 4 });
+    persistRascunho({ step2: merged, step: 4 });
   };
 
   const handleStep4 = async (data: Step4Data) => {
@@ -271,7 +321,7 @@ export function CotacaoPage() {
 
     const dados: Record<string, unknown> = {
       ...step2Limpo,
-      coberturas: step3Data?.coberturas ?? [],
+      coberturas: data.coberturas,
       plano_pagamento: data.plano_pagamento,
       inicio_vigencia: data.inicio_vigencia,
       fim_vigencia: data.fim_vigencia,
@@ -294,6 +344,7 @@ export function CotacaoPage() {
     setCriando(true);
     try {
       const created = await api.cotacoes.create({
+        cias: selectedInsurers,
         ramo,
         dados,
         cliente_id: clienteId,
@@ -317,10 +368,14 @@ export function CotacaoPage() {
     navigate(`/cotacao?recotar=${cotacaoId}`);
   };
 
-  const handleCancel = () => {
-    setPollCancelled(true);
-    stopPolling();
-    clearRascunho();
+  const handleCancel = async (cia?: string) => {
+    if (!cotacaoId) return;
+    try {
+      await api.cotacoes.cancelar(cotacaoId, cia);
+      setItensComparativo(await api.cotacoes.comparativo(cotacaoId));
+      setCotacao(await api.cotacoes.get(cotacaoId));
+      if (!cia) stopPolling();
+    } catch { setCotacaoErrMsg("Não foi possível cancelar. A consulta continua; tente novamente."); }
   };
 
   const handleNewCotacao = () => {
@@ -355,33 +410,31 @@ export function CotacaoPage() {
     navigate("/cotacao");
   };
 
+  if (!draftReady) return <p role="status">Carregando rascunho…</p>;
   return (
-    <div className="max-w-2xl mx-auto">
+    <div onKeyDown={event => { if (event.altKey && event.key === "ArrowLeft" && step > 1 && !criando && !showCancelConfirm && !showTransmitir) { event.preventDefault(); setStep(value => value - 1); } }} className={step === 5 ? "w-full" : "max-w-3xl mx-auto w-full"}>
       {showCancelConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowCancelConfirm(false); }}
-        >
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-xl w-full max-w-sm mx-4 p-6 space-y-4">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Descartar cotação?</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+        <Dialog title="Descartar cotação?" onClose={() => setShowCancelConfirm(false)}>
+          <div className="space-y-4">
+            <p className="text-sm text-muted ">
               O rascunho atual será perdido. Deseja continuar?
             </p>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" size="sm" onClick={() => setShowCancelConfirm(false)}>
                 Continuar editando
               </Button>
-              <Button type="button" size="sm" onClick={confirmDiscard}
-                className="bg-red-600 hover:bg-red-700 text-white border-red-600">
+              <Button type="button" size="sm" variant="destructive" onClick={confirmDiscard}>
                 Descartar
               </Button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
+      <p className="text-xs text-muted mb-3" role="status">{saveStatus} · Alt + ← para voltar</p>
+      {insurersError && <p role="alert" className="text-danger">{insurersError}</p>}
       {recotarError && (
-        <div className="mb-4 text-sm text-yellow-800 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded px-4 py-3">
+        <div className="mb-4 text-sm text-warning bg-canvas border border-line rounded px-4 py-3">
           {recotarError}
         </div>
       )}
@@ -395,8 +448,8 @@ export function CotacaoPage() {
               onClick={() => handleRamoChange(r)}
               className={`px-4 py-2 rounded text-sm font-medium border transition-colors ${
                 ramo === r
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:border-blue-400"
+                  ? "control-primary border-line"
+                  : "bg-surface text-ink border-line hover:border-line"
               }`}
             >
               {r === "auto" ? "Auto" : r === "moto" ? "Moto" : "Imóvel"}
@@ -413,19 +466,19 @@ export function CotacaoPage() {
               <div key={s} className="flex items-center gap-1 flex-1">
                 <div
                   className={`h-1.5 flex-1 rounded-full transition-colors ${
-                    s <= step ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-600"
+                    s <= step ? "bg-action" : "bg-surface "
                   }`}
                 />
               </div>
             );
           })}
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-muted ">
           Passo {step} de 5 — {STEP_LABELS[step - 1]}
         </p>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div id="quotation-step" className="bg-surface rounded border border-line p-4">
         {step === 1 && (
           <Step1
             dominios={dominios}
@@ -434,43 +487,44 @@ export function CotacaoPage() {
           />
         )}
 
-        {step === 2 && ramo === "auto" && (
+        {(step === 2 || step === 3) && ramo === "auto" && (
           <Step2Auto
+            key={step}
+            stage={step === 2 ? "object" : "profile"}
             defaultValues={step2Data}
-            onBack={() => setStep(1)}
-            onNext={handleStep2}
+            onBack={() => setStep(step - 1)}
+            onNext={step === 2 ? handleStep2 : handleStep3}
           />
         )}
 
-        {step === 2 && ramo === "moto" && (
+        {(step === 2 || step === 3) && ramo === "moto" && (
           <Step2Moto
+            key={step}
+            stage={step === 2 ? "object" : "profile"}
             defaultValues={step2Data}
-            onBack={() => setStep(1)}
-            onNext={handleStep2}
+            onBack={() => setStep(step - 1)}
+            onNext={step === 2 ? handleStep2 : handleStep3}
           />
         )}
 
-        {step === 2 && ramo === "imovel" && (
+        {(step === 2 || step === 3) && ramo === "imovel" && (
           <Step2Imovel
+            key={step}
+            stage={step === 2 ? "object" : "profile"}
             dominios={dominios}
             defaultValues={step2Data}
-            onBack={() => setStep(1)}
-            onNext={handleStep2}
-          />
-        )}
-
-        {step === 3 && (
-          <Step3
-            ramo={ramo}
-            dominios={dominios}
-            defaultValues={step3Data}
-            onBack={() => setStep(2)}
-            onNext={handleStep3}
+            onBack={() => setStep(step - 1)}
+            onNext={step === 2 ? handleStep2 : handleStep3}
           />
         )}
 
         {step === 4 && (
           <Step4
+            ramo={ramo}
+            coberturasIniciais={step3Data?.coberturas}
+            seguradoras={insurers.filter(item => item.ramos.includes(ramo))}
+            selecionadas={selectedInsurers}
+            onSelecionadas={setSelectedInsurers}
             dominios={dominios}
             defaultValues={step4Data}
             onBack={() => setStep(3)}
@@ -482,16 +536,17 @@ export function CotacaoPage() {
 
         {step === 5 && (
           <div className="space-y-4">
+            {cotacaoErrMsg && <p role="alert" className="text-sm text-danger">{cotacaoErrMsg}</p>}
             {polling && !pollCancelled && (
-              <LoadingPanel seconds={pollingSeconds} onCancel={handleCancel} />
+              <div className="flex items-center justify-between gap-3"><p className="text-xs text-muted tabular-nums">Consultas em andamento · {pollingSeconds}s</p><Button variant="outline" onClick={() => void handleCancel()}>Cancelar todas as consultas</Button></div>
             )}
 
             {pollCancelled && (
-              <div className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded p-4">
-                Consulta cancelada.{" "}
+              <div className="text-sm text-muted bg-canvas rounded p-4">
+                Acompanhamento pausado. A consulta continua no servidor.{" "}
                 <button
                   type="button"
-                  className="text-blue-600 dark:text-blue-400 underline"
+                  className="text-action underline"
                   onClick={() => {
                     if (cotacaoId) startPolling(cotacaoId);
                   }}
@@ -509,6 +564,7 @@ export function CotacaoPage() {
                 proposta={proposta}
                 onEmitir={(cia) => { setTransmitirCia(cia); setShowTransmitir(true); }}
                 onRecotar={handleRecotar}
+                onCancel={cia => void handleCancel(cia)}
               />
             )}
 
