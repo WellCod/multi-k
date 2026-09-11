@@ -31,7 +31,7 @@ export function Step3({
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-4">
-      <p className="text-sm text-gray-600">Selecione as coberturas desejadas:</p>
+      <p className="text-sm text-muted">Selecione as coberturas desejadas:</p>
       <div className="space-y-2">
         {coberturas.map((d) => (
           <label key={d.codigo} className="flex items-center gap-3 text-sm">
@@ -42,12 +42,12 @@ export function Step3({
               className="rounded"
             />
             <span className="font-medium">{d.descricao}</span>
-            <span className="text-gray-400 text-xs">({d.codigo})</span>
+            <span className="text-muted text-xs">({d.codigo})</span>
           </label>
         ))}
       </div>
       {errors.coberturas && (
-        <p className="text-xs text-red-600">{errors.coberturas.message}</p>
+        <p className="text-xs text-danger">{errors.coberturas.message}</p>
       )}
 
       <div className="pt-2 flex justify-between">

@@ -38,6 +38,7 @@ class DashboardCiaOut(BaseModel):
     cotacoes: int
     propostas: int
     premio_total: Decimal
+    barra_pct: Decimal = Decimal("0.00")
     latencia_media_s: float | None = None
 
 
@@ -169,6 +170,13 @@ async def _calcular_dashboard(
             key=lambda x: x.premio_total,
             reverse=True,
         )
+
+    maior_premio = max((item.premio_total for item in ranking_cias), default=Decimal("0"))
+    if maior_premio > 0:
+        for item in ranking_cias:
+            item.barra_pct = (item.premio_total / maior_premio * 100).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
 
     return DashboardOut(
         total_cotacoes=total_cotacoes,

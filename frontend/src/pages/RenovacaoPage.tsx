@@ -1,3 +1,4 @@
+import { DataTable } from "@/components/DataTable";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type CotacaoCriada, type Renovacao } from "@/lib/api";
@@ -7,30 +8,30 @@ import { formatBRL, formatDate } from "@/lib/utils";
 const JANELA_CONFIG = {
   D30: {
     label: "≤ 30 dias",
-    headerBg: "bg-red-50 dark:bg-red-900/20",
-    headerText: "text-red-800 dark:text-red-300",
-    border: "border-red-200 dark:border-red-800",
+    headerBg: "bg-canvas ",
+    headerText: "text-danger ",
+    border: "border-line ",
     badgeColor:
-      "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-700",
-    countText: "text-red-600 dark:text-red-400",
+      "bg-canvas text-danger border-line ",
+    countText: "text-danger ",
   },
   D45: {
     label: "31–45 dias",
-    headerBg: "bg-orange-50 dark:bg-orange-900/20",
-    headerText: "text-orange-800 dark:text-orange-300",
-    border: "border-orange-200 dark:border-orange-800",
+    headerBg: "bg-canvas ",
+    headerText: "text-warning ",
+    border: "border-line ",
     badgeColor:
-      "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:border-orange-700",
-    countText: "text-orange-600 dark:text-orange-400",
+      "bg-canvas text-warning border-line ",
+    countText: "text-warning ",
   },
   D60: {
     label: "46–60 dias",
-    headerBg: "bg-yellow-50 dark:bg-yellow-900/20",
-    headerText: "text-yellow-800 dark:text-yellow-300",
-    border: "border-yellow-200 dark:border-yellow-800",
+    headerBg: "bg-canvas ",
+    headerText: "text-warning ",
+    border: "border-line ",
     badgeColor:
-      "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-700",
-    countText: "text-yellow-600 dark:text-yellow-400",
+      "bg-canvas text-warning border-line ",
+    countText: "text-warning ",
   },
 };
 
@@ -40,7 +41,7 @@ function DiasBadge({ dias, janela }: { dias: number; janela: Janela }) {
   const cfg = JANELA_CONFIG[janela];
   return (
     <span
-      className={`inline-flex items-center justify-center rounded border px-2 py-0.5 text-xs font-semibold tabular-nums ${cfg.badgeColor}`}
+      className={`inline-flex items-center justify-center rounded border px-2 py-1 text-xs font-semibold tabular-nums ${cfg.badgeColor}`}
     >
       {dias}d
     </span>
@@ -49,19 +50,19 @@ function DiasBadge({ dias, janela }: { dias: number; janela: Janela }) {
 
 function SkeletonGroupCard() {
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse">
-      <div className="px-4 py-3 bg-gray-100 dark:bg-gray-700/60 flex items-center justify-between">
-        <div className="h-4 w-24 rounded bg-gray-200 dark:bg-gray-600" />
-        <div className="h-4 w-16 rounded bg-gray-200 dark:bg-gray-600" />
+    <div className="rounded border border-line overflow-hidden animate-pulse">
+      <div className="px-4 py-3 bg-canvas flex items-center justify-between">
+        <div className="h-4 w-24 rounded bg-surface " />
+        <div className="h-4 w-16 rounded bg-surface " />
       </div>
-      <div className="divide-y divide-gray-100 dark:divide-gray-700">
+      <div className="divide-y divide-line ">
         {[...Array(3)].map((_, i) => (
           <div key={i} className="px-4 py-3 flex items-center gap-4">
-            <div className="h-3 w-28 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-3 w-16 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-3 w-20 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="ml-auto h-6 w-14 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-3 w-28 rounded bg-surface " />
+            <div className="h-3 w-16 rounded bg-surface " />
+            <div className="h-3 w-24 rounded bg-surface " />
+            <div className="h-3 w-20 rounded bg-surface " />
+            <div className="ml-auto h-6 w-14 rounded bg-surface " />
           </div>
         ))}
       </div>
@@ -84,7 +85,7 @@ function GrupoCard({
   const cfg = JANELA_CONFIG[janela];
 
   return (
-    <div className={`rounded-xl border ${cfg.border} overflow-hidden`}>
+    <div className={`rounded border ${cfg.border} overflow-hidden`}>
       {/* Header colorido do grupo */}
       <div className={`flex items-center justify-between px-4 py-3 ${cfg.headerBg}`}>
         <span className={`text-sm font-semibold ${cfg.headerText}`}>
@@ -96,27 +97,27 @@ function GrupoCard({
       </div>
 
       {/* Tabela interna */}
-      <div className="bg-white dark:bg-gray-800 overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+      <div className="bg-surface overflow-x-auto">
+        <DataTable className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-gray-50 dark:bg-gray-700/60 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-              <th className="px-3 py-2.5 w-8" />
-              <th className="px-4 py-2.5">Protocolo</th>
-              <th className="px-4 py-2.5">Ramo</th>
-              <th className="px-4 py-2.5">Prêmio</th>
-              <th className="px-4 py-2.5">Vigência até</th>
-              <th className="px-4 py-2.5 text-center">Dias</th>
-              <th className="px-4 py-2.5" />
+            <tr className="bg-canvas text-left text-xs font-semibold text-muted uppercase tracking-wide">
+              <th className="px-3 py-3 w-8" />
+              <th className="px-4 py-3">Protocolo</th>
+              <th className="px-4 py-3">Ramo</th>
+              <th className="px-4 py-3">Prêmio</th>
+              <th className="px-4 py-3">Vigência até</th>
+              <th className="px-4 py-3 text-center">Dias</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {grupo.map((r) => (
               <tr
                 key={r.proposta_id}
-                className={`border-b border-gray-100 dark:border-gray-700 transition-colors ${
+                className={`border-b border-line transition-colors ${
                   selecionadas.has(r.cotacao_id)
-                    ? "bg-indigo-50 dark:bg-indigo-900/20"
-                    : "hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                    ? "bg-canvas "
+                    : "hover:bg-canvas "
                 }`}
               >
                 <td className="px-3 py-3">
@@ -124,20 +125,20 @@ function GrupoCard({
                     type="checkbox"
                     checked={selecionadas.has(r.cotacao_id)}
                     onChange={() => onToggle(r.cotacao_id)}
-                    className="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                    className="rounded border-line text-action focus:ring-action"
                     aria-label={`Selecionar ${r.protocolo}`}
                   />
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
+                <td className="px-4 py-3 font-mono text-xs text-ink ">
                   {r.protocolo}
                 </td>
-                <td className="px-4 py-3 capitalize text-gray-900 dark:text-white">
+                <td className="px-4 py-3 capitalize text-ink ">
                   {r.ramo}
                 </td>
-                <td className="px-4 py-3 text-gray-900 dark:text-white tabular-nums">
+                <td className="px-4 py-3 text-ink tabular-nums">
                   {formatBRL(r.premio_total)}
                 </td>
-                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                <td className="px-4 py-3 text-ink ">
                   {formatDate(r.fim_vigencia)}
                 </td>
                 <td className="px-4 py-3 text-center">
@@ -147,7 +148,7 @@ function GrupoCard({
                   <div className="flex gap-2 justify-end">
                     {r.cliente_id && (
                       <button
-                        className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+                        className="text-xs px-3 py-1 rounded border border-line text-muted hover:bg-canvas transition-colors whitespace-nowrap"
                         onClick={() => navigate(`/clientes/${r.cliente_id}`)}
                       >
                         Ver cliente
@@ -158,7 +159,7 @@ function GrupoCard({
                       position="top"
                     >
                       <button
-                        className="text-xs px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors whitespace-nowrap"
+                        className="text-xs px-3 py-1 rounded border border-line text-action hover:bg-canvas transition-colors whitespace-nowrap"
                         onClick={() =>
                           navigate(`/cotacao?recotar=${r.cotacao_id}`)
                         }
@@ -171,14 +172,14 @@ function GrupoCard({
               </tr>
             ))}
           </tbody>
-        </table>
+        </DataTable>
       </div>
     </div>
   );
 }
 
 const SELECT_CLS =
-  "rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400";
+  "rounded border border-line bg-surface text-sm text-ink px-3 py-2 focus:outline-none focus:ring-2 focus:ring-action ";
 
 export function RenovacaoPage() {
   const navigate = useNavigate();
@@ -260,15 +261,15 @@ export function RenovacaoPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <h1 className="text-xl font-semibold text-ink ">
             Renovações
           </h1>
           {!loading && !err && total > 0 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-sm text-muted mt-1">
               {total} apólice{total !== 1 ? "s" : ""} vencem nos próximos 60 dias
             </p>
           )}
@@ -302,10 +303,10 @@ export function RenovacaoPage() {
           <button
             onClick={handleExportCsv}
             disabled={csvLoading || loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 rounded border border-line bg-surface px-3 py-2 text-sm text-ink hover:bg-canvas disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {csvLoading ? (
-              <span className="h-3.5 w-3.5 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
+              <span className="h-3.5 w-3.5 rounded-full border-2 border-line border-t-transparent animate-spin" />
             ) : (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -320,7 +321,7 @@ export function RenovacaoPage() {
 
       {/* Erro */}
       {err && (
-        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+        <div className="rounded border border-line bg-canvas p-4 text-sm text-danger ">
           {err}
         </div>
       )}
@@ -336,12 +337,12 @@ export function RenovacaoPage() {
 
       {/* Empty state */}
       {!loading && !err && total === 0 && (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-16 text-center">
-          <p className="text-4xl mb-3">📋</p>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="rounded border border-line bg-surface py-16 text-center">
+          <p className="text-xl mb-3">📋</p>
+          <p className="text-sm font-medium text-ink ">
             Nenhuma apólice encontrada
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-xs text-muted mt-1">
             {ramo || janela
               ? "Tente remover os filtros aplicados"
               : "Volte mais tarde para acompanhar os vencimentos"}
@@ -354,7 +355,7 @@ export function RenovacaoPage() {
         <div className="flex flex-wrap items-center gap-3 px-1">
           <button
             onClick={handleSelecionarTodas}
-            className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
+            className="text-xs text-muted hover:text-ink underline"
           >
             {selecionadas.size === renovacoes.length ? "Desmarcar todas" : "Selecionar todas"}
           </button>
@@ -362,7 +363,7 @@ export function RenovacaoPage() {
             <button
               onClick={handleRecotarLote}
               disabled={loteLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded bg-action hover:bg-action disabled:opacity-50 text-ink text-xs font-medium transition-colors"
             >
               {loteLoading ? (
                 <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
@@ -375,26 +376,26 @@ export function RenovacaoPage() {
 
       {/* Modal resultado lote */}
       {loteResultado && (
-        <div className="rounded-xl border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 p-4">
+        <div className="rounded border border-line bg-canvas p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">
+              <p className="text-sm font-semibold text-action ">
                 {loteResultado.length} cotaç{loteResultado.length !== 1 ? "ões criadas" : "ão criada"} com sucesso
               </p>
-              <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
+              <p className="text-xs text-action mt-1">
                 Processamento em andamento — acompanhe no histórico
               </p>
             </div>
             <div className="flex gap-2 shrink-0">
               <button
                 onClick={() => navigate("/historico")}
-                className="text-xs px-2.5 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                className="text-xs px-3 py-1 rounded bg-action text-ink hover:bg-action transition-colors"
               >
                 Ver histórico
               </button>
               <button
                 onClick={() => setLoteResultado(null)}
-                className="text-xs text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300"
+                className="text-xs text-action hover:text-action "
                 aria-label="fechar"
               >
                 ✕

@@ -27,6 +27,8 @@ router = APIRouter(tags=["comparativo"])
 
 class ItemComparativoOut(BaseModel):
     cia: str
+    nome: str | None = None
+    iniciado_em: str | None = None
     cotacao_id_cia: str | None
     premio_total: Decimal | None
     annual_total: Decimal | None
@@ -36,6 +38,7 @@ class ItemComparativoOut(BaseModel):
     status: str
     coverages_available: dict[str, Any] | None = None
     coverages_selected: dict[str, str | None] | None = None
+    coberturas_comparaveis: list[dict[str, str | None]] = []
 
 
 class RepricingInput(BaseModel):
@@ -48,6 +51,7 @@ class RepricingOutput(BaseModel):
     annual_total: Decimal
     info: str
     coverages_selected: dict[str, str | None]
+    coberturas_comparaveis: list[dict[str, str | None]]
 
 
 async def _get_cotacao_ou_404(
@@ -81,14 +85,66 @@ def _annual_total(job: CotacaoJob) -> Decimal | None:
         return None
 
 
+def _coverage_options(job: CotacaoJob) -> dict[str, Any] | None:
+    source = (job.payload_resposta or {}).get("coverages_available")
+    if not isinstance(source, dict):
+        return None
+    output = {}
+    for code, coverage in source.items():
+        if not isinstance(coverage, dict):
+            continue
+        options = []
+        for option in coverage.get("peril_options", []):
+            normalized = dict(option)
+            for field in ("price", "deductible", "coverage_amount"):
+                raw = normalized.get(field)
+                normalized[field] = (
+                    str(Decimal(str(raw)).quantize(Decimal("0.01")))
+                    if raw is not None
+                    else None
+                )
+            options.append(normalized)
+        output[code] = {**coverage, "peril_options": options}
+    return output
+
+
+def _comparison_coverages(
+    job: CotacaoJob, selected: dict[str, str | None] | None = None
+) -> list[dict[str, str | None]]:
+    available = _coverage_options(job) or {}
+    if selected is None:
+        selected = (job.payload_resposta or {}).get("coverages_selected") or {}
+    rows = []
+    for code, coverage in available.items():
+        option = next(
+            (
+                o
+                for o in coverage["peril_options"]
+                if o.get("slug") == selected.get(code)
+            ),
+            None,
+        )
+        if option is None:
+            continue
+        rows.append(
+            {
+                "conceito_id": str(coverage.get("conceito_id") or f"{job.cia}:{code}"),
+                "nome_canonico": str(
+                    coverage.get("nome_canonico") or coverage.get("name") or code
+                ),
+                "nome_original": str(coverage.get("name") or code),
+                "limite": option.get("coverage_amount"),
+            }
+        )
+    return rows
+
+
 def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparativoOut]:
     """Monta a lista de resultados por cia para o comparativo."""
-    concluidos = [j for j in jobs if j.status == "concluido"]
-    if not concluidos:
-        return []
     return [
         ItemComparativoOut(
             cia=j.cia,
+            iniciado_em=j.criado_em.isoformat() if j.criado_em else None,
             cotacao_id_cia=j.cotacao_id_cia,
             premio_total=j.premio_total,
             annual_total=_annual_total(j),
@@ -98,11 +154,14 @@ def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparati
             ],
             mensagens=[str(m) for m in (j.mensagens or [])],
             necessita_vistoria=j.necessita_vistoria,
-            status=j.status_resultado or "erro",
-            coverages_available=(j.payload_resposta or {}).get("coverages_available"),
+            status=(j.status_resultado or "erro")
+            if j.status in ("concluido", "erro")
+            else j.status,
+            coverages_available=_coverage_options(j),
             coverages_selected=(j.payload_resposta or {}).get("coverages_selected"),
+            coberturas_comparaveis=_comparison_coverages(j),
         )
-        for j in concluidos
+        for j in jobs
     ]
 
 
@@ -234,6 +293,7 @@ async def repricing(
         annual_total=annual,
         info=pricing.get("info", ""),
         coverages_selected=body.coverages_selected,
+        coberturas_comparaveis=_comparison_coverages(job, body.coverages_selected),
     )
 
 

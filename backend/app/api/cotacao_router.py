@@ -64,6 +64,7 @@ class CriarCotacaoInput(BaseModel):
     dados: dict[str, Any]
     cliente_id: uuid.UUID | None = None
     versao_anterior_id: uuid.UUID | None = None
+    cias: list[str] | None = None
 
     @model_validator(mode="after")
     def _validar_dados_risco(self) -> "CriarCotacaoInput":
@@ -152,6 +153,10 @@ async def criar_cotacao(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CotacaoCriadaOut:
+    available = cias_para_ramo(body.ramo)
+    selected = list(dict.fromkeys(body.cias)) if body.cias is not None else available
+    if not selected or any(cia not in available for cia in selected):
+        raise HTTPException(422, "Selecione uma seguradora disponível para o ramo.")
     cotacao = Cotacao(
         id=uuid.uuid4(),
         cliente_id=body.cliente_id,
@@ -164,7 +169,7 @@ async def criar_cotacao(
     db.add(cotacao)
     await db.flush()
 
-    for cia in cias_para_ramo(body.ramo):
+    for cia in selected:
         db.add(
             CotacaoJob(
                 id=uuid.uuid4(),
@@ -499,6 +504,49 @@ async def recotar(
     await db.commit()
 
     return CotacaoCriadaOut(id=nova.id, status=nova.status, ramo=nova.ramo)
+
+
+class CancelarInput(BaseModel):
+    cia: str | None = None
+
+
+@router.post("/{cotacao_id}/cancelar", status_code=204)
+async def cancelar_consulta(
+    cotacao_id: uuid.UUID,
+    body: CancelarInput,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    cotacao = await _get_cotacao_ou_404(cotacao_id, usuario.id, db)
+    jobs = list(
+        (
+            await db.execute(
+                select(CotacaoJob)
+                .where(CotacaoJob.cotacao_id == cotacao_id)
+                .order_by(CotacaoJob.id)
+                .with_for_update()
+            )
+        ).scalars()
+    )
+    for job in jobs:
+        if job.status in ("pendente", "processando") and (
+            body.cia is None or body.cia == job.cia
+        ):
+            job.status = "erro"
+            job.status_resultado = "cancelado"
+            job.mensagens = [
+                "Consulta cancelada no multi-K. Uma solicitação já enviada pode continuar na seguradora; seu retorno será descartado."
+            ]
+    if all(job.status in ("concluido", "erro") for job in jobs):
+        states = {job.status_resultado for job in jobs}
+        cotacao.status = (
+            "sucesso"
+            if "sucesso" in states
+            else "restricao"
+            if "restricao" in states
+            else "erro"
+        )
+    await db.commit()
 
 
 class VersaoPremioOut(BaseModel):
