@@ -41,6 +41,8 @@ async def processar_job(
         job = job_r.scalar_one_or_none()
         if cotacao is None or job is None:
             return
+        if job.status_resultado == "cancelado":
+            return
         ramo = cotacao.ramo
         dados_risco: dict[str, Any] = dict(cotacao.dados_risco)
         cia = job.cia
@@ -60,8 +62,12 @@ async def processar_job(
 
         async with factory() as db, db.begin():
             jb = (
-                await db.execute(select(CotacaoJob).where(CotacaoJob.id == job_id))
+                await db.execute(
+                    select(CotacaoJob).where(CotacaoJob.id == job_id).with_for_update()
+                )
             ).scalar_one()
+            if jb.status_resultado == "cancelado":
+                return
             jb.status = "concluido"
             jb.processado_em = _utcnow()
             jb.cotacao_id_cia = resultado.cotacao_id
@@ -133,9 +139,13 @@ async def processar_job(
         logger.exception("Erro ao processar job %s", job_id)
         async with factory() as db, db.begin():
             err_jb = (
-                await db.execute(select(CotacaoJob).where(CotacaoJob.id == job_id))
+                await db.execute(
+                    select(CotacaoJob).where(CotacaoJob.id == job_id).with_for_update()
+                )
             ).scalar_one_or_none()
             if err_jb is not None:
+                if err_jb.status_resultado == "cancelado":
+                    return
                 err_jb.status = "erro"
                 err_jb.processado_em = _utcnow()
 

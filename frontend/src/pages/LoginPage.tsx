@@ -17,8 +17,8 @@ type FormData = z.infer<typeof schema>;
 
 function ShieldIcon() {
   return (
-    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/30">
-      <span className="text-2xl font-bold text-white select-none">K</span>
+    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded border border-line">
+      <span className="text-xl font-bold text-ink select-none">K</span>
     </div>
   );
 }
@@ -69,23 +69,23 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50/30 dark:from-gray-900 dark:to-gray-800 px-4">
+    <div className="page min-h-screen flex items-center justify-center bg-canvas">
       <div className="w-full max-w-sm">
         {/* Logo + título */}
         <div className="mb-6 text-center">
           <ShieldIcon />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+          <h1 className="text-xl font-bold text-ink tracking-tight">
             multi-K
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-sm text-muted mt-1">
             Multicálculo de seguros
           </p>
         </div>
 
         {/* Aviso de sessão expirada */}
         {sessionExpired && (
-          <div className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl px-4 py-3 mb-4">
-            <span className="text-base leading-none mt-0.5" aria-hidden>⚠️</span>
+          <div className="flex items-start gap-2 text-sm text-warning bg-canvas border border-line rounded px-4 py-3 mb-4">
+            <span className="text-base leading-none mt-1" aria-hidden>⚠️</span>
             <span>Sua sessão expirou. Faça login novamente.</span>
           </div>
         )}
@@ -93,9 +93,9 @@ export function LoginPage() {
         {/* Card do formulário */}
         <form
           onSubmit={handleSubmit(onSubmit)}
-          className="bg-white dark:bg-gray-800 border border-gray-200/80 dark:border-gray-700 rounded-2xl p-6 shadow-lg space-y-4"
+          className="bg-surface border border-line rounded p-6 shadow-panel space-y-4"
         >
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
             <Input
               id="email"
@@ -107,7 +107,7 @@ export function LoginPage() {
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label htmlFor="senha">Senha</Label>
             <div className="relative">
               <Input
@@ -116,13 +116,13 @@ export function LoginPage() {
                 autoComplete="current-password"
                 {...register("senha")}
                 error={errors.senha?.message}
-                className="pr-10"
+                className="pr-8"
               />
               <button
                 type="button"
                 tabIndex={-1}
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-muted transition-colors"
                 aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               >
                 <EyeIcon open={showPassword} />
@@ -131,7 +131,7 @@ export function LoginPage() {
           </div>
 
           {apiError && (
-            <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+            <div className="rounded border border-line bg-canvas px-4 py-3 text-sm text-danger ">
               {apiError}
             </div>
           )}

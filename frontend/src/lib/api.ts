@@ -79,6 +79,11 @@ export interface MeOut {
 }
 
 export const api = {
+  rascunho: {
+    get: () => request<{ dados: Record<string, unknown> | null; versao: number }>("/rascunhos/cotacao"),
+    save: (dados: object, versao: number) => request<{ versao: number }>("/rascunhos/cotacao", { method: "PUT", body: JSON.stringify({ dados, versao }) }),
+    clear: () => request<void>("/rascunhos/cotacao", { method: "DELETE" }),
+  },
   auth: {
     login: (email: string, senha: string) =>
       request<LoginOut>("/auth/login", {
@@ -92,6 +97,7 @@ export const api = {
 
   // ---- Domínios ----
   dominios: {
+    seguradoras: () => request<Seguradora[]>("/dominios/seguradoras"),
     list: (tipo?: string) => {
       const params = tipo ? `?tipo=${encodeURIComponent(tipo)}` : "";
       return request<Dominio[]>(`/dominios${params}`);
@@ -149,6 +155,7 @@ export const api = {
 
   // ---- Cotações ----
   cotacoes: {
+    cancelar: (id: string, cia?: string) => request<void>(`/cotacoes/${id}/cancelar`, { method: "POST", body: JSON.stringify({ cia }) }),
     exportCsvUrl: () => `${BASE}/cotacoes/export/csv`,
     create: (body: CriarCotacaoInput) =>
       request<CotacaoCriada>("/cotacoes", {
@@ -299,7 +306,7 @@ export const api = {
       const p = new URLSearchParams({ periodo: String(periodo) });
       if (dateFrom) p.set("date_from", dateFrom);
       if (dateTo) p.set("date_to", dateTo);
-      return request<ComissaoRamoOut[]>(`/relatorios/comissoes?${p}`);
+      return request<ComissoesResumoOut>(`/relatorios/comissoes/resumo?${p}`);
     },
     comissoesExportUrl: (periodo: number, dateFrom?: string, dateTo?: string) => {
       const p = new URLSearchParams({ periodo: String(periodo) });
@@ -349,6 +356,18 @@ export interface Dominio {
   codigo: string;
   descricao: string;
   cia: string | null;
+}
+
+export interface Seguradora {
+  id: string;
+  nome: string;
+  logo_url: string | null;
+  ramos: string[];
+  coberturas: string[];
+  franquias: string[];
+  parcelamentos: string[];
+  planos: { codigo: string; descricao: string; parcelas: number }[];
+  modos_transmissao: { id: string; label: string; dados_negocio: Record<string, unknown>; campo_parcelas: string | null }[];
 }
 
 export interface ClienteList {
@@ -439,6 +458,7 @@ export interface ImovelInput {
 }
 
 export interface CriarCotacaoInput {
+  cias?: string[];
   ramo: string;
   dados: Record<string, unknown>;
   cliente_id?: string;
@@ -522,9 +542,9 @@ export interface PerilOption {
   slug: string;
   name: string;
   description: string;
-  price: number;
-  deductible: number;
-  coverage_amount: number;
+  price: string | null;
+  deductible: string | null;
+  coverage_amount: string | null;
   used_parts: boolean;
 }
 
@@ -536,6 +556,10 @@ export interface Peril {
 }
 
 export interface ItemComparativo {
+  nome?: string;
+  logo_url?: string | null;
+  iniciado_em?: string | null;
+  coberturas_comparaveis?: { conceito_id: string; nome_canonico: string; nome_original: string; limite: string | null }[];
   cia: string;
   nome?: string;
   cotacao_id_cia: string | null;
@@ -551,6 +575,7 @@ export interface ItemComparativo {
 }
 
 export interface RepricingResult {
+  coberturas_comparaveis: NonNullable<ItemComparativo["coberturas_comparaveis"]>;
   monthly_total: string;
   annual_total: string;
   info: string;
@@ -733,6 +758,12 @@ export interface MixOut {
   premio_total: string;
 }
 
+export interface ComissoesResumoOut {
+  itens: ComissaoRamoOut[];
+  premio_total: string;
+  comissao_total: string;
+}
+
 export interface ComissaoRamoOut {
   ramo: string;
   n_propostas: number;
@@ -750,6 +781,7 @@ export interface DashboardRamoOut {
 }
 
 export interface DashboardCiaOut {
+  barra_pct: string;
   cia: string;
   cotacoes: number;
   propostas: number;
