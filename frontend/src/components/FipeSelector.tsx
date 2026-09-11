@@ -14,7 +14,7 @@ export interface FipeResult {
 interface Props {
   tipo: "carros" | "motos";
   onChange: (fipe: FipeResult) => void;
-  onInvalidate: () => void;
+  onInvalidate?: () => void;
   savedVehicle?: { codigo_fipe?: unknown; marca?: unknown; modelo?: unknown; ano_modelo?: unknown };
   error?: string;
 }
@@ -323,7 +323,7 @@ export default function FipeSelector({ tipo, onChange, onInvalidate, savedVehicl
       <p className="text-xs text-muted">Veículo salvo</p>
       <p className="font-medium">{[savedVehicle.marca, savedVehicle.modelo, savedVehicle.ano_modelo].filter(Boolean).map(String).join(" · ")}</p>
       <p className="text-xs">Código FIPE: {String(savedVehicle.codigo_fipe)}</p>
-      <button type="button" className="text-action underline" onClick={() => { setReplacing(true); onInvalidate(); }}>Trocar veículo</button>
+      <button type="button" className="text-action underline" onClick={() => { setReplacing(true); onInvalidate?.(); }}>Trocar veículo</button>
     </div>
   );
 
@@ -338,7 +338,7 @@ export default function FipeSelector({ tipo, onChange, onInvalidate, savedVehicl
         placeholder="Selecione a marca"
         loading={marcas.loading}
         onChange={(opt) => {
-          onInvalidate();
+          onInvalidate?.();
           setMarcaId(opt.codigo);
           setMarcaNome(opt.nome);
           setModeloId("");
@@ -346,7 +346,7 @@ export default function FipeSelector({ tipo, onChange, onInvalidate, savedVehicl
           setAnoId("");
         }}
         onClear={() => {
-          onInvalidate();
+          onInvalidate?.();
           setMarcaId("");
           setMarcaNome("");
           setModeloId("");
@@ -366,13 +366,13 @@ export default function FipeSelector({ tipo, onChange, onInvalidate, savedVehicl
         disabled={!marcaId}
         loading={!!marcaId && modelos.loading}
         onChange={(opt) => {
-          onInvalidate();
+          onInvalidate?.();
           setModeloId(opt.codigo);
           setModeloNome(opt.nome);
           setAnoId("");
         }}
         onClear={() => {
-          onInvalidate();
+          onInvalidate?.();
           setModeloId("");
           setModeloNome("");
           setAnoId("");
@@ -389,8 +389,8 @@ export default function FipeSelector({ tipo, onChange, onInvalidate, savedVehicl
         placeholder={modeloId ? "Selecione o ano" : "Selecione o modelo primeiro"}
         disabled={!modeloId}
         loading={!!modeloId && anos.loading}
-        onChange={(opt) => { onInvalidate(); setAnoId(opt.codigo); }}
-        onClear={() => { onInvalidate(); setAnoId(""); }}
+        onChange={(opt) => { onInvalidate?.(); setAnoId(opt.codigo); }}
+        onClear={() => { onInvalidate?.(); setAnoId(""); }}
       />
       {anos.error && (
         <p className="text-xs text-danger">Erro ao carregar anos.</p>
