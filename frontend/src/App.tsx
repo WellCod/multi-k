@@ -21,8 +21,8 @@ const ComissoesPage = lazy(() => import("@/pages/ComissoesPage").then((m) => ({ 
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <span className="text-sm text-gray-400 dark:text-gray-500">Carregando…</span>
+    <div className="flex items-center justify-center min-h-96">
+      <span className="text-sm text-muted ">Carregando…</span>
     </div>
   );
 }
@@ -203,9 +203,9 @@ function CotacaoToasts() {
     erro: "Cotação com erros",
   };
   const statusColor: Record<string, string> = {
-    sucesso: "bg-green-800 text-green-100",
-    restricao: "bg-yellow-800 text-yellow-100",
-    erro: "bg-red-800 text-red-100",
+    sucesso: "bg-surface text-success",
+    restricao: "bg-surface text-warning",
+    erro: "bg-surface text-danger",
   };
 
   return (
@@ -213,19 +213,19 @@ function CotacaoToasts() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`flex items-start gap-3 rounded-lg px-4 py-3 shadow-lg text-sm max-w-xs ${statusColor[t.status] ?? "bg-gray-800 text-gray-100"}`}
+          className={`flex items-start gap-3 rounded px-4 py-3 shadow-panel text-sm max-w-xs ${statusColor[t.status] ?? "bg-surface text-muted"}`}
         >
           <div className="flex-1">
             <p className="font-medium">{statusLabel[t.status] ?? "Cotação finalizada"}</p>
             {t.premio_total && t.status === "sucesso" && (
-              <p className="text-xs opacity-80 mt-0.5">Prêmio: R$ {t.premio_total}</p>
+              <p className="text-xs opacity-80 mt-1">Prêmio: R$ {t.premio_total}</p>
             )}
             <button
               onClick={() => {
                 setToasts((prev) => prev.filter((x) => x.id !== t.id));
                 navigate("/historico");
               }}
-              className="mt-1.5 text-xs underline opacity-80 hover:opacity-100 transition-opacity"
+              className="mt-2 text-xs underline opacity-80 hover:opacity-100 transition-opacity"
             >
               Ver cotação →
             </button>
@@ -254,8 +254,8 @@ function OfflineBanner() {
   }, []);
   if (online) return null;
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg bg-yellow-800 px-4 py-2 text-sm text-yellow-100 shadow-lg">
-      <span className="inline-block h-2 w-2 rounded-full bg-yellow-400" />
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded bg-surface px-4 py-2 text-sm text-warning shadow-panel">
+      <span className="inline-block h-2 w-2 rounded-full bg-warning" />
       Sem conexão — algumas ações podem falhar
     </div>
   );
