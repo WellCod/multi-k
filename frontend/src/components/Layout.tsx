@@ -5,12 +5,13 @@ import { api, type RenovacaoCount } from "@/lib/api";
 import { useDarkMode } from "@/lib/use-dark-mode";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Page } from "@/components/primitives";
 
 function StagingBadge() {
   return (
     <span
       title="Ambiente de staging Justos — preços não refletem produção"
-      className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
+      className="hidden sm:inline-flex items-center px-2 py-1 rounded text-xs font-bold uppercase tracking-wide bg-canvas text-warning border border-line "
     >
       STAGING
     </span>
@@ -82,12 +83,12 @@ function Breadcrumb({ pathname }: { pathname: string }) {
   const current = allNav.find((n) => pathname.startsWith(n.to));
   if (!current || current.to === "/home") return null;
   return (
-    <div className="mx-auto max-w-6xl px-4 py-1.5 flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700/60 bg-white dark:bg-gray-800">
-      <Link to="/home" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+    <div className="mx-auto max-w-workspace px-4 py-2 flex items-center gap-2 text-xs text-muted border-b border-line bg-surface ">
+      <Link to="/home" className="hover:text-muted transition-colors">
         Home
       </Link>
       <span>/</span>
-      <span className="text-gray-600 dark:text-gray-300 font-medium">{current.label}</span>
+      <span className="text-muted font-medium">{current.label}</span>
     </div>
   );
 }
@@ -115,29 +116,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex flex-col bg-canvas ">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <div className="mx-auto max-w-6xl px-4 h-12 flex items-center justify-between">
+      <header className="sticky top-0 z-20 border-b border-line bg-surface ">
+        <div className="mx-auto max-w-workspace px-4 h-12 flex items-center justify-between">
           {/* Logo + nav desktop */}
           <div className="flex items-center gap-6">
-            <span className="font-semibold text-gray-900 dark:text-white text-sm">multi-K</span>
+            <span className="font-semibold text-ink text-sm">multi-K</span>
             {isStaging && <StagingBadge />}
-            <nav className="hidden md:flex gap-1" aria-label="Navegação principal">
+            <nav className="hidden 2xl:flex gap-1" aria-label="Navegação principal">
               {navItems.map(({ to, label }) => (
                 <Link
                   key={to}
                   to={to}
                   className={cn(
-                    "px-3 py-1.5 rounded text-sm transition-colors inline-flex items-center gap-1",
+                    "px-3 py-2 rounded text-sm transition-colors inline-flex items-center gap-1",
                     pathname.startsWith(to)
-                      ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700",
+                      ? "bg-canvas text-action font-medium "
+                      : "text-muted hover:text-ink hover:bg-canvas ",
                   )}
                 >
                   {label}
                   {to === "/renovacoes" && renovCount && renovCount.D30 > 0 && (
-                    <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                    <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 text-xs font-bold bg-danger text-ink rounded-full leading-none">
                       {renovCount.D30 > 9 ? "9+" : renovCount.D30}
                     </span>
                   )}
@@ -148,12 +149,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Ações direita */}
           <div className="flex items-center gap-2">
-            <span className="hidden sm:block text-xs text-gray-500 dark:text-gray-400">{user?.nome}</span>
+            <span className="hidden sm:block text-xs text-muted ">{user?.nome}</span>
             <button
               onClick={toggle}
               title={dark ? "Mudar para modo claro" : "Mudar para modo escuro"}
               aria-label={dark ? "Mudar para modo claro" : "Mudar para modo escuro"}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted hover:bg-canvas transition-colors border border-line "
             >
               {dark ? <SunIcon /> : <MoonIcon />}
               <span className="hidden sm:inline">{dark ? "Claro" : "Escuro"}</span>
@@ -162,7 +163,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               variant="ghost"
               size="sm"
               onClick={handleLogout}
-              className="hidden md:inline-flex dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
+              className="hidden 2xl:inline-flex "
             >
               Sair
             </Button>
@@ -170,7 +171,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => setMenuOpen((v) => !v)}
               aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
-              className="md:hidden flex items-center justify-center p-1.5 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="2xl:hidden flex items-center justify-center p-2 rounded text-muted hover:bg-canvas transition-colors"
             >
               <HamburgerIcon open={menuOpen} />
             </button>
@@ -179,23 +180,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Drawer mobile */}
         {menuOpen && (
-          <div className="md:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 space-y-1">
-            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">{user?.nome}</p>
+          <div className="2xl:hidden border-t border-line bg-surface px-4 py-3 space-y-1">
+            <p className="text-xs text-muted mb-2">{user?.nome}</p>
             {navItems.map(({ to, label }) => (
               <Link
                 key={to}
                 to={to}
                 onClick={() => setMenuOpen(false)}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                  "flex items-center gap-2 px-3 py-2 rounded text-sm transition-colors",
                   pathname.startsWith(to)
-                    ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
+                    ? "bg-canvas text-action font-medium "
+                    : "text-ink hover:bg-canvas ",
                 )}
               >
                 {label}
                 {to === "/renovacoes" && renovCount && renovCount.D30 > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                  <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 text-xs font-bold bg-danger text-ink rounded-full leading-none">
                     {renovCount.D30 > 9 ? "9+" : renovCount.D30}
                   </span>
                 )}
@@ -203,7 +204,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             ))}
             <button
               onClick={handleLogout}
-              className="block w-full text-left px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors mt-1"
+              className="block w-full text-left px-3 py-2 rounded text-sm text-danger hover:bg-canvas transition-colors mt-1"
             >
               Sair
             </button>
@@ -214,11 +215,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Breadcrumb */}
       <Breadcrumb pathname={pathname} />
 
-      <main className="flex-1 mx-auto max-w-6xl w-full px-4 py-6">{children}</main>
+      <main id="main-content" className="flex-1 w-full"><Page>{children}</Page></main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-3 mt-auto">
-        <div className="mx-auto max-w-6xl px-4 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+      <footer className="border-t border-line bg-surface py-3 mt-auto">
+        <div className="mx-auto max-w-workspace px-4 flex items-center justify-between text-xs text-muted ">
           <span>multi-K — Klubi Corretora de Seguros</span>
           <span>v{_APP_VERSION}</span>
         </div>
