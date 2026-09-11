@@ -2,267 +2,61 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Cotacao, type ItemComparativo, type Proposta, type RepricingResult } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/Tooltip";
-import { formatBRL } from "@/lib/utils";
-import { StatusBadge } from "./shared";
+import { Money } from "@/components/Money";
+import { InsurerResult } from "@/components/InsurerResult";
+import { InsurerComparison } from "@/components/InsurerComparison";
+import { Row, Stack } from "@/components/primitives";
 import { CoverageConfigurator } from "./CoverageConfigurator";
 
-interface PriceOverride {
-  monthly: string;
-  annual: string;
-  info: string;
-  coverages_selected: Record<string, string | null>;
-}
-
-interface ComparativoInlineProps {
+interface Props {
   cotacao: Cotacao;
   cotacaoId: string;
   itens: ItemComparativo[];
   proposta: Proposta | null;
   onEmitir: (cia: string) => void;
   onRecotar: () => void;
+  onCancel?: (cia: string) => void;
 }
-
-export function ComparativoInline({
-  cotacao,
-  cotacaoId,
-  itens,
-  proposta,
-  onEmitir,
-  onRecotar,
-}: ComparativoInlineProps) {
+export function ComparativoInline({ cotacao, cotacaoId, itens, proposta, onEmitir, onRecotar, onCancel }: Props) {
   const navigate = useNavigate();
   const [configurando, setConfigurando] = useState<string | null>(null);
-  const [overrides, setOverrides] = useState<Record<string, PriceOverride>>({});
-
-  const handleApplyRepricing = (cia: string, result: RepricingResult) => {
-    setOverrides((o) => ({
-      ...o,
-      [cia]: {
-        monthly: result.monthly_total,
-        annual: result.annual_total,
-        info: result.info,
-        coverages_selected: result.coverages_selected,
-      },
-    }));
-  };
-
-  if (proposta) {
-    return (
-      <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-5 space-y-1">
-        <p className="font-semibold text-green-800 dark:text-green-300">Proposta transmitida com sucesso!</p>
-        <p className="text-sm text-green-700 dark:text-green-400">
-          Protocolo:{" "}
-          <span className="font-mono font-semibold">{proposta.protocolo}</span>
-        </p>
-        <p className="text-sm text-green-700 dark:text-green-400">
-          {proposta.n_parcelas}× de {formatBRL(proposta.valor_parcela)}
-        </p>
-        {cotacao.cliente_id && (
-          <Button
-            className="mt-3"
-            size="sm"
-            variant="outline"
-            onClick={() => navigate(`/clientes/${cotacao.cliente_id}`)}
-          >
-            Ver timeline do cliente
-          </Button>
-        )}
-      </div>
-    );
-  }
-
-  if (cotacao.status === "erro") {
-    return (
-      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-6">
-        <h3 className="font-medium text-red-800 dark:text-red-300 mb-2">Cotação não realizada</h3>
-        <p className="text-sm text-red-700 dark:text-red-400">
-          {cotacao.mensagens[0] ??
-            "A seguradora não pôde calcular o prêmio para este risco."}
-        </p>
-        <Tooltip text="Reenvia os mesmos dados para a seguradora tentar calcular novamente">
-          <Button variant="outline" size="sm" className="mt-4" onClick={onRecotar}>
-            Tentar novamente
-          </Button>
-        </Tooltip>
-      </div>
-    );
-  }
-
-  const effectivePrice = (item: ItemComparativo) => {
-    const ov = overrides[item.cia];
-    if (ov) return { monthly: ov.monthly, annual: ov.annual, info: ov.info };
-    return { monthly: item.premio_total, annual: item.annual_total, info: item.mensagens[0] ?? "" };
-  };
-
-  const itemConfigurando = configurando ? itens.find((it) => it.cia === configurando) : null;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-medium text-gray-900 dark:text-white">
-          Resultados —{" "}
-          {cotacao.ramo.charAt(0).toUpperCase() + cotacao.ramo.slice(1)}
-        </h3>
-        <StatusBadge status={cotacao.status} />
-      </div>
-
-      {cotacao.necessita_vistoria && (
-        <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded px-3 py-2">
-          Vistoria prévia obrigatória — prazo de emissão estendido.
-        </p>
-      )}
-
-      {itens.length === 0 ? (
-        <p className="text-sm text-gray-500 py-4">Processando resultados…</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-left">
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Seguradora</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Mensal</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Anual</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Observações</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Vistoria</th>
-                <th className="px-4 py-2 font-medium text-gray-700 dark:text-gray-300">Status</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const aprovados = itens.filter(
-                  (it) => (it.status === "sucesso" || it.status === "restricao") && effectivePrice(it).monthly,
-                );
-                const minPreco =
-                  aprovados.length > 0
-                    ? Math.min(...aprovados.map((it) => parseFloat(effectivePrice(it).monthly!)))
-                    : null;
-                return itens.map((item, i) => {
-                  const { monthly, annual, info } = effectivePrice(item);
-                  const hasOverride = !!overrides[item.cia];
-                  const isBest =
-                    minPreco !== null &&
-                    monthly !== null &&
-                    parseFloat(monthly) === minPreco;
-                  const hasCoverages = !!(item.coverages_available && Object.keys(item.coverages_available).length > 0);
-                  return (
-                    <tr
-                      key={i}
-                      className={
-                        isBest
-                          ? "border-b border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20"
-                          : "border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      }
-                    >
-                      <td className="px-4 py-3 font-semibold uppercase">
-                        {item.cia}
-                        {isBest && (
-                          <span className="ml-2 inline-block text-[10px] font-bold uppercase tracking-wide text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/50 border border-green-300 dark:border-green-700 rounded px-1.5 py-0.5">
-                            Melhor preço
-                          </span>
-                        )}
-                        {hasOverride && (
-                          <span className="ml-2 inline-block text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded px-1.5 py-0.5">
-                            Personalizado
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-mono">{formatBRL(monthly)}</td>
-                      <td className="px-4 py-3 font-mono text-gray-500 dark:text-gray-400">
-                        {annual ? formatBRL(annual) : <span className="text-gray-300 dark:text-gray-600">—</span>}
-                      </td>
-                      <td className="px-4 py-3 max-w-xs">
-                        {item.restricoes.length === 0 && !info ? (
-                          <span className="text-gray-400">—</span>
-                        ) : (
-                          <>
-                            {item.restricoes.map((r) => (
-                              <span key={r.codigo} className="block text-xs text-yellow-700 dark:text-yellow-400">
-                                {r.codigo}: {r.mensagem}
-                              </span>
-                            ))}
-                            {info && (
-                              <span className="block text-xs text-blue-600 dark:text-blue-400">{info}</span>
-                            )}
-                          </>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {item.necessita_vistoria ? (
-                          <span className="text-yellow-700 dark:text-yellow-400 text-xs font-medium">Sim</span>
-                        ) : (
-                          <span className="text-gray-400 text-xs">Não</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1.5">
-                          {hasCoverages && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setConfigurando(item.cia)}
-                              className="whitespace-nowrap text-xs"
-                            >
-                              Coberturas
-                            </Button>
-                          )}
-                          {(item.status === "sucesso" || item.status === "restricao") && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => onEmitir(item.cia)}
-                            >
-                              Emitir
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                });
-              })()}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className="flex items-center gap-3 flex-wrap">
-        <a
-          href={api.cotacoes.comparativoPdfUrl(cotacaoId)}
-          target="_blank"
-          rel="noreferrer"
-          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-        >
-          Baixar PDF
-        </a>
-        <Tooltip text="Refaz a cotação com os mesmos dados do risco, gerando um novo comparativo">
-          <Button variant="outline" onClick={onRecotar}>
-            Refazer cotação
-          </Button>
-        </Tooltip>
-      </div>
-
-      {configurando && itemConfigurando?.coverages_available && (
-        <CoverageConfigurator
-          cotacaoId={cotacaoId}
-          cia={configurando}
-          coveragesAvailable={itemConfigurando.coverages_available}
-          initialSelected={
-            overrides[configurando]?.coverages_selected ??
-            itemConfigurando.coverages_selected ??
-            {}
-          }
-          onClose={() => setConfigurando(null)}
-          onApply={(result) => {
-            handleApplyRepricing(configurando, result);
-            setConfigurando(null);
-          }}
-        />
-      )}
-    </div>
-  );
+  const [overrides, setOverrides] = useState<Record<string, RepricingResult>>({});
+  const effective = itens.map(item => {
+    const override = overrides[item.cia];
+    return override ? { ...item, premio_total: override.monthly_total, annual_total: override.annual_total, coverages_selected: override.coverages_selected, coberturas_comparaveis: override.coberturas_comparaveis } : item;
+  });
+  const active = effective.find(i => i.cia === configurando);
+  const pending = effective.filter(i => ["pendente", "aguardando", "processando"].includes(i.status));
+  const successes = effective.filter(i => ["sucesso", "restricao"].includes(i.status));
+  if (proposta) return <Stack className="border border-line rounded p-4 bg-surface">
+    <h2 className="text-success font-semibold">Proposta transmitida</h2>
+    <p>Protocolo: {proposta.protocolo}</p>
+    <p className="tabular-nums">{proposta.n_parcelas}× de <Money value={proposta.valor_parcela} /></p>
+    {cotacao.cliente_id && <Button variant="outline" onClick={() => navigate(`/clientes/${cotacao.cliente_id}`)}>Ver timeline do cliente</Button>}
+  </Stack>;
+  return <Stack>
+    <Row className="justify-between flex-wrap">
+      <h2 className="text-lg font-semibold">Resultado da cotação</h2>
+      <p className="text-xs text-muted tabular-nums" role="status">{effective.length - pending.length} de {effective.length} consultas concluídas</p>
+    </Row>
+    {!pending.length && !successes.length && (effective.length > 0 || cotacao.status === "erro") &&
+      <div className="border border-line rounded p-3" role="status"><h3 className="font-semibold">Nenhuma proposta disponível</h3><p>Confira o retorno de cada seguradora abaixo e tente recotar.</p></div>}
+    {effective.length === 0 && cotacao.status !== "erro" && <p role="status">{["aguardando", "pendente", "processando"].includes(cotacao.status) ? "Aguardando a identificação das consultas pelo servidor…" : "Nenhum resultado disponível. Recarregue a página para tentar recuperar as consultas."}</p>}
+    <div className="result-grid">{effective.map(item => <InsurerResult key={item.cia} result={item} actions={
+      <>
+        {["aguardando", "pendente", "processando"].includes(item.status) && onCancel && <Button variant="outline" onClick={() => onCancel(item.cia)}>Cancelar consulta</Button>}
+        {["sucesso", "restricao"].includes(item.status) && !!item.coverages_available && <Button variant="outline" onClick={() => setConfigurando(item.cia)}>Configurar coberturas</Button>}
+        {["sucesso", "restricao"].includes(item.status) && item.cia === "justos" && <a className="control inline-flex items-center rounded border border-line px-3 text-sm" href={api.cotacoes.pdfUrl(cotacaoId, "cotacao")} target="_blank" rel="noreferrer">Baixar PDF</a>}
+        {["sucesso", "restricao"].includes(item.status) && <Button onClick={() => onEmitir(item.cia)}>Transmitir proposta</Button>}
+      </>
+    } />)}</div>
+    <InsurerComparison items={effective} />
+    <Row className="flex-wrap">
+      <a className="control inline-flex items-center rounded border border-line px-3" href={api.cotacoes.comparativoPdfUrl(cotacaoId)} target="_blank" rel="noreferrer">Baixar comparativo em PDF</a>
+      <Button variant="outline" onClick={onRecotar}>Recotar</Button>
+    </Row>
+    {active?.coverages_available && <CoverageConfigurator cotacaoId={cotacaoId} cia={active.cia}
+      coveragesAvailable={active.coverages_available} initialSelected={active.coverages_selected ?? {}}
+      onClose={() => setConfigurando(null)} onApply={result => { setOverrides(old => ({...old, [active.cia]:result})); setConfigurando(null); }} />}
+  </Stack>;
 }

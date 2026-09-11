@@ -1,3 +1,4 @@
+import { DataTable } from "@/components/DataTable";
 import { useEffect, useState } from "react";
 import { api, type ComissaoConfigOut } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ function EditRow({ initial, onSave, onCancel, fixCia, fixRamo }: EditRowProps) {
   const [err, setErr] = useState<string | null>(null);
 
   const inputClass =
-    "border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+    "border border-line rounded px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-action";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +52,7 @@ function EditRow({ initial, onSave, onCancel, fixCia, fixRamo }: EditRowProps) {
       <Input
         value={cia}
         onChange={(e) => setCia(e.target.value)}
-        placeholder="CIA (ex: fake)"
+        placeholder="Identificador da seguradora"
         className="w-28"
         disabled={!!fixCia}
         required
@@ -74,9 +75,9 @@ function EditRow({ initial, onSave, onCancel, fixCia, fixRamo }: EditRowProps) {
           step={0.01}
           className="w-24"
         />
-        <span className="text-sm text-gray-500 dark:text-gray-400">%</span>
+        <span className="text-sm text-muted ">%</span>
       </div>
-      {err && <span className="text-xs text-red-500">{err}</span>}
+      {err && <span className="text-xs text-danger">{err}</span>}
       <Button type="submit" size="sm" disabled={saving}>
         {saving ? "Salvando…" : "Salvar"}
       </Button>
@@ -126,13 +127,13 @@ export function ComissoesPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <h1 className="text-xl font-semibold text-ink ">
             Comissões por CIA
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          <p className="text-sm text-muted mt-1">
             Comissão padrão preenchida automaticamente ao transmitir proposta
           </p>
         </div>
@@ -144,14 +145,14 @@ export function ComissoesPage() {
       </div>
 
       {err && (
-        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+        <div className="rounded border border-line bg-canvas p-4 text-sm text-danger ">
           {err}
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-line rounded overflow-hidden">
         {adding && (
-          <div className="px-4 border-b border-gray-100 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
+          <div className="px-4 border-b border-line bg-canvas ">
             <EditRow
               onSave={handleSave}
               onCancel={() => setAdding(false)}
@@ -160,19 +161,19 @@ export function ComissoesPage() {
         )}
 
         {loading ? (
-          <div className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
+          <div className="py-8 text-center text-sm text-muted ">
             Carregando…
           </div>
         ) : configs.length === 0 && !adding ? (
-          <div className="py-12 text-center">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="py-8 text-center">
+            <p className="text-sm text-muted ">
               Nenhuma configuração. Clique em "+ Nova configuração" para adicionar.
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <DataTable className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-700 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              <tr className="border-b border-line text-left text-xs text-muted uppercase tracking-wide">
                 <th className="px-4 py-3 font-medium">CIA</th>
                 <th className="px-4 py-3 font-medium">Ramo</th>
                 <th className="px-4 py-3 font-medium">Comissão padrão</th>
@@ -180,12 +181,12 @@ export function ComissoesPage() {
                 <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            <tbody className="divide-y divide-line ">
               {configs.map((c) => {
                 const key = `${c.cia}|${c.ramo}`;
                 if (editing === key) {
                   return (
-                    <tr key={key} className="bg-blue-50 dark:bg-blue-900/20">
+                    <tr key={key} className="bg-canvas ">
                       <td colSpan={5} className="px-4">
                         <EditRow
                           initial={c}
@@ -199,31 +200,31 @@ export function ComissoesPage() {
                   );
                 }
                 return (
-                  <tr key={key} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-medium text-gray-900 dark:text-white">
+                  <tr key={key} className="hover:bg-canvas transition-colors">
+                    <td className="px-4 py-3 font-mono font-medium text-ink ">
                       {c.cia}
                     </td>
-                    <td className="px-4 py-3 capitalize text-gray-700 dark:text-gray-300">
+                    <td className="px-4 py-3 capitalize text-ink ">
                       {c.ramo}
                     </td>
-                    <td className="px-4 py-3 font-semibold text-green-700 dark:text-green-400 tabular-nums">
+                    <td className="px-4 py-3 font-semibold text-success tabular-nums">
                       {pctDisplay(c.pct_padrao)}
                     </td>
-                    <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs">
+                    <td className="px-4 py-3 text-muted text-xs">
                       {new Date(c.atualizado_em).toLocaleDateString("pt-BR")}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1.5 justify-end">
+                      <div className="flex gap-2 justify-end">
                         <button
                           onClick={() => setEditing(key)}
-                          className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          className="text-xs px-3 py-1 rounded border border-line text-muted hover:bg-canvas transition-colors"
                         >
                           Editar
                         </button>
                         <button
                           onClick={() => handleDelete(c.cia, c.ramo)}
                           disabled={deleting === key}
-                          className="text-xs px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
+                          className="text-xs px-3 py-1 rounded border border-line text-danger hover:bg-canvas transition-colors disabled:opacity-50"
                         >
                           {deleting === key ? "…" : "Excluir"}
                         </button>
@@ -233,7 +234,7 @@ export function ComissoesPage() {
                 );
               })}
             </tbody>
-          </table>
+          </DataTable>
         )}
       </div>
     </div>
