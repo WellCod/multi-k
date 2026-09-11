@@ -14,6 +14,8 @@ export interface FipeResult {
 interface Props {
   tipo: "carros" | "motos";
   onChange: (fipe: FipeResult) => void;
+  onInvalidate: () => void;
+  savedVehicle?: { codigo_fipe?: unknown; marca?: unknown; modelo?: unknown; ano_modelo?: unknown };
   error?: string;
 }
 
@@ -30,7 +32,7 @@ function formatBRL(valor: string): string {
 
 function Skeleton() {
   return (
-    <div className="h-10 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700 animate-pulse" />
+    <div className="h-9 w-full rounded border border-line bg-canvas animate-pulse" />
   );
 }
 
@@ -45,15 +47,15 @@ function StepBar({ step }: { step: 1 | 2 | 3 }) {
         const active = idx === step;
         return (
           <div key={label} className="flex items-center gap-1 flex-1">
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <span
                 className={[
                   "flex-shrink-0 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center",
                   done
-                    ? "bg-green-500 text-white"
+                    ? "bg-surface text-success border border-line"
                     : active
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400",
+                    ? "control-primary"
+                    : "bg-surface text-muted ",
                 ].join(" ")}
               >
                 {done ? "✓" : idx}
@@ -62,10 +64,10 @@ function StepBar({ step }: { step: 1 | 2 | 3 }) {
                 className={[
                   "text-xs font-medium truncate",
                   active
-                    ? "text-blue-600 dark:text-blue-400"
+                    ? "text-action "
                     : done
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-gray-400 dark:text-gray-500",
+                    ? "text-success "
+                    : "text-muted ",
                 ].join(" ")}
               >
                 {label}
@@ -75,7 +77,7 @@ function StepBar({ step }: { step: 1 | 2 | 3 }) {
               <div
                 className={[
                   "flex-1 h-px mx-1",
-                  done ? "bg-green-400" : "bg-gray-200 dark:bg-gray-600",
+                  done ? "bg-success" : "bg-surface ",
                 ].join(" ")}
               />
             )}
@@ -158,17 +160,17 @@ function ComboBox({
   }, []);
 
   const baseCls =
-    "w-full flex items-center justify-between h-10 px-3 rounded-lg border text-sm transition-colors";
+    "w-full flex items-center justify-between h-9 px-3 rounded border text-sm transition-colors";
   const enabledCls =
-    "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 cursor-pointer hover:border-blue-400 dark:hover:border-blue-500";
+    "border-line bg-surface text-ink cursor-pointer hover:border-line ";
   const disabledCls =
-    "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed";
+    "border-line bg-canvas text-muted cursor-not-allowed";
 
   if (loading) return <Skeleton />;
 
   return (
     <div ref={containerRef} className="relative">
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">
+      <p className="text-xs font-medium text-muted mb-1 uppercase tracking-wide">
         {label}
       </p>
 
@@ -190,7 +192,7 @@ function ComboBox({
           onClick={handleOpen}
           className={`${baseCls} ${disabled ? disabledCls : enabledCls}`}
         >
-          <span className={value ? "text-gray-900 dark:text-gray-100" : "text-gray-400 dark:text-gray-500"}>
+          <span className={value ? "text-ink " : "text-muted "}>
             {value ? selectedLabel : placeholder}
           </span>
           <span className="flex items-center gap-1 ml-2 flex-shrink-0">
@@ -199,13 +201,13 @@ function ComboBox({
                 role="button"
                 aria-label={`Limpar seleção de ${label}`}
                 onClick={handleClear}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none"
+                className="text-muted hover:text-muted text-lg leading-none"
               >
                 ×
               </span>
             )}
             <svg
-              className="w-4 h-4 text-gray-400"
+              className="w-4 h-4 text-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -215,7 +217,7 @@ function ComboBox({
           </span>
         </button>
       ) : (
-        <div className="rounded-lg border border-blue-500 dark:border-blue-400 overflow-hidden shadow-lg bg-white dark:bg-gray-700">
+        <div className="rounded border border-line overflow-hidden shadow-panel bg-surface ">
           <input
             ref={inputRef}
             type="text"
@@ -228,7 +230,7 @@ function ComboBox({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={`Buscar ${label.toLowerCase()}...`}
-            className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 outline-none border-b border-gray-200 dark:border-gray-600"
+            className="w-full px-3 py-2 text-sm bg-surface text-ink outline-none border-b border-line "
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 setOpen(false);
@@ -250,7 +252,7 @@ function ComboBox({
             aria-label={`Opções de ${label}`}
           >
             {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500 italic">
+              <li className="px-3 py-2 text-sm text-muted italic">
                 Nenhum resultado
               </li>
             ) : (
@@ -271,8 +273,8 @@ function ComboBox({
                   className={[
                     "px-3 py-2 text-sm cursor-pointer outline-none",
                     opt.codigo === value
-                      ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium"
-                      : "text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:bg-gray-50 dark:focus:bg-gray-600",
+                      ? "bg-canvas text-action font-medium"
+                      : "text-ink hover:bg-canvas focus:bg-canvas ",
                   ].join(" ")}
                 >
                   {opt.nome}
@@ -286,7 +288,8 @@ function ComboBox({
   );
 }
 
-export default function FipeSelector({ tipo, onChange, error }: Props) {
+export default function FipeSelector({ tipo, onChange, onInvalidate, savedVehicle, error }: Props) {
+  const [replacing, setReplacing] = useState(false);
   const [marcaId, setMarcaId] = useState("");
   const [marcaNome, setMarcaNome] = useState("");
   const [modeloId, setModeloId] = useState("");
@@ -315,8 +318,17 @@ export default function FipeSelector({ tipo, onChange, error }: Props) {
     }
   }, [precoState.data, precoState.loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (savedVehicle?.codigo_fipe && !replacing) return (
+    <div className="rounded border border-line bg-canvas p-4 space-y-3">
+      <p className="text-xs text-muted">Veículo salvo</p>
+      <p className="font-medium">{[savedVehicle.marca, savedVehicle.modelo, savedVehicle.ano_modelo].filter(Boolean).map(String).join(" · ")}</p>
+      <p className="text-xs">Código FIPE: {String(savedVehicle.codigo_fipe)}</p>
+      <button type="button" className="text-action underline" onClick={() => { setReplacing(true); onInvalidate(); }}>Trocar veículo</button>
+    </div>
+  );
+
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
+    <div className="rounded border border-line bg-canvas p-4 space-y-3">
       <StepBar step={step} />
 
       <ComboBox
@@ -326,6 +338,7 @@ export default function FipeSelector({ tipo, onChange, error }: Props) {
         placeholder="Selecione a marca"
         loading={marcas.loading}
         onChange={(opt) => {
+          onInvalidate();
           setMarcaId(opt.codigo);
           setMarcaNome(opt.nome);
           setModeloId("");
@@ -333,6 +346,7 @@ export default function FipeSelector({ tipo, onChange, error }: Props) {
           setAnoId("");
         }}
         onClear={() => {
+          onInvalidate();
           setMarcaId("");
           setMarcaNome("");
           setModeloId("");
@@ -341,7 +355,7 @@ export default function FipeSelector({ tipo, onChange, error }: Props) {
         }}
       />
       {marcas.error && (
-        <p className="text-xs text-red-500">Erro ao carregar marcas. Verifique sua conexão.</p>
+        <p className="text-xs text-danger">Erro ao carregar marcas. Verifique sua conexão.</p>
       )}
 
       <ComboBox
@@ -352,18 +366,20 @@ export default function FipeSelector({ tipo, onChange, error }: Props) {
         disabled={!marcaId}
         loading={!!marcaId && modelos.loading}
         onChange={(opt) => {
+          onInvalidate();
           setModeloId(opt.codigo);
           setModeloNome(opt.nome);
           setAnoId("");
         }}
         onClear={() => {
+          onInvalidate();
           setModeloId("");
           setModeloNome("");
           setAnoId("");
         }}
       />
       {modelos.error && (
-        <p className="text-xs text-red-500">Erro ao carregar modelos.</p>
+        <p className="text-xs text-danger">Erro ao carregar modelos.</p>
       )}
 
       <ComboBox
@@ -373,11 +389,11 @@ export default function FipeSelector({ tipo, onChange, error }: Props) {
         placeholder={modeloId ? "Selecione o ano" : "Selecione o modelo primeiro"}
         disabled={!modeloId}
         loading={!!modeloId && anos.loading}
-        onChange={(opt) => setAnoId(opt.codigo)}
-        onClear={() => setAnoId("")}
+        onChange={(opt) => { onInvalidate(); setAnoId(opt.codigo); }}
+        onClear={() => { onInvalidate(); setAnoId(""); }}
       />
       {anos.error && (
-        <p className="text-xs text-red-500">Erro ao carregar anos.</p>
+        <p className="text-xs text-danger">Erro ao carregar anos.</p>
       )}
 
       {/* Resultado FIPE */}
@@ -387,38 +403,38 @@ export default function FipeSelector({ tipo, onChange, error }: Props) {
         </div>
       )}
       {precoState.data && !precoState.loading && (
-        <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 px-4 py-3 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+        <div className="rounded border border-line bg-canvas px-4 py-3 space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-action ">
             Tabela FIPE
           </p>
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+          <p className="text-sm text-ink ">
             {precoState.data.marca} {precoState.data.modelo}
           </p>
-          <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+          <p className="text-lg font-bold text-action ">
             {formatBRL(precoState.data.valor)}
           </p>
           <div className="flex flex-wrap gap-2 mt-1">
-            <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+            <span className="inline-flex items-center rounded-full bg-canvas px-2 py-1 text-xs font-medium text-action ">
               Cód. {precoState.data.codigo_fipe}
             </span>
-            <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs text-gray-600 dark:text-gray-400">
+            <span className="inline-flex items-center rounded-full bg-canvas px-2 py-1 text-xs text-muted ">
               {precoState.data.combustivel}
             </span>
-            <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs text-gray-600 dark:text-gray-400">
+            <span className="inline-flex items-center rounded-full bg-canvas px-2 py-1 text-xs text-muted ">
               Ref. {precoState.data.mes_referencia}
             </span>
           </div>
         </div>
       )}
       {precoState.error && (
-        <div className="rounded-lg border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/30 px-3 py-2">
-          <p className="text-xs text-yellow-700 dark:text-yellow-300">
-            Não foi possível consultar o valor FIPE. Você pode continuar mesmo assim.
+        <div className="rounded border border-line bg-canvas px-3 py-2">
+          <p className="text-xs text-warning ">
+            Não foi possível consultar o veículo. Selecione o ano novamente para tentar outra vez.
           </p>
         </div>
       )}
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
 }
