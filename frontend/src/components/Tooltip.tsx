@@ -45,7 +45,7 @@ export function Tooltip({ text, children, position = "top" }: TooltipProps) {
       {coords &&
         createPortal(
           <span
-            className="pointer-events-none fixed z-[9999]"
+            className="pointer-events-none fixed z-50"
             style={{
               left: coords.x,
               top: coords.y,
@@ -58,15 +58,15 @@ export function Tooltip({ text, children, position = "top" }: TooltipProps) {
           >
             {/* seta — fica embaixo do balão quando position=top */}
             {position === "top" && (
-              <span className="block w-2 h-2 bg-white dark:bg-gray-800 border-b border-r border-gray-200 dark:border-gray-600 rotate-45 mx-auto translate-y-[1px]" />
+              <span className="block w-2 h-2 bg-surface border-b border-r border-line rotate-45 mx-auto translate-y-0" />
             )}
 
-            <span className="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-lg px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 text-center leading-relaxed">
+            <span className="block bg-surface border border-line rounded shadow-panel px-3 py-2 text-xs text-ink text-center leading-relaxed">
               {text}
             </span>
 
             {position === "bottom" && (
-              <span className="block w-2 h-2 bg-white dark:bg-gray-800 border-t border-l border-gray-200 dark:border-gray-600 rotate-45 mx-auto -translate-y-[1px]" />
+              <span className="block w-2 h-2 bg-surface border-t border-l border-line rotate-45 mx-auto translate-y-0" />
             )}
           </span>,
           document.body,

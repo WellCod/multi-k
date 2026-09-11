@@ -3,16 +3,71 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    box-sizing: border-box;
+  :root {
+    --paper: rgb(255 255 255);
+    --source-ink: rgb(15 23 42);
+    --source-action: rgb(3 105 161);
+    --button-bg: rgb(3 105 161);
+    --button-text: rgb(255 255 255);
+    --surface: var(--paper);
+    --canvas: rgb(244 247 251);
+    --ink: var(--source-ink);
+    --muted: rgb(82 99 120);
+    --line: rgb(210 222 233);
+    --action: var(--source-action);
+    --selected: rgb(228 244 250);
+    --success: rgb(22 101 52);
+    --warning: rgb(146 64 14);
+    --danger: rgb(185 28 28);
+    --divergence: rgb(157 23 77);
+    color-scheme: light;
   }
+  .dark {
+    --surface: rgb(17 29 46);
+    --canvas: rgb(9 17 30);
+    --ink: rgb(235 243 250);
+    --muted: rgb(160 179 199);
+    --line: rgb(46 65 87);
+    --action: rgb(56 189 248);
+    --button-bg: rgb(56 189 248);
+    --button-text: rgb(9 17 30);
+    --selected: rgb(20 48 66);
+    --success: rgb(110 231 183);
+    --warning: rgb(252 211 77);
+    --danger: rgb(253 164 175);
+    --divergence: rgb(216 180 254);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { @apply bg-canvas text-ink font-sans text-sm antialiased; }
+  :focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select,
+  button:not([role="option"]), a.control { min-height: 36px; }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select { height: 36px; }
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--action); }
+  input[type="date"], .font-mono { font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+}
 
-  body {
-    @apply bg-gray-50 text-gray-900 font-sans antialiased;
-    font-size: 14px; /* ferramenta densa — base menor que o padrão web */
-  }
-
-  .dark body {
-    @apply bg-gray-900 text-gray-100;
-  }
+@layer components {
+  .quote-summary { @apply bg-surface p-6 space-y-4; border: 1px solid var(--line); border-radius: 12px; }
+  .comparison-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .page { @apply mx-auto w-full max-w-workspace p-4; }
+  .field-message { min-height: 16px; }
+  .data-table { @apply w-full text-sm border-collapse; }
+  .data-table th { @apply sticky top-0 bg-canvas text-muted text-xs font-medium text-left; z-index: 1; }
+  .data-table th, .data-table td { @apply px-3 py-2 border-b border-line; height: 36px; }
+  .data-table[data-density="comfortable"] td { height: 40px; }
+  .data-table td:has(.tabular-nums), .data-table td.font-mono { text-align: right; font-variant-numeric: tabular-nums; }
+  .data-table tbody tr:hover { background: var(--selected); }
+  .comparison { table-layout: fixed; }
+  .comparison th:first-child { width: 176px; position: sticky; left: 0; z-index: 2; }
+  .comparison td { text-align: right; vertical-align: top; }
+  .comparison th:not(:first-child) { text-align: right; }
+  .comparison caption { text-align: left; padding-bottom: 12px; }
+  .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 272px), 1fr)); gap: 16px; }
+  .control-primary { background: var(--button-bg); color: var(--button-text); }
+  .control-primary:hover { filter: brightness(1.08); }
 }
