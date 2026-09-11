@@ -429,6 +429,28 @@ async def relatorio_comissoes(
     return await _dados_comissoes(db, inicio, fim, uid)
 
 
+class ComissoesResumoOut(BaseModel):
+    itens: list[ComissaoRamoOut]
+    premio_total: Decimal
+    comissao_total: Decimal
+
+
+@router.get("/comissoes/resumo", response_model=ComissoesResumoOut)
+async def resumo_comissoes(
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    periodo: int = Query(default=30, ge=1, le=365),
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
+) -> ComissoesResumoOut:
+    itens = await relatorio_comissoes(usuario, db, periodo, date_from, date_to)
+    return ComissoesResumoOut(
+        itens=itens,
+        premio_total=sum((item.premio_total for item in itens), Decimal("0.00")),
+        comissao_total=sum((item.comissao_total for item in itens), Decimal("0.00")),
+    )
+
+
 @router.get("/comissoes/csv")
 async def export_comissoes_csv(
     usuario: CurrentUser,

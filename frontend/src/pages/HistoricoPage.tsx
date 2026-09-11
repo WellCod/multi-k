@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Pagination } from "@/components/Pagination";
 import { Tooltip } from "@/components/Tooltip";
 import { formatBRL, formatDate } from "@/lib/utils";
+import { useInsurers } from "@/hooks/useInsurers";
 
 const PAGE_SIZE = 20;
 
@@ -15,35 +16,32 @@ function nomeProponente(dados: Record<string, unknown>): string {
   return String(prop?.nome ?? dados.nome ?? "");
 }
 
-const RAMO_ICON: Record<string, string> = {
-  auto: "🚗",
-  imovel: "🏠",
-  vida: "💙",
-  empresarial: "🏢",
+const RAMO_LABEL: Record<string, string> = {
+  auto: "Auto",
+  moto: "Moto",
+  imovel: "Imóvel",
+  vida: "Vida",
+  empresarial: "Empresarial",
 };
-
-function RamoIcon({ ramo }: { ramo: string }) {
-  return <span className="text-base leading-none">{RAMO_ICON[ramo] ?? "📋"}</span>;
-}
 
 function SkeletonCard() {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-4 animate-pulse">
+    <div className="bg-surface rounded border border-line px-4 py-4 animate-pulse">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 space-y-2">
           <div className="flex gap-2 items-center">
-            <div className="h-4 w-4 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-4 w-20 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-5 w-16 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-4 w-4 rounded bg-surface " />
+            <div className="h-4 w-20 rounded bg-surface " />
+            <div className="h-5 w-16 rounded bg-surface " />
           </div>
-          <div className="h-3 w-40 rounded bg-gray-200 dark:bg-gray-700" />
-          <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="h-3 w-40 rounded bg-surface " />
+          <div className="h-3 w-24 rounded bg-surface " />
         </div>
         <div className="space-y-2 text-right">
-          <div className="h-5 w-24 rounded bg-gray-200 dark:bg-gray-700 ml-auto" />
+          <div className="h-5 w-24 rounded bg-surface ml-auto" />
           <div className="flex gap-2 justify-end">
-            <div className="h-7 w-20 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-7 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="h-7 w-20 rounded bg-surface " />
+            <div className="h-7 w-20 rounded bg-surface " />
           </div>
         </div>
       </div>
@@ -53,9 +51,9 @@ function SkeletonCard() {
 
 function ActiveFilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-canvas text-action border border-line ">
       {label}
-      <button onClick={onRemove} className="ml-0.5 hover:text-blue-900 dark:hover:text-blue-100 leading-none" aria-label="remover filtro">×</button>
+      <button onClick={onRemove} className="ml-1 hover:text-action leading-none" aria-label={`Remover filtro: ${label}`}>×</button>
     </span>
   );
 }
@@ -64,19 +62,20 @@ function RestricoesList({ restricoes }: { restricoes: { codigo: string; mensagem
   const [open, setOpen] = useState(false);
   if (restricoes.length === 0) return null;
   return (
-    <div className="mt-1.5">
+    <div className="mt-2">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="text-xs text-yellow-700 dark:text-yellow-400 hover:underline flex items-center gap-1"
+        aria-expanded={open}
+        className="text-sm text-warning hover:underline flex items-center gap-1"
       >
         <span>{open ? "▾" : "▸"}</span>
-        {restricoes.length} restrição{restricoes.length > 1 ? "ões" : ""}
+        {restricoes.length} {restricoes.length === 1 ? "restrição" : "restrições"}
       </button>
       {open && (
-        <ul className="mt-1 space-y-0.5 pl-3 border-l-2 border-yellow-300 dark:border-yellow-700">
+        <ul className="mt-1 space-y-1 pl-3 border-l-2 border-line ">
           {restricoes.map((r) => (
-            <li key={r.codigo} className="text-xs text-yellow-700 dark:text-yellow-400">
-              <span className="font-mono text-yellow-600 dark:text-yellow-500">{r.codigo}</span> — {r.mensagem}
+            <li key={r.codigo} className="text-xs text-warning ">
+              <span className="font-mono text-warning ">{r.codigo}</span> — {r.mensagem}
             </li>
           ))}
         </ul>
@@ -107,7 +106,7 @@ function VincularApolice({ propostaId, onVinculado }: { propostaId: string; onVi
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-xs px-2.5 py-1 rounded-lg border border-dashed border-emerald-400 dark:border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+        className="text-xs px-3 py-1 rounded border border-dashed border-line text-success hover:bg-canvas transition-colors"
       >
         + Apólice
       </button>
@@ -122,22 +121,23 @@ function VincularApolice({ propostaId, onVinculado }: { propostaId: string; onVi
         onChange={(e) => setNumero(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setOpen(false); }}
         placeholder="Nº apólice"
-        className="text-xs px-2 py-1 rounded-lg border border-emerald-300 dark:border-emerald-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28"
+        className="text-xs px-2 py-1 rounded border border-line bg-surface text-ink focus:outline-none focus:ring-1 focus:ring-action w-28"
       />
       <button
         onClick={submit}
         disabled={saving || !numero.trim()}
-        className="text-xs px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+        className="text-xs px-2 py-1 rounded bg-success text-ink hover:bg-success disabled:opacity-50 transition-colors"
       >
         {saving ? "…" : "OK"}
       </button>
-      <button onClick={() => setOpen(false)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">✕</button>
-      {errLocal && <span className="text-xs text-red-500">{errLocal}</span>}
+      <button onClick={() => setOpen(false)} className="text-xs text-muted hover:text-muted ">✕</button>
+      {errLocal && <span className="text-xs text-danger">{errLocal}</span>}
     </div>
   );
 }
 
 export function HistoricoPage() {
+  const { items: insurers, error: insurersError } = useInsurers();
   const [data, setData] = useState<PaginatedCotacoes | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -150,6 +150,7 @@ export function HistoricoPage() {
   const [page, setPage] = useState(1);
   const [apolicesPendentes, setApolicesPendentes] = useState<Record<string, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestVersion = useRef(0);
   const navigate = useNavigate();
 
   const fetchCotacoes = useCallback((opts: {
@@ -161,6 +162,7 @@ export function HistoricoPage() {
     cia: string;
     order_by: string;
   }) => {
+    const version = ++requestVersion.current;
     setLoading(true);
     setErr(null);
     api.cotacoes
@@ -174,11 +176,11 @@ export function HistoricoPage() {
         cia: opts.cia || undefined,
         order_by: opts.order_by || undefined,
       })
-      .then((r: PaginatedCotacoes) => setData(r))
-      .catch((e: unknown) =>
-        setErr(e instanceof Error ? e.message : "Erro ao carregar histórico"),
-      )
-      .finally(() => setLoading(false));
+      .then((r: PaginatedCotacoes) => { if (version === requestVersion.current) setData(r); })
+      .catch((e: unknown) => {
+        if (version === requestVersion.current) setErr(e instanceof Error ? e.message : "Erro ao carregar histórico");
+      })
+      .finally(() => { if (version === requestVersion.current) setLoading(false); });
   }, []);
 
   // Re-fetch whenever filter params change (debounce busca)
@@ -189,6 +191,7 @@ export function HistoricoPage() {
     }, busca ? 350 : 0);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      requestVersion.current++;
     };
   }, [page, filtroRamo, filtroStatus, filtroDias, busca, filtroCia, orderBy]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -197,7 +200,7 @@ export function HistoricoPage() {
     setPage(1);
   }, [busca, filtroRamo, filtroStatus, filtroDias, filtroCia, orderBy]);
 
-  const temFiltroAtivo = busca || filtroRamo || filtroStatus || filtroDias > 0 || filtroCia;
+  const temFiltroAtivo = busca || filtroRamo || filtroStatus || filtroDias > 0 || filtroCia || orderBy;
 
   function limparFiltros() {
     setBusca("");
@@ -209,23 +212,23 @@ export function HistoricoPage() {
   }
 
   const selectClass =
-    "border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
+    "border border-line rounded px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-action";
 
   const cotacoes: Cotacao[] = data?.items ?? [];
   const total = data?.total ?? 0;
   const pages = data?.pages ?? 1;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <h1 className="text-xl font-semibold text-ink ">
             Histórico de cotações
           </h1>
           {!loading && !err && data && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {total} cotação{total !== 1 ? "ões" : ""}{temFiltroAtivo ? " encontrada" + (total !== 1 ? "s" : "") : " no total"}
+            <p className="text-sm text-muted mt-1">
+              {total} {total === 1 ? "cotação" : "cotações"}{temFiltroAtivo ? " encontrada" + (total !== 1 ? "s" : "") : " no total"}
             </p>
           )}
         </div>
@@ -235,37 +238,40 @@ export function HistoricoPage() {
             variant="outline"
             onClick={() => { window.location.href = api.cotacoes.exportCsvUrl(); }}
           >
-            ↓ Exportar CSV
+            Exportar CSV
           </Button>
           <Button size="sm" onClick={() => navigate("/cotacao")}>
-            + Nova cotação
+            Nova cotação
           </Button>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
-        <div className="flex flex-wrap gap-2">
+      <div className="comparison-panel p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           <Input
-            placeholder="Buscar proponente ou ID CIA…"
+            placeholder="Buscar por nome ou ID da seguradora"
+            aria-label="Buscar proponente ou identificador da seguradora"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="min-w-[200px] flex-1"
+            className="w-full sm:col-span-2 xl:col-span-3"
           />
           <select
             value={filtroRamo}
+            aria-label="Filtrar por ramo"
             onChange={(e) => setFiltroRamo(e.target.value)}
             className={selectClass}
           >
             <option value="">Todos os ramos</option>
-            {["auto", "imovel", "vida", "empresarial"].map((r) => (
+            {Object.keys(RAMO_LABEL).map((r) => (
               <option key={r} value={r}>
-                {RAMO_ICON[r] ?? ""} {r.charAt(0).toUpperCase() + r.slice(1)}
+                {RAMO_LABEL[r]}
               </option>
             ))}
           </select>
           <select
             value={filtroStatus}
+            aria-label="Filtrar por status"
             onChange={(e) => setFiltroStatus(e.target.value)}
             className={selectClass}
           >
@@ -282,6 +288,7 @@ export function HistoricoPage() {
           </select>
           <select
             value={filtroDias}
+            aria-label="Filtrar por período"
             onChange={(e) => setFiltroDias(Number(e.target.value))}
             className={selectClass}
           >
@@ -293,13 +300,12 @@ export function HistoricoPage() {
           </select>
           <select
             value={filtroCia}
+            aria-label="Filtrar por seguradora"
             onChange={(e) => setFiltroCia(e.target.value)}
             className={selectClass}
           >
-            <option value="">Todas as CIAs</option>
-            <option value="fake">Simulação</option>
-            <option value="justos">Justos</option>
-            <option value="yelum">Yelum</option>
+            <option value="">Todas as seguradoras</option>
+            {insurers.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
           </select>
           <select
             value={orderBy}
@@ -315,7 +321,7 @@ export function HistoricoPage() {
           {temFiltroAtivo && (
             <button
               onClick={limparFiltros}
-              className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 underline self-center"
+              className="text-sm text-muted hover:text-action underline justify-self-start self-center"
             >
               Limpar filtros
             </button>
@@ -324,43 +330,44 @@ export function HistoricoPage() {
 
         {/* Chips de filtros ativos */}
         {temFiltroAtivo && (
-          <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-100 dark:border-gray-700">
+          <div className="flex flex-wrap gap-2 pt-1 border-t border-line ">
             {busca && <ActiveFilterChip label={`"${busca}"`} onRemove={() => setBusca("")} />}
             {filtroRamo && <ActiveFilterChip label={`Ramo: ${filtroRamo}`} onRemove={() => setFiltroRamo("")} />}
             {filtroStatus && <ActiveFilterChip label={`Status: ${filtroStatus}`} onRemove={() => setFiltroStatus("")} />}
             {filtroDias > 0 && <ActiveFilterChip label={filtroDias === 365 ? "Último ano" : `Últimos ${filtroDias} dias`} onRemove={() => setFiltroDias(0)} />}
-            {filtroCia && <ActiveFilterChip label={`CIA: ${filtroCia}`} onRemove={() => setFiltroCia("")} />}
+            {filtroCia && <ActiveFilterChip label={insurers.find(item => item.id === filtroCia)?.nome ?? filtroCia} onRemove={() => setFiltroCia("")} />}
             {orderBy && <ActiveFilterChip label={{ data_asc: "Mais antigas", premio_desc: "Maior prêmio", premio_asc: "Menor prêmio" }[orderBy] ?? orderBy} onRemove={() => setOrderBy("")} />}
           </div>
         )}
+        {insurersError && <p role="status" className="text-sm text-warning">{insurersError}</p>}
       </div>
 
       {/* Erro */}
       {err && (
-        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
-          {err}
+        <div role="alert" className="comparison-panel p-4 space-y-3 text-sm text-danger">
+          <p>{err}</p>
+          <Button variant="outline" onClick={() => fetchCotacoes({ page, ramo: filtroRamo, status: filtroStatus, dias: filtroDias, q: busca, cia: filtroCia, order_by: orderBy })}>Tentar novamente</Button>
         </div>
       )}
 
       {/* Skeleton */}
       {loading && (
-        <div className="space-y-3">
+        <div role="status" aria-label="Carregando cotações" className="space-y-3">
           {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
         </div>
       )}
 
       {/* Empty state */}
       {!loading && !err && cotacoes.length === 0 && (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-16 text-center">
-          <p className="text-4xl mb-3">🔍</p>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="comparison-panel py-12 px-4 text-center">
+          <p className="text-base font-medium text-ink">
             {temFiltroAtivo ? "Nenhuma cotação encontrada" : "Nenhuma cotação registrada"}
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {temFiltroAtivo ? "Tente ajustar os filtros acima" : "Clique em + Nova cotação para começar"}
+          <p className="text-sm text-muted mt-1">
+            {temFiltroAtivo ? "Tente ajustar os filtros acima." : "Crie sua primeira cotação para consultar os resultados aqui."}
           </p>
           {temFiltroAtivo && (
-            <button onClick={limparFiltros} className="mt-3 text-xs text-blue-600 dark:text-blue-400 underline">
+            <button onClick={limparFiltros} className="mt-3 text-xs text-action underline">
               Limpar filtros
             </button>
           )}
@@ -370,51 +377,47 @@ export function HistoricoPage() {
       {/* Lista */}
       {!loading && !err && cotacoes.length > 0 && (
         <>
-          <div className="space-y-2">
+          <div className="comparison-panel divide-y divide-line">
             {cotacoes.map((c) => {
               const nome = nomeProponente(c.dados_risco);
               return (
                 <div
                   key={c.id}
-                  className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                  className="px-4 py-4 hover:bg-canvas transition-colors"
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex flex-col md:flex-row md:items-start gap-4">
                     <div className="flex-1 min-w-0">
+                      <button onClick={() => navigate(`/cotacoes/${c.id}/comparativo`)} className="text-base font-semibold text-ink hover:text-action text-left break-words">
+                        {nome || "Proponente não informado"}
+                      </button>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <RamoIcon ramo={c.ramo} />
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white capitalize">
-                          {c.ramo}
+                        <span className="text-sm text-muted">
+                          {RAMO_LABEL[c.ramo] ?? c.ramo}
                         </span>
                         <StatusBadge status={c.status} />
                         {c.necessita_vistoria && (
-                          <span className="text-xs text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-700 rounded-full px-2 py-0.5">
+                          <span className="text-xs text-warning bg-canvas border border-line rounded-full px-2 py-1">
                             Vistoria obrigatória
                           </span>
                         )}
                         {c.proposta_id && (
-                          <span className="text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-700 rounded-full px-2 py-0.5">
-                            ✓ Emitida
+                          <span className="text-xs text-success bg-canvas border border-line rounded-full px-2 py-1">
+                            Proposta registrada
                           </span>
                         )}
                         {(c.numero_apolice ?? apolicesPendentes[c.id]) && (
-                          <span className="text-xs font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700 rounded-full px-2 py-0.5">
+                          <span className="text-xs font-mono text-success bg-canvas border border-line rounded-full px-2 py-1">
                             Apólice {c.numero_apolice ?? apolicesPendentes[c.id]}
                           </span>
                         )}
                         {c.versao_anterior_id && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-700 rounded-full px-2 py-0.5">
+                          <span className="text-xs text-action bg-canvas border border-line rounded-full px-2 py-1">
                             Revisão
                           </span>
                         )}
                       </div>
 
-                      {nome && (
-                        <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {nome}
-                        </p>
-                      )}
-
-                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-400 dark:text-gray-500">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted ">
                         <span>{formatDate(c.criado_em)}</span>
                         {c.cotacao_id_cia && (
                           <Tooltip text={c.cotacao_id_cia} position="top">
@@ -430,36 +433,34 @@ export function HistoricoPage() {
                       <RestricoesList restricoes={c.restricoes} />
                     </div>
 
-                    <div className="flex-shrink-0 text-right space-y-2">
-                      {c.premio_total ? (
-                        <p className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+                    <div className="md:w-72 md:flex-shrink-0 md:text-right space-y-2">
+                      <p className="text-xs text-muted">Prêmio informado</p>
+                      {c.premio_total != null ? (
+                        <p className="text-base font-semibold text-ink tabular-nums">
                           {formatBRL(c.premio_total)}
                         </p>
                       ) : (
-                        <p className="text-sm text-gray-300 dark:text-gray-600 font-medium">—</p>
+                        <p className="text-sm text-muted font-medium">—</p>
                       )}
 
-                      <div className="flex gap-1.5 justify-end flex-wrap">
+                      <div className="flex gap-2 md:justify-end flex-wrap">
                         {c.cliente_id && (
                           <button
                             onClick={() => navigate(`/clientes/${c.cliente_id}`)}
-                            className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            className="text-sm px-3 py-2 rounded text-muted hover:bg-surface transition-colors"
                           >
                             Cliente
                           </button>
                         )}
-                        {(c.status === "sucesso" || c.status === "restricao") && (
-                          <button
+                          <Button variant="outline" size="sm"
                             onClick={() => navigate(`/cotacoes/${c.id}/comparativo`)}
-                            className="text-xs px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
                           >
-                            Comparativo
-                          </button>
-                        )}
+                            Ver resultados
+                          </Button>
                         <Tooltip text="Nova cotação com os mesmos dados" position="top">
                           <button
                             onClick={() => navigate(`/cotacao?recotar=${c.id}`)}
-                            className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            className="text-sm px-3 py-2 rounded text-muted hover:bg-surface transition-colors"
                           >
                             Refazer
                           </button>
@@ -485,7 +486,7 @@ export function HistoricoPage() {
             onChange={setPage}
           />
           {pages > 1 && (
-            <p className="text-xs text-center text-gray-400 dark:text-gray-500">
+            <p className="text-xs text-center text-muted ">
               Página {page} de {pages}
             </p>
           )}

@@ -5,15 +5,17 @@ import { type Dominio } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { step2ImovelSchema, type Step2Data } from "./types";
+import { step2ImovelSchema, riskStepSchemas, type Step2Data } from "./types";
 import { Field } from "./shared";
 
 export function Step2Imovel({
+  stage = "object",
   dominios,
   defaultValues,
   onBack,
   onNext,
 }: {
+  stage?: "object" | "profile";
   dominios: Dominio[];
   defaultValues?: Step2Data;
   onBack: () => void;
@@ -27,12 +29,13 @@ export function Step2Imovel({
     handleSubmit,
     formState: { errors },
   } = useForm<z.infer<typeof step2ImovelSchema>>({
-    resolver: zodResolver(step2ImovelSchema),
+    resolver: zodResolver(riskStepSchemas.imovel[stage]),
     defaultValues: defaultValues as z.infer<typeof step2ImovelSchema>,
   });
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-4">
+      {stage === "object" && <>
       <Field label="CEP do imóvel" error={errors.cep?.message}>
         <Input placeholder="00000-000" {...register("cep")} />
       </Field>
@@ -72,7 +75,8 @@ export function Step2Imovel({
         </Field>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      </>}
+      {stage === "profile" && <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" {...register("alarme")} />
           Alarme
@@ -87,6 +91,7 @@ export function Step2Imovel({
         </label>
       </div>
 
+      }
       <div className="pt-2 flex justify-between">
         <Button type="button" variant="outline" onClick={onBack}>
           ← Voltar

@@ -250,6 +250,7 @@ class JustosSeguradora:
                 coverages_selected,
             )
             pricing_resp = await client.calcular_preco(quote_id, coverages_selected)
+            await client.selecionar_coberturas(quote_id, coverages_selected)
         except httpx.HTTPStatusError as exc:
             trecho = exc.response.text[:400]
             return ResultadoCotacao(

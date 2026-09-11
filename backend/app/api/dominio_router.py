@@ -8,11 +8,18 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.registry import catalogo_seguradoras
 from app.api.deps import CurrentUser
 from app.infra.db import get_db
 from app.infra.models import Dominio
 
 router = APIRouter(prefix="/dominios", tags=["dominios"])
+
+
+@router.get("/seguradoras")
+async def seguradoras(_usuario: CurrentUser) -> list[dict[str, object]]:
+    return catalogo_seguradoras()
+
 
 _DOMINIO_TTL = 30 * 60  # 30 minutos — domínios mudam só via migration
 _DominioCache = dict[tuple[str | None, str | None], tuple[float, list["DominioOut"]]]

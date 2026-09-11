@@ -1,3 +1,4 @@
+import { DataTable } from "@/components/DataTable";
 import { useEffect, useState } from "react";
 import { api, type UsuarioAdmin } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,11 @@ function fmtData(iso: string) {
 function PapelBadge({ papel }: { papel: string }) {
   const cls =
     papel === "admin"
-      ? "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300"
-      : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300";
+      ? "bg-canvas text-muted "
+      : "bg-canvas text-action ";
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${cls}`}
     >
       {papel === "admin" ? "Admin" : "Corretor"}
     </span>
@@ -23,11 +24,11 @@ function PapelBadge({ papel }: { papel: string }) {
 
 function StatusBadge({ ativo }: { ativo: boolean }) {
   const cls = ativo
-    ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
-    : "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400";
+    ? "bg-canvas text-success "
+    : "bg-canvas text-danger ";
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${cls}`}
     >
       {ativo ? "Ativo" : "Inativo"}
     </span>
@@ -75,12 +76,12 @@ function ModalWrapper({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl w-full max-w-md mx-4 p-6 space-y-4">
+      <div className="bg-surface rounded border border-line shadow-panel w-full max-w-md mx-4 p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h2>
+          <h2 className="text-base font-semibold text-ink ">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            className="text-muted hover:text-muted transition-colors"
             aria-label="Fechar"
           >
             <CloseIcon />
@@ -94,14 +95,14 @@ function ModalWrapper({
 
 function ErrorBox({ msg }: { msg: string }) {
   return (
-    <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-400">
+    <div className="rounded border border-line bg-canvas p-3 text-sm text-danger ">
       {msg}
     </div>
   );
 }
 
 const selectClass =
-  "w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 mt-0.5";
+  "w-full border border-line rounded px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:ring-2 focus:ring-action mt-1";
 
 function NovoUsuarioModal({
   onSave,
@@ -141,7 +142,7 @@ function NovoUsuarioModal({
       {err && <ErrorBox msg={err} />}
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">E-mail *</label>
+          <label className="text-xs font-medium text-muted ">E-mail *</label>
           <Input
             type="email"
             value={email}
@@ -149,22 +150,22 @@ function NovoUsuarioModal({
             placeholder="usuario@exemplo.com"
             required
             autoFocus
-            className="mt-0.5"
+            className="mt-1"
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Nome *</label>
+          <label className="text-xs font-medium text-muted ">Nome *</label>
           <Input
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             placeholder="Nome completo"
             required
             minLength={2}
-            className="mt-0.5"
+            className="mt-1"
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Papel *</label>
+          <label className="text-xs font-medium text-muted ">Papel *</label>
           <select
             value={papel}
             onChange={(e) => setPapel(e.target.value as "corretor" | "admin")}
@@ -175,7 +176,7 @@ function NovoUsuarioModal({
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Senha *</label>
+          <label className="text-xs font-medium text-muted ">Senha *</label>
           <Input
             type="password"
             value={senha}
@@ -183,11 +184,11 @@ function NovoUsuarioModal({
             placeholder="Mínimo 8 caracteres"
             required
             minLength={8}
-            className="mt-0.5"
+            className="mt-1"
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          <label className="text-xs font-medium text-muted ">
             Confirmar senha *
           </label>
           <Input
@@ -196,7 +197,7 @@ function NovoUsuarioModal({
             onChange={(e) => setConfirmar(e.target.value)}
             placeholder="Repita a senha"
             required
-            className="mt-0.5"
+            className="mt-1"
           />
         </div>
         <div className="flex gap-2 justify-end pt-1">
@@ -256,7 +257,7 @@ function EditarUsuarioModal({
       {err && <ErrorBox msg={err} />}
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Nome *</label>
+          <label className="text-xs font-medium text-muted ">Nome *</label>
           <Input
             value={nome}
             onChange={(e) => setNome(e.target.value)}
@@ -264,11 +265,11 @@ function EditarUsuarioModal({
             required
             minLength={2}
             autoFocus
-            className="mt-0.5"
+            className="mt-1"
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Papel *</label>
+          <label className="text-xs font-medium text-muted ">Papel *</label>
           <select
             value={papel}
             onChange={(e) => setPapel(e.target.value as "corretor" | "admin")}
@@ -284,11 +285,11 @@ function EditarUsuarioModal({
             type="checkbox"
             checked={ativo}
             onChange={(e) => setAtivo(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="h-4 w-4 rounded border-line text-action focus:ring-action"
           />
           <label
             htmlFor="ativo-toggle"
-            className="text-sm text-gray-700 dark:text-gray-300 select-none"
+            className="text-sm text-ink select-none"
           >
             Conta ativa
           </label>
@@ -342,7 +343,7 @@ function ResetSenhaModal({
       {err && <ErrorBox msg={err} />}
       {done ? (
         <div className="space-y-3">
-          <p className="text-sm text-green-700 dark:text-green-400">
+          <p className="text-sm text-success ">
             Senha redefinida com sucesso.
           </p>
           <div className="flex justify-end">
@@ -354,7 +355,7 @@ function ResetSenhaModal({
       ) : (
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            <label className="text-xs font-medium text-muted ">
               Nova senha *
             </label>
             <Input
@@ -365,11 +366,11 @@ function ResetSenhaModal({
               required
               minLength={8}
               autoFocus
-              className="mt-0.5"
+              className="mt-1"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            <label className="text-xs font-medium text-muted ">
               Confirmar nova senha *
             </label>
             <Input
@@ -378,7 +379,7 @@ function ResetSenhaModal({
               onChange={(e) => setConfirmar(e.target.value)}
               placeholder="Repita a nova senha"
               required
-              className="mt-0.5"
+              className="mt-1"
             />
           </div>
           <div className="flex gap-2 justify-end pt-1">
@@ -407,24 +408,24 @@ function ResetSenhaModal({
 
 function SkeletonRow() {
   return (
-    <tr className="border-b border-gray-100 dark:border-gray-700 animate-pulse">
+    <tr className="border-b border-line animate-pulse">
       <td className="px-4 py-3">
-        <div className="h-3 w-36 rounded bg-gray-200 dark:bg-gray-700" />
+        <div className="h-3 w-36 rounded bg-surface " />
       </td>
       <td className="px-4 py-3">
-        <div className="h-3 w-44 rounded bg-gray-200 dark:bg-gray-700" />
+        <div className="h-3 w-44 rounded bg-surface " />
       </td>
       <td className="px-4 py-3">
-        <div className="h-5 w-20 rounded-full bg-gray-200 dark:bg-gray-700" />
+        <div className="h-5 w-20 rounded-full bg-surface " />
       </td>
       <td className="px-4 py-3">
-        <div className="h-5 w-16 rounded-full bg-gray-200 dark:bg-gray-700" />
+        <div className="h-5 w-16 rounded-full bg-surface " />
       </td>
       <td className="px-4 py-3">
-        <div className="h-3 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+        <div className="h-3 w-20 rounded bg-surface " />
       </td>
       <td className="px-4 py-3">
-        <div className="h-6 w-40 rounded bg-gray-200 dark:bg-gray-700" />
+        <div className="h-6 w-40 rounded bg-surface " />
       </td>
     </tr>
   );
@@ -482,7 +483,7 @@ export function UsuariosPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {modal.type === "criar" && (
         <NovoUsuarioModal onSave={handleCriado} onClose={() => setModal({ type: "none" })} />
       )}
@@ -503,9 +504,9 @@ export function UsuariosPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Usuários</h1>
+          <h1 className="text-xl font-semibold text-ink ">Usuários</h1>
           {!loading && !err && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-sm text-muted mt-1">
               {usuarios.length} usuário{usuarios.length !== 1 ? "s" : ""}
             </p>
           )}
@@ -517,17 +518,17 @@ export function UsuariosPage() {
 
       {/* Erro */}
       {err && (
-        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+        <div className="rounded border border-line bg-canvas p-4 text-sm text-danger ">
           {err}
         </div>
       )}
 
       {/* Tabela */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-line rounded overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+          <DataTable className="w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-gray-50 dark:bg-gray-700/60 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              <tr className="bg-canvas text-left text-xs font-semibold text-muted uppercase tracking-wide">
                 <th className="px-4 py-3">Nome</th>
                 <th className="px-4 py-3">E-mail</th>
                 <th className="px-4 py-3">Papel</th>
@@ -542,7 +543,7 @@ export function UsuariosPage() {
               {!loading && !err && usuarios.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-16 text-center">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <p className="text-sm font-medium text-ink ">
                       Nenhum usuário encontrado
                     </p>
                   </td>
@@ -554,44 +555,44 @@ export function UsuariosPage() {
                 usuarios.map((u, idx) => (
                   <tr
                     key={u.id}
-                    className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${
-                      idx % 2 === 0 ? "" : "bg-gray-50/50 dark:bg-gray-700/10"
+                    className={`border-b border-line hover:bg-canvas transition-colors ${
+                      idx % 2 === 0 ? "" : "bg-canvas "
                     }`}
                   >
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                    <td className="px-4 py-3 font-medium text-ink ">
                       {u.nome}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{u.email}</td>
+                    <td className="px-4 py-3 text-muted ">{u.email}</td>
                     <td className="px-4 py-3">
                       <PapelBadge papel={u.papel} />
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge ativo={u.ativo} />
                     </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 tabular-nums text-xs">
+                    <td className="px-4 py-3 text-muted tabular-nums text-xs">
                       {fmtData(u.criado_em)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <button
                           onClick={() => setModal({ type: "editar", usuario: u })}
-                          className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          className="text-xs px-3 py-1 rounded border border-line text-muted hover:bg-canvas transition-colors"
                         >
                           Editar
                         </button>
                         <button
                           onClick={() => setModal({ type: "resetSenha", usuario: u })}
-                          className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          className="text-xs px-3 py-1 rounded border border-line text-muted hover:bg-canvas transition-colors"
                         >
                           Redefinir senha
                         </button>
                         <button
                           onClick={() => handleToggleAtivo(u)}
                           disabled={toggling === u.id}
-                          className={`text-xs px-2.5 py-1 rounded-lg border transition-colors disabled:opacity-50 ${
+                          className={`text-xs px-3 py-1 rounded border transition-colors disabled:opacity-50 ${
                             u.ativo
-                              ? "border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
-                              : "border-green-200 dark:border-green-700 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
+                              ? "border-line text-danger hover:bg-canvas "
+                              : "border-line text-success hover:bg-canvas "
                           }`}
                         >
                           {toggling === u.id ? "…" : u.ativo ? "Desativar" : "Ativar"}
@@ -601,7 +602,7 @@ export function UsuariosPage() {
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </DataTable>
         </div>
       </div>
     </div>
