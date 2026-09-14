@@ -37,6 +37,22 @@ async def test_registrar_falha_reseta_na_nova_janela(engine: AsyncEngine) -> Non
 # ---------------------------------------------------------------------------
 
 
+async def test_get_or_404_retorna_objeto(engine: AsyncEngine) -> None:
+    """get_or_404 retorna objeto quando ele existe (_utils.py:22)."""
+    from sqlalchemy import select
+
+    from app.api._utils import get_or_404
+    from app.infra.models import Dominio
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        stmt = select(Dominio).limit(1)
+        obj = await get_or_404(stmt, session)
+        assert obj is not None
+
+
 async def test_get_or_404_levanta_404(engine: AsyncEngine) -> None:
     """get_or_404 levanta HTTPException 404 quando objeto não existe."""
     import pytest

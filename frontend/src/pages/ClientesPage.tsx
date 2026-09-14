@@ -1,3 +1,4 @@
+import { DataTable } from "@/components/DataTable";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Cliente, type ClienteInput } from "@/lib/api";
@@ -19,7 +20,7 @@ function Avatar({ nome }: { nome: string }) {
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
   return (
-    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-xs font-semibold text-indigo-700 dark:text-indigo-300 select-none">
+    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-canvas text-xs font-semibold text-action select-none">
       {initials || "?"}
     </div>
   );
@@ -27,18 +28,18 @@ function Avatar({ nome }: { nome: string }) {
 
 function SkeletonRow() {
   return (
-    <tr className="border-b border-gray-100 dark:border-gray-700 animate-pulse">
+    <tr className="border-b border-line animate-pulse">
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
-          <div className="h-3 w-36 rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="h-8 w-8 rounded-full bg-surface flex-shrink-0" />
+          <div className="h-3 w-36 rounded bg-surface " />
         </div>
       </td>
-      <td className="px-4 py-3"><div className="h-3 w-40 rounded bg-gray-200 dark:bg-gray-700" /></td>
-      <td className="px-4 py-3"><div className="h-3 w-28 rounded bg-gray-200 dark:bg-gray-700" /></td>
-      <td className="px-4 py-3"><div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700" /></td>
-      <td className="px-4 py-3"><div className="h-3 w-20 rounded bg-gray-200 dark:bg-gray-700" /></td>
-      <td className="px-4 py-3"><div className="h-6 w-24 rounded-lg bg-gray-200 dark:bg-gray-700" /></td>
+      <td className="px-4 py-3"><div className="h-3 w-40 rounded bg-surface " /></td>
+      <td className="px-4 py-3"><div className="h-3 w-28 rounded bg-surface " /></td>
+      <td className="px-4 py-3"><div className="h-3 w-24 rounded bg-surface " /></td>
+      <td className="px-4 py-3"><div className="h-3 w-20 rounded bg-surface " /></td>
+      <td className="px-4 py-3"><div className="h-6 w-24 rounded bg-surface " /></td>
     </tr>
   );
 }
@@ -89,12 +90,12 @@ function NovoClienteModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl w-full max-w-md mx-4 p-6 space-y-4">
+      <div className="bg-surface rounded border border-line shadow-panel w-full max-w-md mx-4 p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Novo cliente</h2>
+          <h2 className="text-base font-semibold text-ink ">Novo cliente</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            className="text-muted hover:text-muted transition-colors"
             aria-label="Fechar"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -104,53 +105,53 @@ function NovoClienteModal({
         </div>
 
         {err && (
-          <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-400">
+          <div className="rounded border border-line bg-canvas p-3 text-sm text-danger ">
             {err}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Nome *</label>
+            <label className="text-xs font-medium text-muted ">Nome *</label>
             <Input
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               placeholder="Nome completo"
               required
               autoFocus
-              className="mt-0.5"
+              className="mt-1"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">CPF *</label>
+            <label className="text-xs font-medium text-muted ">CPF *</label>
             <Input
               value={cpf}
               onChange={(e) => setCpf(e.target.value)}
               placeholder="000.000.000-00"
               maxLength={14}
-              className="mt-0.5"
+              className="mt-1"
             />
             {cpf && !cpfValid && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1">CPF deve ter 11 dígitos</p>
+              <p className="text-xs text-danger mt-1">CPF deve ter 11 dígitos</p>
             )}
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">E-mail</label>
+            <label className="text-xs font-medium text-muted ">E-mail</label>
             <Input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="cliente@exemplo.com"
-              className="mt-0.5"
+              className="mt-1"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Telefone</label>
+            <label className="text-xs font-medium text-muted ">Telefone</label>
             <Input
               value={telefone}
               onChange={(e) => setTelefone(e.target.value)}
               placeholder="(11) 90000-0000"
-              className="mt-0.5"
+              className="mt-1"
             />
           </div>
 
@@ -165,7 +166,7 @@ function NovoClienteModal({
             >
               {saving ? (
                 <>
-                  <svg className="animate-spin h-3.5 w-3.5 mr-1.5 inline" viewBox="0 0 24 24" fill="none">
+                  <svg className="animate-spin h-3.5 w-3.5 mr-2 inline" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                   </svg>
@@ -236,9 +237,9 @@ export function ClientesPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Clientes</h1>
+          <h1 className="text-xl font-semibold text-ink ">Clientes</h1>
           {!loading && !err && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-sm text-muted mt-1">
               {total} cliente{total !== 1 ? "s" : ""} na carteira
             </p>
           )}
@@ -264,7 +265,7 @@ export function ClientesPage() {
           />
           {loading && buscaInput && (
             <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
-              <svg className="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-4 w-4 text-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -276,22 +277,22 @@ export function ClientesPage() {
 
       {/* Erro */}
       {err && (
-        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-700 dark:text-red-400">
+        <div className="rounded border border-line bg-canvas p-4 text-sm text-danger ">
           {err}
         </div>
       )}
 
       {/* Empty state: sem clientes cadastrados */}
       {!loading && !err && clientes.length === 0 && !busca && (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-16 text-center">
-          <p className="text-4xl mb-3">👥</p>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Nenhum cliente cadastrado</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        <div className="rounded border border-line bg-surface py-16 text-center">
+          <p className="text-xl mb-3">👥</p>
+          <p className="text-sm font-medium text-ink ">Nenhum cliente cadastrado</p>
+          <p className="text-xs text-muted mt-1">
             Adicione o primeiro cliente para começar
           </p>
           <button
             onClick={() => setShowModal(true)}
-            className="mt-4 text-xs px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+            className="mt-4 text-xs px-3 py-2 rounded border border-line text-action hover:bg-canvas transition-colors"
           >
             + Novo cliente
           </button>
@@ -300,14 +301,14 @@ export function ClientesPage() {
 
       {/* Empty state: busca sem resultado */}
       {!loading && !err && clientes.length === 0 && busca && (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-12 text-center">
-          <p className="text-3xl mb-2">🔍</p>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="rounded border border-line bg-surface py-8 text-center">
+          <p className="text-xl mb-2">🔍</p>
+          <p className="text-sm font-medium text-ink ">
             Nenhum cliente encontrado para "{busca}"
           </p>
           <button
             onClick={() => { setBuscaInput(""); setBusca(""); }}
-            className="mt-3 text-xs text-blue-600 dark:text-blue-400 underline"
+            className="mt-3 text-xs text-action underline"
           >
             Limpar busca
           </button>
@@ -316,11 +317,11 @@ export function ClientesPage() {
 
       {/* Tabela com card wrapper */}
       {(loading || (!err && clientes.length > 0)) && (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+        <div className="rounded border border-line bg-surface overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+            <DataTable className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-gray-50 dark:bg-gray-700/60 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                <tr className="bg-canvas text-left text-xs font-semibold text-muted uppercase tracking-wide">
                   <th className="px-4 py-3">Nome</th>
                   <th className="px-4 py-3">E-mail</th>
                   <th className="px-4 py-3">Telefone</th>
@@ -335,32 +336,32 @@ export function ClientesPage() {
                 {!loading && paginated.map((c) => (
                   <tr
                     key={c.id}
-                    className="border-b border-gray-100 dark:border-gray-700 hover:bg-blue-50/40 dark:hover:bg-gray-700/40 cursor-pointer transition-colors group"
+                    className="border-b border-line hover:bg-canvas cursor-pointer transition-colors group"
                     onClick={() => navigate(`/clientes/${c.id}`)}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <Avatar nome={c.nome} />
-                        <span className="font-medium text-gray-900 dark:text-white group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors">
+                        <span className="font-medium text-ink group-hover:text-action dark:group-hover:text-action transition-colors">
                           {c.nome}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 text-muted ">
                       {c.email ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 text-muted ">
                       {c.telefone ?? "—"}
                     </td>
-                    <td className="px-4 py-3 capitalize text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 capitalize text-muted ">
                       {c.profissao?.replace("_", " ") ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                    <td className="px-4 py-3 text-muted ">
                       {fmtData(c.criado_em)}
                     </td>
                     <td className="px-4 py-3">
                       <button
-                        className="text-xs px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors whitespace-nowrap"
+                        className="text-xs px-3 py-1 rounded border border-line text-action hover:bg-canvas transition-colors whitespace-nowrap"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(`/cotacao?cliente=${c.id}`);
@@ -372,18 +373,18 @@ export function ClientesPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
           </div>
 
           {!loading && total > PAGE_SIZE && (
-            <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+            <div className="px-4 py-3 border-t border-line ">
               <Pagination
                 page={page}
                 total={total}
                 perPage={PAGE_SIZE}
                 onChange={setPage}
               />
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+              <p className="text-xs text-muted mt-2">
                 {total} cliente{total !== 1 ? "s" : ""}
                 {busca ? ` encontrado${total !== 1 ? "s" : ""}` : " na carteira"}
               </p>
