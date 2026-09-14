@@ -14,7 +14,7 @@ export interface FipeResult {
 interface Props {
   tipo: "carros" | "motos";
   onChange: (fipe: FipeResult) => void;
-  onInvalidate?: () => void;
+  onInvalidate: () => void;
   savedVehicle?: { codigo_fipe?: unknown; marca?: unknown; modelo?: unknown; ano_modelo?: unknown };
   error?: string;
 }

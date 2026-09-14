@@ -837,3 +837,13 @@ async def test_pdf_cotacao_erro_gcf(
 
     assert r.status_code == 502
     assert "GCF timeout" in r.json()["detail"]
+
+
+async def test_cotacao_cia_invalida_retorna_422(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Criar cotação com CIA não disponível retorna 422 (cotacao_router.py:159)."""
+    await _login(client, db, "cia_invalida@test.com")
+    body = {**_RISCO_AUTO, "cias": ["nao_existe"]}
+    r = await client.post("/cotacoes", json=body)
+    assert r.status_code == 422

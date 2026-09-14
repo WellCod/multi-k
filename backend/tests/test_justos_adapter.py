@@ -117,6 +117,7 @@ def _mock_auth(router: respx.MockRouter) -> None:
 def _mock_cotar(router: respx.MockRouter) -> None:
     router.post(_QUOTE_URL).mock(return_value=Response(200, json=_RESP_COTACAO))
     router.post(_PRICING_URL).mock(return_value=Response(200, json=_RESP_PRICING))
+    router.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
 
 
 async def test_cotar_sucesso() -> None:
