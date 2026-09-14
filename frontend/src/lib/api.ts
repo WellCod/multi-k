@@ -14,7 +14,7 @@ function _traduzirErro(status: number, detail: string): string {
   if (status === 403) return "Você não tem permissão para esta ação.";
   if (status === 422) return "Dados inválidos. Verifique os campos e tente novamente.";
   if (status === 429) return "Muitas tentativas. Aguarde alguns minutos.";
-  if (status === 503 || status === 502) return "Serviço temporariamente indisponível. Tente novamente.";
+  if (status === 503 || status === 502) return detail || "Serviço temporariamente indisponível. Tente novamente.";
   if (status >= 500) return "Erro interno. Nossa equipe foi notificada.";
   return detail ?? "Erro inesperado.";
 }

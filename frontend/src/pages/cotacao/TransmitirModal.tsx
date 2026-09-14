@@ -50,7 +50,12 @@ export function TransmitirModal({ cotacaoId, ramo, cia, vigenciaInicio, onClose,
       <Field label="Parcelamento"><Select required value={plano} onChange={e=>setPlano(e.target.value)}><option value="">Selecione um plano</option>{carrier?.planos.map(p=><option key={p.codigo} value={p.codigo}>{p.descricao}</option>)}</Select></Field>
       <Field label="Comissão (%)"><Input type="number" min="0" max="30" step="0.01" required value={commission} onChange={e=>setCommission(e.target.value)} /></Field>
       <Field label="Início da vigência"><Input type="date" required value={vigencia} onChange={e=>setVigencia(e.target.value)} /></Field>
-      {error && <p role="alert" className="text-danger">{error}</p>}
+      {error && (
+        <details open className="rounded border border-danger/40 bg-danger/5 p-2 text-sm text-danger">
+          <summary className="cursor-pointer font-medium">Erro na transmissão</summary>
+          <pre className="mt-1 whitespace-pre-wrap break-all text-xs">{error}</pre>
+        </details>
+      )}
       <Row className="justify-end"><Button type="button" variant="outline" disabled={loading} onClick={onClose}>Voltar</Button><Button type="submit" disabled={!carrier || !plano || loading}>{loading ? "Transmitindo…" : "Confirmar transmissão"}</Button></Row>
     </Stack></form>
   </Dialog>;
