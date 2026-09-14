@@ -151,21 +151,41 @@ export function ComparativoPage() {
   const [apoliceInput, setApoliceInput] = useState("");
   const [apoliceLoading, setApoliceLoading] = useState(false);
   const [apoliceErr, setApoliceErr] = useState<string | null>(null);
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
+  const [refreshNotice, setRefreshNotice] = useState("");
 
   useEffect(() => {
     if (!cotacaoId) return;
-    Promise.all([api.cotacoes.get(cotacaoId), api.cotacoes.comparativo(cotacaoId)])
-      .then(([c, comp]) => {
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const started = Date.now();
+    setLoading(true);
+    setErr(null);
+    setRefreshNotice("");
+    setProposta(null);
+    const refresh = async () => {
+      try {
+        const [c, comp] = await Promise.all([api.cotacoes.get(cotacaoId), api.cotacoes.comparativo(cotacaoId)]);
+        if (disposed) return;
         setCotacao(c);
         // Mantém a ordem da API sem converter valores monetários em float.
         setItens(comp);
         if (c.proposta_id) {
-          api.propostas.get(c.proposta_id).then(setProposta).catch(() => undefined);
+          api.propostas.get(c.proposta_id).then(value => { if (!disposed) setProposta(value); }).catch(() => undefined);
         }
-      })
-      .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Erro"))
-      .finally(() => setLoading(false));
-  }, [cotacaoId]);
+        if ([c.status, ...comp.map(item => item.status)].some(status => ["aguardando", "pendente", "processando"].includes(status))) {
+          if (Date.now() - started < 120_000) timer = setTimeout(refresh, 2000);
+          else setRefreshNotice("Acompanhamento pausado. As consultas continuam no servidor.");
+        }
+      } catch (e: unknown) {
+        if (!disposed) setErr(e instanceof Error ? e.message : "Não foi possível carregar os resultados.");
+      } finally {
+        if (!disposed) setLoading(false);
+      }
+    };
+    void refresh();
+    return () => { disposed = true; if (timer) clearTimeout(timer); };
+  }, [cotacaoId, refreshAttempt]);
 
   if (loading) return <ComparativoSkeleton />;
 
@@ -173,6 +193,7 @@ export function ComparativoPage() {
     return (
       <div className="rounded border border-line bg-canvas p-4 text-sm text-danger ">
         {err}
+        <Button variant="outline" className="ml-3" onClick={() => setRefreshAttempt(value => value + 1)}>Tentar novamente</Button>
       </div>
     );
   }
@@ -180,13 +201,14 @@ export function ComparativoPage() {
   if (!cotacao || !cotacaoId) return null;
 
   const podeTransmitir =
-    (cotacao.status === "sucesso" || cotacao.status === "restricao") && !proposta;
+    (cotacao.status === "sucesso" || cotacao.status === "restricao") && !cotacao.proposta_id && !proposta;
   const single = itens.length === 1 ? itens[0] : null;
   const risk = cotacao.dados_risco;
   const vehicle = [risk.marca, risk.modelo, risk.ano_modelo].filter(value => typeof value === "string" && value).join(" · ");
 
   return (
     <div className={`space-y-6 mx-auto ${single ? "max-w-5xl" : "w-full"}`}>
+      {refreshNotice && <div role="status" className="comparison-panel p-4 text-sm">{refreshNotice} <Button variant="outline" onClick={() => setRefreshAttempt(value => value + 1)}>Retomar acompanhamento</Button></div>}
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <button

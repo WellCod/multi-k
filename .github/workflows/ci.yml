@@ -4,7 +4,6 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -131,6 +130,10 @@ jobs:
 
       - name: Checagem de tipos (tsc)
         run: npm run type-check
+        working-directory: frontend
+
+      - name: Testes de regressão do frontend
+        run: node --test tests/*.mjs
         working-directory: frontend
 
       - name: Build de produção
