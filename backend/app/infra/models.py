@@ -45,6 +45,20 @@ class Usuario(Base):
     )
 
 
+class RascunhoCotacao(Base):
+    __tablename__ = "rascunhos_cotacao"
+
+    usuario_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("usuarios.id"), primary_key=True
+    )
+    dados: Mapped[dict[str, Any]] = mapped_column(EncryptedJSON(), nullable=False)
+    versao: Mapped[int] = mapped_column(Integer, default=1)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(default=lambda: TENANT_ID)
+
+
 class Sessao(Base):
     __tablename__ = "sessoes"
 

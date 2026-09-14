@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.models import Dominio
+from app.infra.ui_domain_seed import ui_domain_rows
 
 _SEED: list[dict[str, str]] = [
     # Estado civil
@@ -138,6 +139,6 @@ async def seed_if_empty(db: AsyncSession) -> None:
     result = await db.execute(select(Dominio).limit(1))
     if result.scalar_one_or_none() is not None:
         return
-    for row in _SEED:
+    for row in [*_SEED, *ui_domain_rows()]:
         db.add(Dominio(**row))
     await db.commit()
