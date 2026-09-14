@@ -16,13 +16,17 @@ def upgrade() -> None:
     connection = op.get_bind()
     for row in ui_domain_rows():
         exists = connection.execute(
-            sa.text("SELECT 1 FROM dominio WHERE tipo = :tipo AND codigo = :codigo AND cia IS NULL"),
+            sa.text(
+                "SELECT 1 FROM dominio"
+                " WHERE tipo = :tipo AND codigo = :codigo AND cia IS NULL"
+            ),
             {"tipo": row["tipo"], "codigo": row["codigo"]},
         ).scalar()
         if not exists:
             connection.execute(
                 sa.text(
-                    "INSERT INTO dominio (tipo, codigo, descricao, ativo, atualizado_em, tenant_id)"
+                    "INSERT INTO dominio"
+                    " (tipo, codigo, descricao, ativo, atualizado_em, tenant_id)"
                     " VALUES (:tipo, :codigo, :descricao, true, now(), :tenant)"
                 ),
                 {**row, "tenant": str(TENANT_ID)},
