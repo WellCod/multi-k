@@ -171,7 +171,9 @@ async def _calcular_dashboard(
             reverse=True,
         )
 
-    maior_premio = max((item.premio_total for item in ranking_cias), default=Decimal("0"))
+    maior_premio = max(
+        (item.premio_total for item in ranking_cias), default=Decimal("0")
+    )
     if maior_premio > 0:
         for item in ranking_cias:
             item.barra_pct = (item.premio_total / maior_premio * 100).quantize(
