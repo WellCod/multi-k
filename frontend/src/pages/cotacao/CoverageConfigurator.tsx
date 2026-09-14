@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type Peril, type RepricingResult } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/Dialog";
 import { formatBRL } from "@/lib/utils";
 
 interface Props {
@@ -12,29 +13,7 @@ interface Props {
   onApply: (result: RepricingResult) => void;
 }
 
-const PERIL_ORDER = [
-  "colisao-e-desastres-naturais",
-  "roubo-e-furto",
-  "incendio",
-  "danos-materiais",
-  "danos-corporais",
-  "danos-morais",
-  "morte-e-invalidez",
-  "assistencia-24h",
-  "assistencia-vidros",
-  "backup-car",
-  "home-assistance",
-  "assistencia-contra-buracos",
-  "assistencia-lataria-e-pintura",
-];
-
-function sortPerils(available: Record<string, Peril>): [string, Peril][] {
-  const entries = Object.entries(available);
-  return [
-    ...PERIL_ORDER.filter((k) => available[k]).map((k) => [k, available[k]] as [string, Peril]),
-    ...entries.filter(([k]) => !PERIL_ORDER.includes(k)),
-  ];
-}
+function sortPerils(available: Record<string, Peril>): [string, Peril][] { return Object.entries(available); }
 
 export function CoverageConfigurator({
   cotacaoId,
@@ -48,27 +27,41 @@ export function CoverageConfigurator({
   const [pricing, setPricing] = useState<RepricingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const revision = useRef(0);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; revision.current += 1; };
+  }, []);
 
   const handleSelect = (perilSlug: string, optionSlug: string | null) => {
+    revision.current += 1;
     setSelected((s) => ({ ...s, [perilSlug]: optionSlug }));
     setPricing(null);
+    setError(null);
   };
 
   const handleReprice = async () => {
+    const requestedRevision = ++revision.current;
     setLoading(true);
+    setPricing(null);
     setError(null);
     try {
       const result = await api.cotacoes.repricing(cotacaoId, cia, selected);
-      setPricing(result);
+      if (mounted.current && revision.current === requestedRevision) setPricing(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao recalcular.");
+      if (mounted.current && revision.current === requestedRevision) {
+        setError(e instanceof Error ? e.message : "Erro ao recalcular.");
+      }
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   };
 
   const handleApply = () => {
-    if (pricing) onApply(pricing);
+    if (!pricing || loading) return;
+    onApply(pricing);
     onClose();
   };
 
@@ -76,19 +69,15 @@ export function CoverageConfigurator({
   const hasChanges = JSON.stringify(selected) !== JSON.stringify(initialSelected);
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[92vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b dark:border-gray-700 flex-shrink-0">
+    <Dialog title="Configurar coberturas" onClose={onClose}>
+      <div className="bg-surface rounded shadow-panel w-full max-w-2xl flex flex-col max-h-screen">
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Configurar coberturas</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Selecione as opções desejadas e recalcule o prêmio</p>
+            <p className="text-xs text-muted mt-1">Selecione as opções desejadas e recalcule o prêmio</p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none"
+            className="text-muted hover:text-muted text-xl leading-none"
             aria-label="Fechar"
           >
             ×
@@ -100,55 +89,55 @@ export function CoverageConfigurator({
             if (!peril.peril_options?.length) return null;
             const current = selected[slug];
             return (
-              <div key={slug} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-700/60">
-                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{peril.name}</span>
+              <div key={slug} className="border border-line rounded overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 bg-canvas ">
+                  <span className="text-sm font-semibold text-ink ">{peril.name}</span>
                   {peril.mandatory ? (
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded px-1.5 py-0.5">Obrigatório</span>
+                    <span className="text-xs font-bold uppercase tracking-wide text-danger bg-canvas border border-line rounded px-2 py-1">Obrigatório</span>
                   ) : (
-                    <span className="text-[10px] text-gray-400">Opcional</span>
+                    <span className="text-xs text-muted">Opcional</span>
                   )}
                 </div>
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                <div className="divide-y divide-line ">
                   {!peril.mandatory && (
-                    <label className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${current === null ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-700/40"}`}>
+                    <label className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${current === null ? "bg-canvas " : "hover:bg-canvas "}`}>
                       <input
                         type="radio"
                         name={slug}
                         checked={current === null}
                         onChange={() => handleSelect(slug, null)}
-                        className="accent-blue-600"
+                        className="accent-action"
                       />
-                      <span className="text-sm text-gray-500 dark:text-gray-400 flex-1">Não contratar</span>
-                      <span className="text-xs text-gray-400">— /mês</span>
+                      <span className="text-sm text-muted flex-1">Não contratar</span>
+                      <span className="text-xs text-muted">— /mês</span>
                     </label>
                   )}
                   {peril.peril_options.map((opt) => {
                     const isSelected = current === opt.slug;
                     return (
-                      <label key={opt.slug} className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${isSelected ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-700/40"}`}>
+                      <label key={opt.slug} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isSelected ? "bg-canvas " : "hover:bg-canvas "}`}>
                         <input
                           type="radio"
                           name={slug}
                           checked={isSelected}
                           onChange={() => handleSelect(slug, opt.slug)}
-                          className="accent-blue-600"
+                          className="accent-action"
                         />
                         <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{opt.name}</span>
-                          {opt.deductible > 0 && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          <span className="text-sm font-medium text-ink ">{opt.name}</span>
+                          {opt.deductible != null && /[1-9]/.test(opt.deductible) && (
+                            <span className="text-xs text-muted ml-2">
                               Franquia: {formatBRL(String(opt.deductible))}
                             </span>
                           )}
-                          {opt.coverage_amount > 0 && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          {opt.coverage_amount != null && /[1-9]/.test(opt.coverage_amount) && (
+                            <span className="text-xs text-muted ml-2">
                               Cobertura: {formatBRL(String(opt.coverage_amount))}
                             </span>
                           )}
                         </div>
-                        <span className="text-sm font-mono font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">
-                          {opt.price > 0 ? `+${formatBRL(String(opt.price))}/mês` : "incluso"}
+                        <span className="text-sm font-mono font-semibold text-ink whitespace-nowrap">
+                          {opt.price == null ? "Preço não informado" : /[1-9]/.test(opt.price) ? `+${formatBRL(opt.price)}/mês` : "incluso"}
                         </span>
                       </label>
                     );
@@ -160,41 +149,41 @@ export function CoverageConfigurator({
         </div>
 
         {pricing && (
-          <div className="px-6 py-3 bg-green-50 dark:bg-green-900/30 border-t border-green-200 dark:border-green-800 flex-shrink-0">
+          <div className="px-6 py-3 bg-canvas border-t border-line flex-shrink-0">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-xs text-green-700 dark:text-green-400 font-medium">Novo prêmio calculado</p>
-                <p className="text-xl font-bold text-green-800 dark:text-green-300">
+                <p className="text-xs text-success font-medium">Novo prêmio calculado</p>
+                <p className="text-xl font-bold text-success ">
                   {formatBRL(pricing.monthly_total)}<span className="text-sm font-normal">/mês</span>
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-green-700 dark:text-green-400">Anual</p>
-                <p className="text-lg font-semibold text-green-800 dark:text-green-300">{formatBRL(pricing.annual_total)}</p>
+                <p className="text-xs text-success ">Anual</p>
+                <p className="text-lg font-semibold text-success ">{formatBRL(pricing.annual_total)}</p>
               </div>
             </div>
             {pricing.info && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-1 truncate">{pricing.info}</p>
+              <p className="text-xs text-success mt-1 truncate">{pricing.info}</p>
             )}
           </div>
         )}
 
         {error && (
-          <div className="px-6 py-2 text-sm text-red-600 dark:text-red-400 border-t dark:border-gray-700 flex-shrink-0">{error}</div>
+          <div role="alert" className="px-6 py-2 text-sm text-danger border-t flex-shrink-0">{error}</div>
         )}
 
-        <div className="px-6 py-4 border-t dark:border-gray-700 flex items-center justify-between gap-3 flex-shrink-0">
+        <div className="px-6 py-4 border-t flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleReprice} disabled={loading || !hasChanges}>
               {loading ? "Calculando…" : "Recalcular prêmio"}
             </Button>
-            <Button onClick={handleApply} disabled={!pricing}>
+            <Button onClick={handleApply} disabled={!pricing || loading}>
               Aplicar e fechar
             </Button>
           </div>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from app.adapters.fake.adapter import FakeSeguradora
 from app.api.proposta_router import _adapter_dep
 from app.domain.auth import Papel
-from app.infra.models import CotacaoJob
+from app.infra.models import Cotacao, CotacaoJob
 from app.infra.worker import processar_job
 from app.main import app
 from tests.conftest import CsrfAuth, criar_usuario
@@ -362,12 +362,19 @@ async def test_comparativo_404_cotacao_invalida(
 async def test_comparativo_sem_jobs_concluidos_retorna_lista_vazia(
     db: AsyncSession, client: AsyncClient, engine: AsyncEngine
 ) -> None:
-    """Cotação sem jobs concluídos deve retornar lista vazia."""
-    await _login(client, db, "corretor_comp_nojob@test.com")
-    r = await client.post("/cotacoes", json=_RISCO_AUTO)
-    assert r.status_code == 202
-    cotacao_id = r.json()["id"]
-    r2 = await client.get(f"/cotacoes/{cotacao_id}/comparativo")
+    """Comparativo retorna lista vazia quando a cotação não tem jobs."""
+    user = await criar_usuario(db, "corretor_comp_nojob@test.com", Papel.CORRETOR)
+    await db.commit()
+    r = await client.post(
+        "/auth/login", json={"email": user.email, "senha": "Senha@123"}
+    )
+    assert r.status_code == 200
+    cotacao = Cotacao(
+        ramo="auto", status="aguardando", dados_risco={}, usuario_id=user.id
+    )
+    db.add(cotacao)
+    await db.commit()
+    r2 = await client.get(f"/cotacoes/{cotacao.id}/comparativo")
     assert r2.status_code == 200
     assert r2.json() == []
 
