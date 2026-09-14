@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import date
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -362,9 +363,10 @@ async def test_comparativo_404_cotacao_invalida(
 async def test_comparativo_sem_jobs_concluidos_retorna_lista_vazia(
     db: AsyncSession, client: AsyncClient, engine: AsyncEngine
 ) -> None:
-    """Cotação sem jobs concluídos deve retornar lista vazia."""
+    """Comparativo retorna lista vazia quando nenhum job foi criado."""
     await _login(client, db, "corretor_comp_nojob@test.com")
-    r = await client.post("/cotacoes", json=_RISCO_AUTO)
+    with patch("app.api.cotacao_router.cias_para_ramo", return_value=[]):
+        r = await client.post("/cotacoes", json=_RISCO_AUTO)
     assert r.status_code == 202
     cotacao_id = r.json()["id"]
     r2 = await client.get(f"/cotacoes/{cotacao_id}/comparativo")
