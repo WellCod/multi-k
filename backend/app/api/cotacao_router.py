@@ -535,7 +535,9 @@ async def cancelar_consulta(
             job.status = "erro"
             job.status_resultado = "cancelado"
             job.mensagens = [
-                "Consulta cancelada no multi-K. Uma solicitação já enviada pode continuar na seguradora; seu retorno será descartado."
+                "Consulta cancelada no multi-K."
+                " Uma solicitação já enviada pode continuar na seguradora;"
+                " seu retorno será descartado."
             ]
     if all(job.status in ("concluido", "erro") for job in jobs):
         states = {job.status_resultado for job in jobs}
