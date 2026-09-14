@@ -321,3 +321,24 @@ async def test_refresh_sem_sid_direto(engine: AsyncEngine) -> None:
 
     assert exc_info.value.status_code == 401
     assert "autenticado" in exc_info.value.detail.lower()
+
+
+async def test_seed_if_empty_idempotente(engine: AsyncEngine) -> None:
+    """seed_if_empty retorna sem inserir quando a tabela já tem dados (line 141)."""
+    from sqlalchemy import func, select
+
+    from app.infra.models import Dominio
+    from app.infra.seed import seed_if_empty
+
+    factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
+        engine, expire_on_commit=False
+    )
+    async with factory() as session:
+        count_before = (
+            await session.execute(select(func.count()).select_from(Dominio))
+        ).scalar_one()
+        await seed_if_empty(session)
+        count_after = (
+            await session.execute(select(func.count()).select_from(Dominio))
+        ).scalar_one()
+    assert count_after == count_before
