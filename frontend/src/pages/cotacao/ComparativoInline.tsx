@@ -47,7 +47,7 @@ export function ComparativoInline({ cotacao, cotacaoId, itens, proposta, onEmiti
         {["aguardando", "pendente", "processando"].includes(item.status) && onCancel && <Button variant="outline" onClick={() => onCancel(item.cia)}>Cancelar consulta</Button>}
         {["sucesso", "restricao"].includes(item.status) && !!item.coverages_available && <Button variant="outline" onClick={() => setConfigurando(item.cia)}>Configurar coberturas</Button>}
         {["sucesso", "restricao"].includes(item.status) && item.cia === "justos" && <a className="control inline-flex items-center rounded border border-line px-3 text-sm" href={api.cotacoes.pdfUrl(cotacaoId, "cotacao")} target="_blank" rel="noreferrer">Baixar PDF</a>}
-        {["sucesso", "restricao"].includes(item.status) && <Button onClick={() => onEmitir(item.cia)}>Transmitir proposta</Button>}
+        {["sucesso", "restricao"].includes(item.status) && <Button onClick={() => onEmitir(item.cia)}>Revisar proposta</Button>}
       </>
     } />)}</div>
     <InsurerComparison items={effective} />

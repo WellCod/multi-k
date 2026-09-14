@@ -33,6 +33,8 @@ interface Rascunho {
   step3?: Step3Data;
   step4?: Step4Data;
   clienteId?: string;
+  selectedInsurers?: string[];
+  cotacaoId?: string;
 }
 
 const STEP_LABELS = [
@@ -120,7 +122,12 @@ export function CotacaoPage() {
   const recotar = searchParams.get("recotar");
   const clienteParam = searchParams.get("cliente");
 
-  useEffect(() => { setSelectedInsurers(insurers.filter(item => item.ramos.includes(ramo)).map(item => item.id)); }, [insurers, ramo]);
+  useEffect(() => {
+    if (!draftReady) return;
+    const available = insurers.filter(item => item.ramos.includes(ramo)).map(item => item.id);
+    const saved = draftRef.current?.ramo === ramo ? draftRef.current.selectedInsurers : undefined;
+    setSelectedInsurers(saved ? saved.filter(id => available.includes(id)) : available);
+  }, [insurers, ramo, draftReady]);
 
   useEffect(() => {
     let disposed = false;
@@ -129,6 +136,10 @@ export function CotacaoPage() {
       versionRef.current = response.versao;
       if (response.dados && !recotar && !clienteParam) {
         const draft = response.dados as unknown as Rascunho;
+        if (draft.cotacaoId) {
+          navigate(`/cotacoes/${encodeURIComponent(draft.cotacaoId)}/comparativo`, { replace: true });
+          return;
+        }
         draftRef.current = draft;
         setRamo(draft.ramo);
         setStep(draft.flowVersion === 2 ? Math.max(1, Math.min(draft.step, 4)) : 1);
@@ -142,7 +153,7 @@ export function CotacaoPage() {
     }).catch(() => { if (!disposed) setSaveStatus("Autosave indisponível. O rascunho não está protegido contra perda de sessão."); })
       .finally(() => { if (!disposed) setDraftReady(true); });
     return () => { disposed = true; };
-  }, [recotar, clienteParam]);
+  }, [recotar, clienteParam, navigate]);
 
   useEffect(() => {
     if (!draftReady) return;
@@ -278,7 +289,7 @@ export function CotacaoPage() {
     setStep2Data(undefined);
     setStep3Data(undefined);
     setStep4Data(undefined);
-    persistRascunho({ ramo: r, step2: undefined, step3: undefined, step4: undefined });
+    persistRascunho({ ramo: r, step2: undefined, step3: undefined, step4: undefined, selectedInsurers: undefined });
   };
 
   const handleStep1 = (data: Step1Data, cliente: Cliente | null) => {
@@ -352,7 +363,7 @@ export function CotacaoPage() {
       });
       setCotacaoId(created.id);
       setStep(5);
-      persistRascunho({ step: 5 });
+      persistRascunho({ step: 5, cotacaoId: created.id, selectedInsurers });
       startPolling(created.id);
     } catch (err) {
       setCotacaoErrMsg(
@@ -524,7 +535,7 @@ export function CotacaoPage() {
             coberturasIniciais={step3Data?.coberturas}
             seguradoras={insurers.filter(item => item.ramos.includes(ramo))}
             selecionadas={selectedInsurers}
-            onSelecionadas={setSelectedInsurers}
+            onSelecionadas={selected => { setSelectedInsurers(selected); persistRascunho({ selectedInsurers: selected }); }}
             dominios={dominios}
             defaultValues={step4Data}
             onBack={() => setStep(3)}

@@ -185,13 +185,14 @@ export function HistoricoPage() {
 
   // Re-fetch whenever filter params change (debounce busca)
   useEffect(() => {
+    const version = requestVersion;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchCotacoes({ page, ramo: filtroRamo, status: filtroStatus, dias: filtroDias, q: busca, cia: filtroCia, order_by: orderBy });
     }, busca ? 350 : 0);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      requestVersion.current++;
+      version.current++;
     };
   }, [page, filtroRamo, filtroStatus, filtroDias, busca, filtroCia, orderBy]); // eslint-disable-line react-hooks/exhaustive-deps
 
