@@ -10,7 +10,7 @@ const buttonVariants = cva(
       variant: {
         default: "control-primary hover:opacity-90",
         outline:
-          "border border-line bg-surface text-ink hover:bg-canvas ",
+          "border border-line-strong bg-surface text-ink hover:bg-selected ",
         ghost: "hover:bg-canvas text-ink ",
         destructive: "border border-danger text-danger bg-surface hover:bg-canvas",
         secondary: "bg-canvas text-ink hover:bg-surface ",

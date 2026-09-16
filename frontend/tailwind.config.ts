@@ -8,6 +8,7 @@ export default {
       colors: {
         surface: "var(--surface)", canvas: "var(--canvas)", ink: "var(--ink)",
         muted: "var(--muted)", line: "var(--line)", selected: "var(--selected)",
+        "line-strong": "var(--line-strong)",
         action: "var(--action)", success: "var(--success)", warning: "var(--warning)",
         danger: "var(--danger)", divergence: "var(--divergence)",
       },
@@ -18,7 +19,7 @@ export default {
       },
       fontSize: { xs: ["12px", "16px"], sm: ["14px", "20px"], base: ["16px", "24px"], lg: ["20px", "28px"], xl: ["24px", "32px"] },
       borderRadius: { DEFAULT: "4px" },
-      boxShadow: { panel: "0 4px 16px rgb(30 41 59 / 0.12)" },
+      boxShadow: { panel: "var(--shadow-panel)" },
       maxWidth: { workspace: "1440px" },
     },
   },
