@@ -83,9 +83,16 @@ class PropostaCanonica:
 
 @dataclass(frozen=True)
 class ResultadoTransmissao:
+    """`protocolo` identifica a proposta de forma estável e durável.
+
+    Links voláteis (checkout, download) vão em `dados` e não são persistidos:
+    proposta transmitida não é apólice emitida.
+    """
+
     sucesso: bool
     protocolo: str | None
     mensagens: list[str] = field(default_factory=list)
+    dados: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -102,6 +109,41 @@ class MovimentoCanonico:
 # ---------------------------------------------------------------------------
 # Interface da porta
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SelecaoTransmissao:
+    """O que o usuário escolheu; `comissao_pct` é fração (0–1), não percentual."""
+
+    opcao_pagamento: int | None
+    parcelas: int
+    inicio_vigencia: date | None
+    dados_negocio: dict[str, object]
+    comissao_pct: Decimal
+
+
+@dataclass(frozen=True)
+class PreparacaoTransmissao:
+    """`comissao_pct` é a comissão que a seguradora confirma, não a digitada."""
+
+    dados_negocio: dict[str, object]
+    plano_pagamento: str
+    valor_parcela: Decimal
+    condicao_pagamento: dict[str, object]
+    comissao_pct: Decimal
+
+
+class CondicaoTransmissaoError(ValueError):
+    """Mensagem segura para revisão pelo usuário, sem resposta bruta do provedor."""
+
+
+@runtime_checkable
+class PreparadorTransmissao(Protocol):
+    """Capacidade opcional; adapters legados mantêm seu fluxo de transmissão."""
+
+    def preparar_transmissao(
+        self, payload: dict[str, object], selecao: SelecaoTransmissao
+    ) -> PreparacaoTransmissao: ...
 
 
 @runtime_checkable

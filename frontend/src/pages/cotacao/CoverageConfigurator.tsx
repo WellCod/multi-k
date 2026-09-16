@@ -26,6 +26,7 @@ export function CoverageConfigurator({
   const [selected, setSelected] = useState<Record<string, string | null>>(initialSelected);
   const [pricing, setPricing] = useState<RepricingResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const revision = useRef(0);
   const mounted = useRef(true);
@@ -36,6 +37,7 @@ export function CoverageConfigurator({
   }, []);
 
   const handleSelect = (perilSlug: string, optionSlug: string | null) => {
+    if (saving) return;
     revision.current += 1;
     setSelected((s) => ({ ...s, [perilSlug]: optionSlug }));
     setPricing(null);
@@ -59,24 +61,35 @@ export function CoverageConfigurator({
     }
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!pricing || loading) return;
-    onApply(pricing);
-    onClose();
+    setLoading(true); setSaving(true); setError(null);
+    try {
+      const saved = await api.cotacoes.repricing(cotacaoId, cia, pricing.coverages_selected, pricing);
+      if (mounted.current) { onApply(saved); onClose(); }
+    } catch (e) {
+      if (mounted.current) {
+        setPricing(null);
+        setError(e instanceof Error ? e.message : "Não foi possível salvar. Atualize a cotação antes de continuar.");
+      }
+    } finally {
+      if (mounted.current) { setLoading(false); setSaving(false); }
+    }
   };
 
   const perils = sortPerils(coveragesAvailable);
   const hasChanges = JSON.stringify(selected) !== JSON.stringify(initialSelected);
 
   return (
-    <Dialog title="Configurar coberturas" onClose={onClose}>
+    <Dialog title="Configurar coberturas" onClose={() => { if (!saving) onClose(); }}>
       <div className="bg-surface rounded shadow-panel w-full max-w-2xl flex flex-col max-h-screen">
         <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
           <div>
-            <p className="text-xs text-muted mt-1">Selecione as opções desejadas e recalcule o prêmio</p>
+            <p className="text-xs text-muted mt-1">Recalcule para conferir. Aplicar salva as coberturas e os valores na cotação, sem transmitir a proposta.</p>
           </div>
           <button
             onClick={onClose}
+            disabled={saving}
             className="text-muted hover:text-muted text-xl leading-none"
             aria-label="Fechar"
           >
@@ -103,6 +116,7 @@ export function CoverageConfigurator({
                     <label className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${current === null ? "bg-canvas " : "hover:bg-canvas "}`}>
                       <input
                         type="radio"
+                        disabled={saving}
                         name={slug}
                         checked={current === null}
                         onChange={() => handleSelect(slug, null)}
@@ -118,6 +132,7 @@ export function CoverageConfigurator({
                       <label key={opt.slug} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isSelected ? "bg-canvas " : "hover:bg-canvas "}`}>
                         <input
                           type="radio"
+                          disabled={saving}
                           name={slug}
                           checked={isSelected}
                           onChange={() => handleSelect(slug, opt.slug)}
@@ -130,9 +145,10 @@ export function CoverageConfigurator({
                               Franquia: {formatBRL(String(opt.deductible))}
                             </span>
                           )}
-                          {opt.coverage_amount != null && /[1-9]/.test(opt.coverage_amount) && (
+                          {opt.coverage_amount != null && (
                             <span className="text-xs text-muted ml-2">
-                              Cobertura: {formatBRL(String(opt.coverage_amount))}
+                              {/* coverage_amount zerado = 100% da FIPE (J1/J2 §4.4) */}
+                              Cobertura: {/[1-9]/.test(opt.coverage_amount) ? formatBRL(String(opt.coverage_amount)) : "100% da tabela FIPE"}
                             </span>
                           )}
                         </div>
@@ -173,13 +189,13 @@ export function CoverageConfigurator({
         )}
 
         <div className="px-6 py-4 border-t flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button variant="ghost" disabled={saving} onClick={onClose}>Cancelar</Button>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleReprice} disabled={loading || !hasChanges}>
               {loading ? "Calculando…" : "Recalcular prêmio"}
             </Button>
             <Button onClick={handleApply} disabled={!pricing || loading}>
-              Aplicar e fechar
+              {saving ? "Salvando…" : "Aplicar e fechar"}
             </Button>
           </div>
         </div>

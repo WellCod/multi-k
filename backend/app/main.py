@@ -27,6 +27,7 @@ from app.api.proposta_router import router as proposta_router
 from app.api.rascunho_router import router as rascunho_router
 from app.api.relatorio_router import router as relatorio_router
 from app.api.renovacao_router import router as renovacao_router
+from app.api.transmissao_router import router as transmissao_router
 from app.infra.db import AsyncSessionLocal
 from app.infra.logging_config import configure_logging
 from app.infra.secrets import get_optional_secret
@@ -133,6 +134,8 @@ async def security_headers_middleware(
 ) -> Response:
     response = await call_next(request)
     response.headers["X-Frame-Options"] = "DENY"
+    if request.cookies.get("sid") or request.url.path.startswith("/auth/"):
+        response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
@@ -164,6 +167,7 @@ async def correlation_id_middleware(
 
 
 app.include_router(rascunho_router)
+app.include_router(transmissao_router)
 app.include_router(health_router)
 app.include_router(admin_router)
 app.include_router(auditoria_router)

@@ -162,7 +162,7 @@ async def refresh(
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, str]:
-    """Prorroga a sessão ativa por mais 8h."""
+    """Confirma a sessão ativa sem ultrapassar oito horas desde o login."""
     ip = request.client.host if request.client else None
     if ip:
         await checar_rate_limit(db, f"refresh:{ip}")
@@ -180,7 +180,7 @@ async def refresh(
             detail="Não autenticado.",
         ) from exc
 
-    ok = await prorrogar_sessao(db, sessao_id)
+    ok = await prorrogar_sessao(db, sessao_id, ip)
     if not ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

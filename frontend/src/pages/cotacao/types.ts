@@ -3,10 +3,22 @@ import { stripCPF } from "@/lib/utils";
 
 export const step1Schema = z.object({
   nome: z.string().min(2, "Nome muito curto"),
+  // J2 §4: o segurado pode ser PF (CPF) ou PJ (CNPJ).
   cpf: z
     .string()
     .transform(stripCPF)
-    .pipe(z.string().length(11, "CPF deve ter 11 dígitos")),
+    .pipe(
+      z.string().refine(
+        (v) => v.length === 11 || v.length === 14,
+        "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos)"
+      )
+    ),
+  nome_social: z.string().trim().optional(),
+  cep: z
+    .string()
+    .transform((v) => v.replace(/\D/g, ""))
+    .pipe(z.string().length(8, "CEP deve ter 8 dígitos").or(z.literal("")))
+    .optional(),
   email: z.string().email("E-mail inválido").optional().or(z.literal("")),
   telefone: z.string().optional(),
   data_nascimento: z
@@ -47,8 +59,11 @@ export const step2AutoSchema = z.object({
   blindado: z.boolean().optional(),
   garagem: z.boolean().optional(),
   zero_km: z.boolean().optional().default(false),
+  leilao: z.boolean().optional().default(false),
   ja_segurado: z.boolean().optional().default(false),
   bonus_anterior: z.coerce.number().int().min(0).max(10).optional().default(0),
+  tipo_negocio: z.enum(["novo", "renovacao"]).optional().default("novo"),
+  ci_code: z.string().trim().optional(),
   condutor_diferente: z.boolean().optional().default(false),
   condutor_cpf: z
     .string()
@@ -105,8 +120,15 @@ const autoObjectFields = { cep_pernoite: true, codigo_fipe: true, placa: true, m
 const motoObjectFields = { ...autoObjectFields, cilindrada: true, categoria: true } as const;
 const imovelObjectFields = { cep: true, tipo_imovel: true, tipo_construcao: true, valor_imovel: true, valor_conteudo: true } as const;
 
+// O CI da apólice anterior é exigido pela renovação, não pelo bônus.
+const autoProfileSchema = step2AutoSchema.omit(autoObjectFields).superRefine((data, ctx) => {
+  if (data.tipo_negocio === "renovacao" && !data.ci_code) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Renovação exige o código CI da apólice anterior", path: ["ci_code"] });
+  }
+});
+
 export const riskStepSchemas = {
-  auto: { object: step2AutoSchema.pick(autoObjectFields), profile: step2AutoSchema.omit(autoObjectFields) },
+  auto: { object: step2AutoSchema.pick(autoObjectFields), profile: autoProfileSchema },
   moto: { object: step2MotoSchema.pick(motoObjectFields), profile: step2MotoSchema.omit(motoObjectFields) },
   imovel: { object: step2ImovelSchema.pick(imovelObjectFields), profile: step2ImovelSchema.omit(imovelObjectFields) },
 };
