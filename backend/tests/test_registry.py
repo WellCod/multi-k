@@ -4,7 +4,11 @@ import pytest
 
 from app.adapters.fake.adapter import FakeSeguradora
 from app.adapters.justos.adapter import JustosSeguradora
-from app.adapters.registry import cias_para_ramo, get_adapter
+from app.adapters.registry import (
+    catalogo_seguradoras,
+    cias_para_ramo,
+    get_adapter,
+)
 from app.adapters.yelum.adapter import YelumSeguradora
 
 
@@ -53,3 +57,24 @@ def test_cias_para_ramo_imovel_sem_yelum_nao_inclui_yelum(
     monkeypatch.delenv("YELUM_CLIENT_ID", raising=False)
     cias = cias_para_ramo("imovel")
     assert "yelum" not in cias
+
+
+def test_catalogo_descreve_apenas_as_cias_habilitadas() -> None:
+    """A interface monta as opções a partir das capacidades, sem if por CIA."""
+    catalogo = {item["id"]: item for item in catalogo_seguradoras()}
+    assert catalogo
+    for item in catalogo.values():
+        assert item["ramos"]
+        assert item["modos_transmissao"] == [] or item["id"] == "justos"
+
+
+def test_catalogo_deriva_planos_do_parcelamento(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("JUSTOS_PARTNER_NAME", "corretor-teste")
+    justos = next(i for i in catalogo_seguradoras() if i["id"] == "justos")
+    planos = {p["codigo"]: p["parcelas"] for p in justos["planos"]}  # type: ignore[index,union-attr]
+    assert planos["AVISTA"] == 1
+    assert planos["12X"] == 12
+    modos = {m["id"] for m in justos["modos_transmissao"]}  # type: ignore[index,union-attr]
+    assert modos == {"monthly", "annual"}
