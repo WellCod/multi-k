@@ -1,5 +1,5 @@
 import { DomainOptions } from "@/components/DomainOptions";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api, type Dominio, type Cliente, ApiError } from "@/lib/api";
@@ -22,6 +22,11 @@ export function Step1({
   const [searching, setSearching] = useState(false);
   const [foundCliente, setFoundCliente] = useState<Cliente | null>(null);
   const [cpfSearchError, setCpfSearchError] = useState<string | null>(null);
+  const nomeSocialId = useId();
+  // Rascunho com nome social preenchido reabre com o campo já visível.
+  const [usaNomeSocial, setUsaNomeSocial] = useState(
+    Boolean(defaultValues?.nome_social),
+  );
 
   const {
     register,
@@ -110,6 +115,32 @@ export function Step1({
       <Field label="Nome completo ou razão social" error={errors.nome?.message}>
         <Input {...register("nome")} />
       </Field>
+
+      <label
+        htmlFor={nomeSocialId}
+        className="flex items-center gap-2 text-sm text-ink cursor-pointer"
+      >
+        <input
+          id={nomeSocialId}
+          type="checkbox"
+          checked={usaNomeSocial}
+          onChange={(e) => {
+            setUsaNomeSocial(e.target.checked);
+            if (!e.target.checked) setValue("nome_social", "");
+          }}
+        />
+        Informar nome social
+      </label>
+
+      {usaNomeSocial && (
+        <Field
+          label="Nome social"
+          hint="Nome pelo qual a pessoa é conhecida, quando diferente do nome de registro."
+          error={errors.nome_social?.message}
+        >
+          <Input {...register("nome_social")} />
+        </Field>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="CEP do segurado" error={errors.cep?.message}>
