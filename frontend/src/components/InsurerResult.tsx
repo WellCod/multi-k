@@ -40,7 +40,7 @@ export function InsurerResult({ result, actions }: { result: InsurerView; action
       {result.necessita_vistoria && <p className="text-warning font-medium">Vistoria prévia obrigatória — confirme o prazo de emissão.</p>}
       {result.restricoes.map(r => <p className="text-warning text-xs" key={r.codigo}>{r.mensagem}</p>)}
       {result.mensagens.map((message, index) => <p className="text-xs text-muted" key={index}>{message}</p>)}
-      {result.info && <p className="text-xs text-muted"><span className="font-medium">Observação da seguradora:</span> {result.info}</p>}
+      {result.info && !result.mensagens.includes(result.info) && <p className="text-xs text-muted"><span className="font-medium">Observação da seguradora:</span> {result.info}</p>}
       {!pending && result.status === "erro" && !result.mensagens.length && <p className="text-xs text-danger">Não foi possível obter o resultado. Tente recotar nesta seguradora.</p>}
       {result.status === "cancelado" && !result.mensagens.length && <p className="text-xs text-muted">Consulta cancelada. Nenhuma proposta foi transmitida por esta ação.</p>}
       {actions && <Row className="flex-wrap border-t border-line pt-3">{actions}</Row>}

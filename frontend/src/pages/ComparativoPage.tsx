@@ -348,7 +348,7 @@ export function ComparativoPage() {
           {single.annual_total && <div><p className="text-xs text-muted mb-1">Opção anual</p><p className="text-lg font-medium"><Money value={single.annual_total} /></p></div>}
         </div>
         {single.mensagens.map((message, index) => <p key={index} className="text-sm text-muted">{message}</p>)}
-        {single.info && <p className="text-sm text-muted"><span className="font-medium">Observação da seguradora:</span> {single.info}</p>}
+        {single.info && !single.mensagens.includes(single.info) && <p className="text-sm text-muted"><span className="font-medium">Observação da seguradora:</span> {single.info}</p>}
         {single.restricoes.map((restriction, index) => <p key={index} className="text-sm text-warning">{restriction.mensagem}</p>)}
         {single.necessita_vistoria && <p className="text-sm text-warning">Vistoria prévia obrigatória.</p>}
         <div className="flex flex-wrap gap-3 border-t border-line pt-4">
@@ -371,10 +371,9 @@ export function ComparativoPage() {
       {single ? <section className="quote-summary" aria-label="Coberturas da cotação">
         <div><h2 className="text-base font-semibold">Coberturas</h2><p className="text-sm text-muted mt-1">Limites informados pela seguradora para esta seleção.</p></div>
         <dl className="divide-y divide-line">{(single.coberturas_comparaveis ?? []).map(coverage => <div key={coverage.conceito_id} className="flex justify-between gap-4 py-3 text-sm">
-          <dt>{coverage.nome_canonico}</dt><dd className="text-right font-medium shrink-0"><Money value={coverage.limite} /></dd>
+          <dt>{coverage.nome_canonico}</dt><dd className="text-right font-medium shrink-0">{coverage.limite_descricao ?? <Money value={coverage.limite} />}</dd>
         </div>)}</dl>
         {!single.coberturas_comparaveis?.length && <p className="text-sm text-muted">Os detalhes das coberturas não foram informados.</p>}
-        {single.coberturas_comparaveis?.some(c => c.limite != null && /^0+(?:\.0+)?$/.test(c.limite)) && <p className="text-xs text-muted">Valores zerados reproduzem o retorno da seguradora e não confirmam ausência de cobertura. Consulte as condições antes de transmitir.</p>}
       </section> : <InsurerComparison items={itens} />}
 
       {/* Histórico de prêmio por recotação */}
