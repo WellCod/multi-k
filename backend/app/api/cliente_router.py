@@ -29,7 +29,8 @@ router = APIRouter(prefix="/clientes", tags=["clientes"])
 
 class ClienteInput(BaseModel):
     nome: str
-    cpf: str = Field(pattern=r"^\d{11}$")  # recebido, nunca armazenado
+    # CPF ou CNPJ; recebido, nunca armazenado em claro.
+    cpf: str = Field(pattern=r"^(\d{11}|\d{14})$")
     email: str | None = None
     telefone: str | None = None
     data_nascimento: date | None = None
@@ -215,7 +216,7 @@ async def criar_cliente(
 
 
 class BuscaCpfInput(BaseModel):
-    cpf: str = Field(pattern=r"^\d{11}$")
+    cpf: str = Field(pattern=r"^(\d{11}|\d{14})$")
 
 
 @router.post("/busca", response_model=list[ClienteOut])

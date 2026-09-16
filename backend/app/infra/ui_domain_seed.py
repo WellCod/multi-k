@@ -9,6 +9,8 @@ def ui_domain_rows() -> list[dict[str, str]]:
             ("filho", "Filho(a)"),
             ("pai", "Pai / Mãe"),
             ("irmao", "Irmão(ã)"),
+            ("empregado", "Empregado(a)"),
+            ("socio", "Sócio(a)"),
             ("outro", "Outro"),
         ],
         "categoria_moto": [
