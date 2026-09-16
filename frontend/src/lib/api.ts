@@ -103,6 +103,11 @@ export const api = {
   // ---- Domínios ----
   dominios: {
     seguradoras: () => request<Seguradora[]>("/dominios/seguradoras"),
+    /** Seguradoras aceitas como apólice anterior na renovação. */
+    seguradorasAnteriores: (cia: string) =>
+      request<SeguradoraAnterior[]>(
+        `/dominios/seguradoras-anteriores?cia=${encodeURIComponent(cia)}`
+      ),
     list: (tipo?: string) => {
       const params = tipo ? `?tipo=${encodeURIComponent(tipo)}` : "";
       return request<Dominio[]>(`/dominios${params}`);
@@ -377,6 +382,8 @@ export interface Seguradora {
   parcelamentos: string[];
   planos: { codigo: string; descricao: string; parcelas: number }[];
   modos_transmissao: { id: string; label: string; dados_negocio: Record<string, unknown>; campo_parcelas: string | null }[];
+  /** Publica o catálogo de seguradora anterior usado na renovação. */
+  catalogo_renovacao?: boolean;
 }
 
 export interface ClienteList {
@@ -586,6 +593,11 @@ export interface Peril {
   description: string;
   mandatory: boolean;
   peril_options: PerilOption[];
+}
+
+export interface SeguradoraAnterior {
+  codigo: number;
+  nome: string;
 }
 
 export interface ItemComparativo {

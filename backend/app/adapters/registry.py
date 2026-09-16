@@ -4,7 +4,7 @@ Fica em app/adapters/ (fora do escopo de scan do test_arch.py) para que os
 nomes das seguradoras não vazem para o domínio, API ou infra.
 """
 
-from app.adapters.base import PortaSeguradora
+from app.adapters.base import CatalogoRenovacao, PortaSeguradora
 from app.adapters.fake.adapter import FakeSeguradora
 from app.adapters.justos.adapter import JustosSeguradora
 from app.adapters.yelum.adapter import YelumSeguradora
@@ -48,7 +48,8 @@ def catalogo_seguradoras() -> list[dict[str, object]]:
         cia for ramo in ("auto", "moto", "imovel") for cia in cias_para_ramo(ramo)
     )
     for cia in cias:
-        caps = get_adapter(cia).capacidades()
+        adapter = get_adapter(cia)
+        caps = adapter.capacidades()
         modes: list[dict[str, object]] = []
         if cia == "justos":
             modes = [
@@ -83,6 +84,8 @@ def catalogo_seguradoras() -> list[dict[str, object]]:
                     for p in caps.parcelamentos
                 ],
                 "modos_transmissao": modes,
+                # A interface pergunta a capacidade, não o nome da seguradora.
+                "catalogo_renovacao": isinstance(adapter, CatalogoRenovacao),
             }
         )
     return result
