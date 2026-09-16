@@ -347,7 +347,6 @@ export function CotacaoPage() {
         ? {
             proponente: {
               cpf: step1Data.cpf,
-              nome_social: step1Data.nome_social,
               cep: step1Data.cep,
               telefone: step1Data.telefone,
               nome: step1Data.nome,

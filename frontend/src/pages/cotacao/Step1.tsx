@@ -112,9 +112,6 @@ export function Step1({
       </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Nome social (opcional)" error={errors.nome_social?.message}>
-          <Input {...register("nome_social")} />
-        </Field>
         <Field label="CEP do segurado" error={errors.cep?.message}>
           <Input placeholder="00000-000" {...register("cep")} />
         </Field>
