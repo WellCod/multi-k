@@ -400,13 +400,13 @@ async def test_upsert_comissao_cria(db: AsyncSession, client: AsyncClient) -> No
     await _login(client, db, Papel.ADMIN, "admin_comissao_cria@test.com")
     r = await client.put(
         "/admin/comissoes/justos/auto",
-        json={"pct_padrao": "0.0500"},
+        json={"pct_padrao": "0.1500"},
     )
     assert r.status_code == 200
     body = r.json()
     assert body["cia"] == "justos"
     assert body["ramo"] == "auto"
-    assert body["pct_padrao"] == "0.0500"
+    assert body["pct_padrao"] == "0.1500"
 
 
 async def test_upsert_comissao_atualiza(db: AsyncSession, client: AsyncClient) -> None:
@@ -439,7 +439,7 @@ async def test_get_comissao_por_cia_ramo(db: AsyncSession, client: AsyncClient) 
     await _login(client, db, Papel.ADMIN, "admin_comissao_get@test.com")
     await client.put(
         "/admin/comissoes/justos/vida",
-        json={"pct_padrao": "0.0800"},
+        json={"pct_padrao": "0.2000"},
     )
     r = await client.get("/admin/comissoes/justos/vida")
     assert r.status_code == 200
@@ -491,20 +491,22 @@ async def test_direct_listar_comissoes(db: AsyncSession) -> None:
 
     # upsert cria — cobre linhas 260-268 (branch else)
     body = ComissaoConfigIn(pct_padrao="0.1500")
-    cfg = await _upsert(cia="direct_cia", ramo="auto", _usuario=admin, db=db, body=body)
-    assert cfg.cia == "direct_cia"
+    cfg = await _upsert(
+        cia="justos", ramo="direct_ramo", _usuario=admin, db=db, body=body
+    )
+    assert cfg.cia == "justos"
     assert str(cfg.pct_padrao) == "0.1500"
 
     # upsert atualiza — cobre linhas 260-268 (branch if)
     body2 = ComissaoConfigIn(pct_padrao="0.2000")
     cfg2 = await _upsert(
-        cia="direct_cia", ramo="auto", _usuario=admin, db=db, body=body2
+        cia="justos", ramo="direct_ramo", _usuario=admin, db=db, body=body2
     )
     assert str(cfg2.pct_padrao) == "0.2000"
 
     # get existente — cobre linha 248
-    found = await _get(cia="direct_cia", ramo="auto", _usuario=admin, db=db)
-    assert found.cia == "direct_cia"
+    found = await _get(cia="justos", ramo="direct_ramo", _usuario=admin, db=db)
+    assert found.cia == "justos"
 
     # get inexistente — cobre linhas 243-247
     with pytest.raises(HTTPException) as exc:
@@ -512,9 +514,35 @@ async def test_direct_listar_comissoes(db: AsyncSession) -> None:
     assert exc.value.status_code == 404
 
     # delete existente — cobre linhas 282-288
-    await _delete(cia="direct_cia", ramo="auto", _usuario=admin, db=db)
+    await _delete(cia="justos", ramo="direct_ramo", _usuario=admin, db=db)
 
     # delete inexistente — cobre linhas 282-285
     with pytest.raises(HTTPException) as exc2:
         await _delete(cia="nao_existe", ramo="auto", _usuario=admin, db=db)
     assert exc2.value.status_code == 404
+
+
+async def test_upsert_comissao_fora_da_faixa_da_cia_retorna_422(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    """A Justos aceita 10–25%: configurar fora disso quebraria toda cotação."""
+    await _login(client, db, Papel.ADMIN, "admin_comissao_faixa@test.com")
+    r = await client.put("/admin/comissoes/justos/auto", json={"pct_padrao": "0.0500"})
+    assert r.status_code == 422
+    assert "entre 10% e 25%" in r.json()["detail"]
+
+
+async def test_upsert_comissao_cia_desconhecida_retorna_422(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_cia@test.com")
+    r = await client.put("/admin/comissoes/naoexiste/auto", json={"pct_padrao": "0.15"})
+    assert r.status_code == 422
+
+
+async def test_upsert_comissao_cia_sem_limite_aceita_a_faixa_geral(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    await _login(client, db, Papel.ADMIN, "admin_comissao_livre@test.com")
+    r = await client.put("/admin/comissoes/fake/auto", json={"pct_padrao": "0.0500"})
+    assert r.status_code == 200
