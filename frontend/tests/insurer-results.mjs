@@ -75,3 +75,40 @@ test("cobertura de 100% da FIPE não vira R$ 0,00 nem traço", () => {
   assert.ok(html.includes("100% da tabela FIPE"));
   assert.ok(!html.includes("R$ 0,00"));
 });
+
+const comparavel = (cia, extra) => base({ cia, ...extra });
+
+test("tabela aparece quando há dois prêmios para confrontar", () => {
+  const html = render([comparavel("justos"), comparavel("outra")]);
+  assert.ok(html.includes("Compare as condições"));
+});
+
+test("tabela some quando só um resultado tem prêmio e não há cobertura", () => {
+  const html = render([
+    comparavel("justos"),
+    comparavel("outra", { status: "erro", premio_total: null, mensagens: ["Falhou"] }),
+  ]);
+  assert.ok(!html.includes("Compare as condições"));
+  assert.ok(html.includes("Falhou"));   // o cartão do erro continua na tela
+});
+
+test("um prêmio com cobertura canônica ainda vale comparar", () => {
+  const html = render([
+    comparavel("justos", {
+      coberturas_comparaveis: [
+        { conceito_id: "casco", nome_canonico: "Casco", nome_original: "Casco", limite: "45000.00" },
+      ],
+    }),
+  ]);
+  assert.ok(html.includes("Compare as condições"));
+});
+
+test("linha de prêmio anual só existe quando alguém informou anual", () => {
+  const semAnual = render([comparavel("justos"), comparavel("outra")]);
+  assert.ok(!semAnual.includes("Prêmio anual"));
+  const comAnual = render([
+    comparavel("justos", { annual_total: "13000.00" }),
+    comparavel("outra"),
+  ]);
+  assert.ok(comAnual.includes("Prêmio anual"));
+});
