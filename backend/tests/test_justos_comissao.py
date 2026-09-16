@@ -91,3 +91,8 @@ def test_cotacao_legada_sem_comissao_confirmada_bloqueia() -> None:
     del payload["comissao_pct_cotada"]
     with pytest.raises(CondicaoTransmissaoError, match="Recotize"):
         prepare_transmission(payload, _selecao("0.15"))
+
+
+def test_comissao_cotada_ilegivel_bloqueia_a_transmissao() -> None:
+    with pytest.raises(CondicaoTransmissaoError, match="ilegível"):
+        prepare_transmission(_payload("quinze por cento"), _selecao("0.15"))
