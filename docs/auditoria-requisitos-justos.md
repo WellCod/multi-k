@@ -72,6 +72,8 @@ Os caminhos de código abaixo são relativos à raiz do repositório.
    projeção idempotente por policyId, encerramento sem causa inventada, vínculo
    de renovação, ciclo mensal separado de parcela anual e URLs assinadas nunca
    persistidas. Implementação e agendamento continuam bloqueados pelo gate.
+   As cinco perguntas ao contrato estão redigidas em
+   `justos/email-perguntas-exportacao.md`, ainda não enviadas.
 7. Ampliar testes de contrato com respostas sintéticas, regressão completa,
    validação visual e homologação autorizada. Nenhum teste deve usar dados reais
    ou credenciais de produção por padrão.
