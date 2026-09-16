@@ -1,5 +1,6 @@
 import { DomainOptions } from "@/components/DomainOptions";
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
+import { api, type SeguradoraAnterior } from "@/lib/api";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -35,6 +36,28 @@ export function Step2Auto({
 
   const condutorDiferente = watch("condutor_diferente");
   const renovacao = watch("tipo_negocio") === "renovacao";
+  const [anteriores, setAnteriores] = useState<SeguradoraAnterior[] | null>(null);
+  const [anterioresErro, setAnterioresErro] = useState(false);
+
+  // A seguradora anterior só existe para CIAs que publicam o catálogo; a
+  // interface pergunta a capacidade em vez de saber o nome delas.
+  useEffect(() => {
+    if (!renovacao || anteriores !== null) return;
+    let disposed = false;
+    api.dominios
+      .seguradoras()
+      .then((cias) => {
+        const comCatalogo = cias.find((cia) => cia.catalogo_renovacao);
+        if (!comCatalogo) return disposed ? undefined : setAnteriores([]);
+        return api.dominios.seguradorasAnteriores(comCatalogo.id).then((lista) => {
+          if (!disposed) setAnteriores(lista);
+        });
+      })
+      .catch(() => {
+        if (!disposed) { setAnteriores([]); setAnterioresErro(true); }
+      });
+    return () => { disposed = true; };
+  }, [renovacao, anteriores]);
 
   function handleFipe(fipe: FipeResult) {
     setValue("codigo_fipe", fipe.codigo_fipe, { shouldValidate: true });
@@ -120,6 +143,24 @@ export function Step2Auto({
           </Field>
         )}
       </div>
+
+      {renovacao && (
+        <Field label="Seguradora anterior" error={errors.insurer_code?.message}>
+          <Select disabled={anteriores === null} {...register("insurer_code")}>
+            <option value="">{anteriores === null ? "Carregando…" : "—"}</option>
+            {anteriores?.map((seguradora) => (
+              <option key={seguradora.codigo} value={seguradora.codigo}>
+                {seguradora.nome}
+              </option>
+            ))}
+          </Select>
+          {anterioresErro && (
+            <p className="text-xs text-warning">
+              Não foi possível consultar o catálogo. Siga sem informar ou tente novamente.
+            </p>
+          )}
+        </Field>
+      )}
 
       <div className="border border-line rounded p-4 space-y-3">
         <label
