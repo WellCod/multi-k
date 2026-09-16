@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import Annotated, Any
+from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -33,6 +34,8 @@ class ItemComparativoOut(BaseModel):
     revisao_base: str
     condicoes_pagamento: list[PaymentOption] = []
     comissao_pct_cotada: Decimal | None = None
+    # J4: observação da seguradora, separada das mensagens do sistema.
+    info: str | None = None
     nome: str | None = None
     iniciado_em: str | None = None
     cotacao_id_cia: str | None
@@ -240,6 +243,7 @@ def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparati
                 "condicoes_pagamento", []
             ),
             comissao_pct_cotada=(j.payload_resposta or {}).get("comissao_pct_cotada"),
+            info=(j.payload_resposta or {}).get("info") or None,
             iniciado_em=j.criado_em.isoformat() if j.criado_em else None,
             cotacao_id_cia=j.cotacao_id_cia,
             premio_total=j.premio_total,
@@ -258,6 +262,18 @@ def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparati
             coberturas_comparaveis=_comparison_coverages(j),
         )
         for j in jobs
+    ]
+
+
+def _observacoes(itens: list[ItemComparativoOut]) -> list[str]:
+    """J4: observação informativa da seguradora, fora da tabela de valores.
+
+    O texto vem do provedor, então é escapado antes de virar markup do PDF.
+    """
+    return [
+        f"<b>{escape(item.cia.upper())}</b>: {escape(item.info)}"
+        for item in itens
+        if item.info
     ]
 
 
@@ -322,6 +338,13 @@ def _gerar_pdf(cotacao: Cotacao, itens: list[ItemComparativoOut]) -> bytes:
             )
         )
         story.append(table)
+
+        observacoes = _observacoes(itens)
+        if observacoes:
+            story.append(Spacer(1, 0.6 * cm))
+            story.append(Paragraph("Observações das seguradoras", styles["Heading3"]))
+            for linha in observacoes:
+                story.append(Paragraph(linha, styles["Normal"]))
 
     doc.build(story)
     return buf.getvalue()
