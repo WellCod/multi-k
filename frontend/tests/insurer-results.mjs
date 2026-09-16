@@ -50,3 +50,28 @@ test("comparativo cresce para oito seguradoras sem perder colunas ou resultados"
   assert.ok(html.includes("50.000,00"));
   assert.ok(html.includes("Consultando"));
 });
+
+const base = (extra) => ({ cia: "justos", status: "sucesso", premio_total: "1234.56", necessita_vistoria: false, restricoes: [], mensagens: [], iniciado_em: "inválida", ...extra });
+
+test("observação da seguradora não aparece duas vezes em cotação antiga", () => {
+  const texto = "9% desconto pagando à vista.";
+  // Antes da separação do campo, a observação era gravada dentro de mensagens.
+  const html = render([base({ mensagens: [texto], info: texto })]);
+  assert.equal(html.split(texto).length - 1, 1);
+});
+
+test("observação nova aparece rotulada quando não está nas mensagens", () => {
+  const html = render([base({ info: "Franquia reduzida disponível." })]);
+  assert.ok(html.includes("Observação da seguradora"));
+  assert.ok(html.includes("Franquia reduzida disponível."));
+});
+
+test("cobertura de 100% da FIPE não vira R$ 0,00 nem traço", () => {
+  const html = render([base({
+    coberturas_comparaveis: [
+      { conceito_id: "casco", nome_canonico: "Casco", nome_original: "Casco", limite: null, limite_descricao: "100% da tabela FIPE" },
+    ],
+  })]);
+  assert.ok(html.includes("100% da tabela FIPE"));
+  assert.ok(!html.includes("R$ 0,00"));
+});
