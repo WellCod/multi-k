@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Money } from "./Money";
+import { InsurerIdentity } from "./InsurerIdentity";
 import { StatusBadge } from "./StatusBadge";
 import { Stack, Row } from "./primitives";
 
@@ -29,7 +30,7 @@ export function InsurerResult({ result, actions }: { result: InsurerView; action
   return <article className="quote-summary min-w-0" aria-label={result.nome || result.cia}>
     <Stack gap={3}>
       <Row className="justify-between flex-wrap">
-        <Row gap={2}>{result.logo_url && <img src={result.logo_url} alt="" className="h-6 w-6 object-contain" />}<h3 className="font-semibold capitalize break-words">{result.nome || result.cia}</h3></Row>
+        <h3 className="font-semibold"><InsurerIdentity cia={result.cia} nome={result.nome} logoUrl={result.logo_url} /></h3>
         <StatusBadge status={result.status} />
       </Row>
       {pending ? <p role="status">Consultando…{seconds !== null && <span className="tabular-nums"> {seconds}s</span>}</p>
