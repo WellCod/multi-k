@@ -77,6 +77,7 @@ _RISCO_AUTO_PLANO: dict[str, object] = {
     "cep_pernoite": "01310100",
     "codigo_fipe": "023108-8",
     "ano_modelo": "2022",
+    "finalidade": "pessoal",
 }
 
 _RISCO_AUTO_ANINHADO: dict[str, object] = {
@@ -90,6 +91,7 @@ _RISCO_AUTO_ANINHADO: dict[str, object] = {
     "cep_pernoite": "01310100",
     "codigo_fipe": "023108-8",
     "ano_modelo": "2022",
+    "finalidade": "pessoal",
 }
 
 
@@ -118,6 +120,46 @@ def _mock_cotar(router: respx.MockRouter) -> None:
     router.post(_QUOTE_URL).mock(return_value=Response(200, json=_RESP_COTACAO))
     router.post(_PRICING_URL).mock(return_value=Response(200, json=_RESP_PRICING))
     router.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
+
+
+async def test_cotar_error_does_not_expose_provider_body() -> None:
+    with respx.mock as r:
+        _mock_auth(r)
+        r.post(_QUOTE_URL).mock(
+            return_value=Response(
+                400, json={"email": "private@example.invalid", "token": "private-token"}
+            )
+        )
+        result = await JustosSeguradora().cotar(
+            RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO)
+        )
+    assert not result.sucesso
+    message = " ".join(result.mensagens)
+    assert "400" in message
+    assert "private@example.invalid" not in message
+    assert "private-token" not in message
+
+
+async def test_transmission_error_does_not_expose_provider_body() -> None:
+    with respx.mock as r:
+        _mock_auth(r)
+        r.put(_COVERAGES_URL).mock(
+            return_value=Response(
+                400, json={"email": "private@example.invalid", "token": "private-token"}
+            )
+        )
+        result = await JustosSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="Q-001",
+                risco=RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO),
+                dados_negocio={"coverages_selected": {"collision": "full"}},
+            )
+        )
+    assert not result.sucesso
+    message = " ".join(result.mensagens)
+    assert "antes de repetir" in message
+    assert "private@example.invalid" not in message
+    assert "private-token" not in message
 
 
 async def test_cotar_sucesso() -> None:
@@ -265,6 +307,75 @@ async def test_transmitir_com_ci_code() -> None:
 
     assert len(captured) == 1
     assert captured[0]["ci_code"] == "CI-2025-999"
+
+
+async def test_transmitir_ci_code_declarado_no_risco() -> None:
+    """Renovação declarada no formulário envia o CI sem repetir em dados_negocio."""
+    captured: list[dict] = []
+
+    with respx.mock as r:
+        _mock_auth(r)
+        r.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
+
+        def _capture_convert(request: respx.patterns.M) -> Response:  # type: ignore[name-defined]
+            import json
+
+            captured.append(json.loads(request.content))
+            return Response(200, json={})
+
+        r.post(_CONVERT_URL).mock(side_effect=_capture_convert)
+        r.get(_CHECKOUT_URL).mock(return_value=Response(200, json=_RESP_CHECKOUT))
+
+        resultado = await JustosSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="Q-001",
+                risco=RiscoCanonico(
+                    ramo="auto",
+                    dados={
+                        **_RISCO_AUTO_PLANO,
+                        "tipo_negocio": "renovacao",
+                        "ci_code": "CI-2026-123",
+                    },
+                ),
+                dados_negocio={
+                    "email": "joao@test.com",
+                    "telefone": "11999990000",
+                    "coverages_selected": {
+                        "colisao-e-desastres-naturais": "colisao-franquia-20"
+                    },
+                },
+            )
+        )
+
+    assert resultado.sucesso is True
+    assert captured[0]["ci_code"] == "CI-2026-123"
+
+
+async def test_protocolo_e_identificador_estavel_nao_o_link() -> None:
+    """J2 §8: o link de checkout não vira protocolo — segue à parte."""
+    with respx.mock as r:
+        _mock_auth(r)
+        r.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
+        r.post(_CONVERT_URL).mock(return_value=Response(200, json={}))
+        r.get(_CHECKOUT_URL).mock(return_value=Response(200, json=_RESP_CHECKOUT))
+
+        resultado = await JustosSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="Q-001",
+                risco=RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO),
+                dados_negocio={
+                    "email": "joao@test.com",
+                    "telefone": "11999990000",
+                    "coverages_selected": {
+                        "colisao-e-desastres-naturais": "colisao-franquia-20"
+                    },
+                },
+            )
+        )
+
+    assert resultado.protocolo == "Q-001"
+    assert len(resultado.protocolo) <= 100
+    assert resultado.dados["checkout_url"] == _RESP_CHECKOUT["checkout_url"]
 
 
 # ---------------------------------------------------------------------------

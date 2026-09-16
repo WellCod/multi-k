@@ -3,21 +3,33 @@
 Ramo suportado: auto (veículos).
 
 Campos obrigatórios em dados_risco para ramo=auto:
-  - cpf / proponente.cpf          CPF do segurado (11 dígitos, sem pontuação)
-  - nome / proponente.nome        Nome completo do segurado
-  - sexo / proponente.sexo        "M" ou "F"
-  - data_nascimento / proponente.data_nascimento  "YYYY-MM-DD"
+  - cpf / proponente.cpf          CPF (11) ou CNPJ (14) do segurado, sem
+                                  pontuação. PJ dispensa sexo e nascimento.
+  - nome / proponente.nome        Nome completo ou razão social do segurado
+  - sexo / proponente.sexo        "M" ou "F" — só PF
+  - data_nascimento / proponente.data_nascimento  "YYYY-MM-DD" — só PF
   - cep_pernoite   CEP de pernoite do veículo (8 dígitos)
   - codigo_fipe    Código FIPE do veículo (ex: "023108-8")
   - ano_modelo     Ano modelo do veículo (int ou string)
+  - finalidade     Uso do veículo; enum fechado da Justos (vehicle_use)
 
 Aceita tanto chaves planas quanto aninhadas sob 'proponente' (formato frontend).
 
 Campos opcionais:
   - placa, chassi, zero_km, ja_segurado, bonus_anterior (0-10),
-    condutor_menor_24, finalidade, comissao_pct,
-    condutor_cpf, condutor_nome, condutor_sexo,
+    condutor_menor_24, finalidade, condutor_cpf, condutor_nome, condutor_sexo,
     condutor_nascimento, condutor_parentesco, insurer_code
+  - cep_segurado    CEP do segurado, distinto do pernoite. Ausente, repete o
+                    CEP de pernoite (compatibilidade com cotações antigas).
+  - nome_social     Nome social do segurado. Nunca inferido do nome legal.
+  - condutor_nome_social  Nome social do condutor principal.
+  - leilao          Veículo de leilão (is_auction).
+  - comissao_pct    Fração (0.10–0.25); default 0.15. Entra no preço da
+                    seguradora, então a transmissão exige o mesmo valor.
+  - tipo_negocio    "novo" (default) ou "renovacao". Declarado, nunca
+                    inferido do bônus.
+  - ci_code         Código CI da apólice anterior; obrigatório quando
+                    tipo_negocio = "renovacao".
 
 Campos obrigatórios em dados_negocio para transmitir():
   - email              E-mail do segurado
@@ -26,9 +38,8 @@ Campos obrigatórios em dados_negocio para transmitir():
   - policy_type        "monthly" ou "annual" (default: "monthly")
 
 Campos opcionais em dados_negocio:
-  - ci_code           Código CI da apólice anterior (obrigatório quando
-                      bonus_anterior > 0; consta no PDF da apólice,
-                      não retornado pelo /policy/export)
+  - ci_code           Sobrepõe o ci_code declarado no risco; consta no PDF
+                      da apólice, não é retornado pelo /policy/export
   - installments      Número de parcelas (obrigatório para annual)
   - scheduling_date   Data de início de vigência futura
 """
@@ -37,7 +48,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, date, datetime
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
 import httpx
@@ -45,12 +56,15 @@ import httpx
 from app.adapters.base import (
     Capacidades,
     MovimentoCanonico,
+    PreparacaoTransmissao,
     PropostaCanonica,
     ResultadoCotacao,
     ResultadoTransmissao,
     RiscoCanonico,
+    SelecaoTransmissao,
 )
 from app.adapters.justos import client
+from app.adapters.justos.payment import payment_options, prepare_transmission
 
 _log = logging.getLogger(__name__)
 
@@ -101,24 +115,103 @@ def _selecionar_coberturas(
     return selected
 
 
+_TIPOS_NEGOCIO = ("novo", "renovacao")
+
+
+def _tipo_negocio(dados: dict[str, Any]) -> str:
+    """Natureza declarada do negócio; ausência é negócio novo, lixo é erro."""
+    bruto = str(dados.get("tipo_negocio") or "novo").strip().lower()
+    if bruto not in _TIPOS_NEGOCIO:
+        raise ValueError(f"tipo_negocio inválido: {bruto!r}")
+    return bruto
+
+
+# J2 §4: vehicle_use e relationship são enums fechados. Valor fora da lista
+# muda o risco precificado, então vira erro em vez de default silencioso.
+_FINALIDADES = {
+    "lazer": "personal",
+    "pessoal": "personal",
+    "personal": "personal",
+    "comercial": "commercial",
+    "commercial": "commercial",
+    "app": "app_driver",
+    "app_driver": "app_driver",
+    "uber": "app_driver",
+    "taxi": "taxi",
+}
+
+_PARENTESCOS = {
+    "conjuge": "spouse",
+    "spouse": "spouse",
+    "pai": "parent",
+    "mae": "parent",
+    "parent": "parent",
+    "filho": "child",
+    "filha": "child",
+    "child": "child",
+    "irmao": "sibling",
+    "irma": "sibling",
+    "sibling": "sibling",
+    "empregado": "employee",
+    "employee": "employee",
+    "socio": "business_partner",
+    "business_partner": "business_partner",
+    "outro": "other",
+    "other": "other",
+}
+
+
 def _mapear_finalidade(finalidade: str) -> str:
-    mapa: dict[str, str] = {
-        "lazer": "personal",
-        "pessoal": "personal",
-        "personal": "personal",
-        "comercial": "commercial",
-        "commercial": "commercial",
-        "app": "app_driver",
-        "app_driver": "app_driver",
-        "uber": "app_driver",
-        "taxi": "taxi",
-    }
-    return mapa.get(finalidade.lower(), "personal")
+    chave = finalidade.strip().lower()
+    if chave not in _FINALIDADES:
+        raise ValueError(f"finalidade fora do enum da Justos: {finalidade!r}")
+    return _FINALIDADES[chave]
 
 
-def _nome_social(nome_completo: str) -> str:
-    partes = nome_completo.strip().split()
-    return partes[0] if partes else nome_completo
+def _mapear_parentesco(parentesco: str) -> str:
+    chave = parentesco.strip().lower()
+    if chave not in _PARENTESCOS:
+        raise ValueError(f"condutor_parentesco fora do enum da Justos: {parentesco!r}")
+    return _PARENTESCOS[chave]
+
+
+def _documento(valor: str) -> str:
+    """CPF (11) ou CNPJ (14) — J2 §4 aceita ambos em insured.cpf_cnpj."""
+    digitos = "".join(c for c in valor if c.isdigit())
+    if len(digitos) not in (11, 14):
+        raise ValueError("documento do segurado deve ter 11 dígitos (CPF) ou 14 (CNPJ)")
+    return digitos
+
+
+# J1/J2 §4: broker_commission_percentage é inteiro, de 10 a 25.
+_COMISSAO_MIN = 10
+_COMISSAO_MAX = 25
+_COMISSAO_PADRAO = 15
+
+
+def _comissao_cotada(dados: dict[str, Any]) -> int:
+    """Percentual inteiro enviado na cotação, a partir da fração canônica.
+
+    A comissão entra no preço da seguradora. Fora da faixa é erro, não
+    arredondamento silencioso: senão o prêmio cotado e a comissão registrada
+    localmente passam a contar histórias diferentes.
+    """
+    bruto = dados.get("comissao_pct")
+    if bruto is None or bruto == "":
+        return _COMISSAO_PADRAO
+    try:
+        pct = Decimal(str(bruto)) * 100
+    except InvalidOperation as exc:
+        raise ValueError(f"comissao_pct inválida: {bruto!r}") from exc
+    if pct != pct.to_integral_value():
+        raise ValueError(f"comissao_pct deve ser percentual inteiro; recebido {pct}%.")
+    valor = int(pct)
+    if not _COMISSAO_MIN <= valor <= _COMISSAO_MAX:
+        raise ValueError(
+            "comissao_pct fora da faixa aceita pela Justos "
+            f"({_COMISSAO_MIN}%–{_COMISSAO_MAX}%): {valor}%."
+        )
+    return valor
 
 
 def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
@@ -138,7 +231,12 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
         or prop.get("nascimento")
         or ""
     )
-    cep = str(dados.get("cep_pernoite") or dados.get("cep") or "")
+    cep_pernoite = str(dados.get("cep_pernoite") or dados.get("cep") or "")
+    # J2 §4: o CEP do segurado é distinto do pernoite. Cotações antigas só
+    # trazem um CEP — repeti-lo preserva o dado em vez de esvaziá-lo.
+    cep_segurado = (
+        str(dados.get("cep_segurado") or prop.get("cep") or "") or cep_pernoite
+    )
     codigo_fipe = str(dados.get("codigo_fipe") or dados.get("fipe_codigo") or "")
     ano_modelo = str(dados.get("ano_modelo") or "")
 
@@ -149,16 +247,22 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
     if not ano_modelo:
         raise ValueError("ano_modelo é obrigatório para cotação Justos")
 
+    documento = _documento(cpf)
     insured: dict[str, Any] = {
-        "cpf_cnpj": cpf,
+        "cpf_cnpj": documento,
         "legal_name": nome,
-        "social_name": _nome_social(nome),
-        "cep": cep,
+        "cep": cep_segurado,
     }
-    if sexo:
-        insured["gender"] = sexo
-    if nascimento:
-        insured["birth_date"] = nascimento
+    # Nome social é declarado pelo segurado; deduzi-lo do nome legal é inventar.
+    nome_social = str(dados.get("nome_social") or prop.get("nome_social") or "").strip()
+    if nome_social:
+        insured["social_name"] = nome_social
+    # J2 §4: gênero e nascimento só se aplicam quando o segurado é PF.
+    if len(documento) == 11:
+        if sexo:
+            insured["gender"] = sexo
+        if nascimento:
+            insured["birth_date"] = nascimento
 
     payload: dict[str, Any] = {
         "plate": str(dados.get("placa") or ""),
@@ -166,27 +270,32 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
         "insured": insured,
         "vehicle_fipe_code": codigo_fipe,
         "vehicle_model_year": ano_modelo,
-        "vehicle_overnight_cep": cep,
-        "vehicle_use": _mapear_finalidade(str(dados.get("finalidade") or "pessoal")),
+        "vehicle_overnight_cep": cep_pernoite,
+        "vehicle_use": _mapear_finalidade(str(dados.get("finalidade") or "")),
         "is_zero_km": bool(dados.get("zero_km", False)),
         "under_24": bool(dados.get("condutor_menor_24", False)),
         "is_insured": bool(dados.get("ja_segurado", False)),
+        "is_auction": bool(dados.get("leilao", dados.get("is_auction", False))),
         "previous_bonus": str(dados.get("bonus_anterior") or "0"),
-        # faixa 0–25; omitido → default do corretor (15)
-        "broker_commission_percentage": int(dados.get("comissao_pct") or 15),
+        "broker_commission_percentage": _comissao_cotada(dados),
     }
 
     condutor_cpf = str(dados.get("condutor_cpf") or "")
     if condutor_cpf:
         condutor_nome = str(dados.get("condutor_nome") or "")
-        payload["main_driver"] = {
+        condutor: dict[str, Any] = {
             "cpf": condutor_cpf,
             "legal_name": condutor_nome,
-            "social_name": _nome_social(condutor_nome),
             "gender": str(dados.get("condutor_sexo") or ""),
             "birth_date": str(dados.get("condutor_nascimento") or ""),
-            "relationship": str(dados.get("condutor_parentesco") or "other"),
+            "relationship": _mapear_parentesco(
+                str(dados.get("condutor_parentesco") or "outro")
+            ),
         }
+        condutor_social = str(dados.get("condutor_nome_social") or "").strip()
+        if condutor_social:
+            condutor["social_name"] = condutor_social
+        payload["main_driver"] = condutor
 
     insurer_code = dados.get("insurer_code")
     if insurer_code is not None:
@@ -197,6 +306,11 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
 
 class JustosSeguradora:
     """Adapter para a API Justos — somente ramo auto."""
+
+    def preparar_transmissao(
+        self, payload: dict[str, object], selecao: SelecaoTransmissao
+    ) -> PreparacaoTransmissao:
+        return prepare_transmission(payload, selecao)
 
     def capacidades(self) -> Capacidades:
         return Capacidades(
@@ -252,12 +366,14 @@ class JustosSeguradora:
             pricing_resp = await client.calcular_preco(quote_id, coverages_selected)
             await client.selecionar_coberturas(quote_id, coverages_selected)
         except httpx.HTTPStatusError as exc:
-            trecho = exc.response.text[:400]
             return ResultadoCotacao(
                 sucesso=False,
                 cotacao_id=None,
                 premio_total=None,
-                mensagens=[f"API Justos {exc.response.status_code}: {trecho}"],
+                mensagens=[
+                    f"Justos não concluiu a cotação (HTTP {exc.response.status_code}). "
+                    "Revise os dados ou tente novamente mais tarde."
+                ],
             )
 
         monthly_total: float = pricing_resp.get("monthly", {}).get("total", 0.0)
@@ -276,9 +392,16 @@ class JustosSeguradora:
             payload_resposta={
                 "quote_id": quote_id,
                 "coverages_selected": coverages_selected,
+                # Comissão de fato cotada: a transmissão não pode divergir dela.
+                "comissao_pct_cotada": str(
+                    Decimal(payload["broker_commission_percentage"]) / 100
+                ),
                 "coverages_available": coverages_available,
                 "monthly_total": monthly_total,
                 "annual_total": annual_total,
+                "condicoes_pagamento": [
+                    p.model_dump() for p in payment_options(pricing_resp)
+                ],
                 "info": info_text,
                 # Campos extras do retorno da cotação (úteis para a UI)
                 "fipe_price_percentage_covered": cotacao_resp.get(
@@ -317,8 +440,28 @@ class JustosSeguradora:
         scheduling_date: str | None = (
             str(scheduling_date_raw) if scheduling_date_raw else None
         )
-        ci_code: str | None = str(dados["ci_code"]) if dados.get("ci_code") else None
+        ci_bruto = dados.get("ci_code") or risco_dados.get("ci_code")
+        ci_code: str | None = str(ci_bruto) if ci_bruto else None
         coverages_selected: dict[str, Any] = dict(dados.get("coverages_selected") or {})
+
+        try:
+            tipo_negocio = _tipo_negocio(risco_dados)
+        except ValueError as exc:
+            return ResultadoTransmissao(
+                sucesso=False, protocolo=None, mensagens=[str(exc)]
+            )
+
+        # J2 §7: renovação exige o CI da apólice anterior. Bônus não indica
+        # renovação — a natureza do negócio vem declarada, nunca inferida.
+        if tipo_negocio == "renovacao" and not ci_code:
+            return ResultadoTransmissao(
+                sucesso=False,
+                protocolo=None,
+                mensagens=[
+                    "Renovação exige o código CI da apólice anterior, "
+                    "que consta no PDF da apólice."
+                ],
+            )
 
         if not coverages_selected:
             return ResultadoTransmissao(
@@ -342,17 +485,28 @@ class JustosSeguradora:
             )
             links = await client.obter_checkout_link(quote_id)
         except httpx.HTTPStatusError as exc:
-            trecho = exc.response.text[:300]
             return ResultadoTransmissao(
                 sucesso=False,
                 protocolo=None,
-                mensagens=[f"API Justos {exc.response.status_code}: {trecho}"],
+                mensagens=[
+                    "Justos não confirmou a transmissão "
+                    f"(HTTP {exc.response.status_code}). "
+                    "Verifique a situação na seguradora antes de repetir o envio."
+                ],
             )
 
-        protocolo = str(
-            links.get("app_download_url") or links.get("checkout_url") or quote_id
+        # J2 §8: o identificador estável é a cotação formalizada. O link de
+        # checkout é volátil, não cabe na coluna de protocolo e não significa
+        # apólice emitida — segue à parte, para o corretor enviar quando quiser.
+        return ResultadoTransmissao(
+            sucesso=True,
+            protocolo=quote_id,
+            dados={
+                chave: str(links[chave])
+                for chave in ("checkout_url", "app_download_url")
+                if links.get(chave)
+            },
         )
-        return ResultadoTransmissao(sucesso=True, protocolo=protocolo)
 
     async def movimentos(self, desde: date) -> list[MovimentoCanonico]:
         """Busca apólices vendidas desde `desde` via paginação."""

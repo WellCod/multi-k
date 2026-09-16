@@ -115,6 +115,7 @@ export function CotacaoPage() {
   const [proposta, setProposta] = useState<Proposta | null>(null);
   const [showTransmitir, setShowTransmitir] = useState(false);
   const [transmitirCia, setTransmitirCia] = useState("");
+  const [transmitirRevisao, setTransmitirRevisao] = useState<string>();
 
   const [recotarError, setRecotarError] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -340,6 +341,8 @@ export function CotacaoPage() {
         ? {
             proponente: {
               cpf: step1Data.cpf,
+              nome_social: step1Data.nome_social,
+              cep: step1Data.cep,
               telefone: step1Data.telefone,
               nome: step1Data.nome,
               email: step1Data.email,
@@ -573,7 +576,7 @@ export function CotacaoPage() {
                 cotacaoId={cotacaoId!}
                 itens={itensComparativo}
                 proposta={proposta}
-                onEmitir={(cia) => { setTransmitirCia(cia); setShowTransmitir(true); }}
+                onEmitir={(cia, revisao) => { setTransmitirCia(cia); setTransmitirRevisao(revisao); setShowTransmitir(true); }}
                 onRecotar={handleRecotar}
                 onCancel={cia => void handleCancel(cia)}
               />
@@ -596,6 +599,7 @@ export function CotacaoPage() {
           cotacaoId={cotacaoId}
           ramo={cotacao?.ramo}
           cia={transmitirCia}
+          revisaoBase={transmitirRevisao}
           vigenciaInicio={step4Data?.inicio_vigencia}
           onClose={() => setShowTransmitir(false)}
           onSuccess={(p) => {
