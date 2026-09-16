@@ -14,6 +14,8 @@ async def registrar(
     dados: dict[str, Any],
     usuario_id: uuid.UUID | None = None,
     ip_origem: str | None = None,
+    *,
+    tenant_id: uuid.UUID = TENANT_ID,
 ) -> None:
     entrada = Auditoria(
         tipo=tipo,
@@ -21,7 +23,7 @@ async def registrar(
         ip_origem=ip_origem,
         dados=dados,
         criado_em=datetime.now(UTC),
-        tenant_id=TENANT_ID,
+        tenant_id=tenant_id,
     )
     db.add(entrada)
     await db.flush()
