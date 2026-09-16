@@ -23,8 +23,10 @@ import uuid  # noqa: E402
 from collections.abc import AsyncGenerator  # noqa: E402
 
 import httpx  # noqa: E402
+import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from sqlalchemy import text  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncEngine,
     AsyncSession,
@@ -56,6 +58,23 @@ from app.infra.models import Base, Usuario  # noqa: E402
 from app.infra.seed import seed_if_empty  # noqa: E402
 
 _TEST_URL = os.environ["DATABASE_URL"]
+_TEST_DATABASE = make_url(_TEST_URL).database or ""
+if not (
+    _TEST_DATABASE == "multik_test"
+    or _TEST_DATABASE.startswith("multik_security_regression_")
+):
+    raise RuntimeError("Os testes destrutivos exigem um banco exclusivo de regressão.")
+
+
+@pytest.fixture(autouse=True)
+def fake_adapter_without_demo_delay(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mantém regras do simulador; remove apenas esperas de demonstração do registry."""
+    from app.adapters.fake.adapter import FakeSeguradora
+
+    monkeypatch.setattr(
+        "app.adapters.registry.FakeSeguradora", lambda: FakeSeguradora(0, 0)
+    )
+
 
 _RLS_STMTS = [
     "ALTER TABLE eventos ENABLE ROW LEVEL SECURITY",

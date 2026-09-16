@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AdminUser, CurrentUser
 from app.infra import audit
-from app.infra.auth_service import hash_senha
+from app.infra.auth_service import hash_senha, invalidar_sessoes_usuario
 from app.infra.db import get_db
 from app.infra.models import ComissaoConfig, Usuario
 
@@ -158,6 +158,8 @@ async def atualizar_usuario(
     if body.ativo is not None:
         mudancas["ativo"] = body.ativo
         alvo.ativo = body.ativo
+    if body.ativo is False or body.papel is not None:
+        await invalidar_sessoes_usuario(db, alvo.id)
     await audit.registrar(
         db,
         tipo="admin_atualizar_usuario",
@@ -187,6 +189,7 @@ async def reset_senha(
             detail="Usuário não encontrado.",
         )
     alvo.senha_hash = hash_senha(body.nova_senha)
+    await invalidar_sessoes_usuario(db, alvo.id)
     await audit.registrar(
         db,
         tipo="admin_reset_senha",
