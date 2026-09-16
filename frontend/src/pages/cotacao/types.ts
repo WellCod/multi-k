@@ -1,6 +1,18 @@
 import { z } from "zod";
 import { stripCPF } from "@/lib/utils";
 
+/** Data local em YYYY-MM-DD. toISOString() usaria UTC e erraria o dia. */
+const isoLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Mesmos limites no schema e nos atributos do input, para o navegador barrar
+ *  no próprio seletor em vez de só reclamar ao enviar. */
+export function limitesNascimento() {
+  const hoje = new Date();
+  const cem = new Date(hoje.getFullYear() - 100, hoje.getMonth(), hoje.getDate());
+  return { min: isoLocal(cem), max: isoLocal(hoje) };
+}
+
 export const step1Schema = z.object({
   nome: z.string().min(2, "Nome muito curto"),
   // J2 §4: o segurado pode ser PF (CPF) ou PJ (CNPJ).

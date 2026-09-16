@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { stripCPF } from "@/lib/utils";
-import { step1Schema, type Step1Data } from "./types";
+import { limitesNascimento, step1Schema, type Step1Data } from "./types";
 import { Field } from "./shared";
 
 export function Step1({
@@ -31,7 +31,10 @@ export function Step1({
   } = useForm<Step1Data & { cpf?: string }>({
     resolver: zodResolver(step1Schema),
     defaultValues: defaultValues ?? {},
+    // Valida ao sair do campo: o erro não espera o envio do passo.
+    mode: "onBlur",
   });
+  const nascimento = limitesNascimento();
 
   const estadosCivis = dominios.filter((d) => d.tipo === "estado_civil");
   const profissoes = dominios.filter((d) => d.tipo === "profissao");
@@ -131,7 +134,7 @@ export function Step1({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Data de nascimento" error={errors.data_nascimento?.message}>
-          <Input type="date" {...register("data_nascimento")} />
+          <Input type="date" min={nascimento.min} max={nascimento.max} {...register("data_nascimento")} />
         </Field>
         <Field label="Sexo">
           <Select {...register("sexo")}>

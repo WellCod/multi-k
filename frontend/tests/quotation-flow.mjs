@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const compiled = await build({ entryPoints: ["src/pages/cotacao/types.ts"], bundle: true, write: false, platform: "node", format: "esm" });
-const { riskStepSchemas, step4Schema } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
+const { riskStepSchemas, step4Schema, step1Schema, limitesNascimento } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
 
 test("auto: objeto e perfil validados separadamente sem perder dados", () => {
   const object = riskStepSchemas.auto.object.parse({ codigo_fipe: "TESTE", cep_pernoite: "00000-000" });
@@ -56,4 +56,30 @@ test("negócio novo: é o padrão e dispensa CI", () => {
   const novo = riskStepSchemas.auto.profile.parse({ finalidade: "TESTE" });
   assert.equal(novo.tipo_negocio, "novo");
   assert.equal(novo.ci_code, undefined);
+});
+
+const identidade = (extra) => ({ nome: "Fulano de Tal", cpf: "39937528801", ...extra });
+
+test("nascimento: limites do input acompanham a regra do schema", () => {
+  const { min, max } = limitesNascimento();
+  const hoje = new Date();
+  assert.match(min, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(Number(max.slice(0, 4)), hoje.getFullYear());
+  assert.equal(Number(min.slice(0, 4)), hoje.getFullYear() - 100);
+});
+
+test("nascimento: ano fora da faixa é recusado", () => {
+  for (const data of ["275760-02-18", "1800-01-01", "0001-01-01"]) {
+    assert.equal(step1Schema.safeParse(identidade({ data_nascimento: data })).success, false, data);
+  }
+});
+
+test("nascimento: data futura é recusada", () => {
+  const amanha = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  assert.equal(step1Schema.safeParse(identidade({ data_nascimento: amanha })).success, false);
+});
+
+test("nascimento: data plausível e campo vazio passam", () => {
+  assert.equal(step1Schema.safeParse(identidade({ data_nascimento: "1990-05-10" })).success, true);
+  assert.equal(step1Schema.safeParse(identidade({})).success, true);
 });
