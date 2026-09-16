@@ -8,15 +8,16 @@ export function setUnauthorizedHandler(fn: () => void): void {
   _unauthorizedHandler = fn;
 }
 
-function _traduzirErro(status: number, detail: string): string {
-  if (status === 409) return "Este registro já existe.";
+function _traduzirErro(status: number, rawDetail: unknown): string {
+  const detail = typeof rawDetail === "string" ? rawDetail : "";
+  if (status === 409) return detail || "Este registro mudou. Atualize os dados antes de tentar novamente.";
   if (status === 404) return "Registro não encontrado.";
   if (status === 403) return "Você não tem permissão para esta ação.";
   if (status === 422) return "Dados inválidos. Verifique os campos e tente novamente.";
   if (status === 429) return "Muitas tentativas. Aguarde alguns minutos.";
   if (status === 503 || status === 502) return detail || "Serviço temporariamente indisponível. Tente novamente.";
-  if (status >= 500) return "Erro interno. Nossa equipe foi notificada.";
-  return detail ?? "Erro inesperado.";
+  if (status >= 500) return "Não foi possível concluir a operação. Tente novamente mais tarde.";
+  return detail || "Erro inesperado.";
 }
 
 function _getCsrfToken(): string | null {
@@ -35,11 +36,10 @@ async function request<T>(
     if (token) csrfHeaders["X-CSRF-Token"] = token;
   }
 
-  const res = await fetch(`${BASE}${path}`, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...csrfHeaders, ...init?.headers },
-    ...init,
-  });
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  for (const [name, value] of Object.entries(csrfHeaders)) headers.set(name, value);
+  const res = await fetch(`${BASE}${path}`, { ...init, credentials: "include", headers });
 
   if (res.status === 401) {
     if (_unauthorizedHandler) _unauthorizedHandler();
@@ -79,6 +79,11 @@ export interface MeOut {
 }
 
 export const api = {
+  transmissoes: {
+    estado: (id: string) => request<TransmissionState>(`/transmissoes/cotacoes/${id}`),
+    pendentes: (page = 1) => request<{ items: TransmissionState[]; page: number; pages: number; total: number }>(`/transmissoes/pendentes?page=${page}`),
+    conferir: (id: string, body: TransmissionReviewInput) => request<TransmissionState>(`/transmissoes/cotacoes/${id}/conferir`, { method: "POST", body: JSON.stringify(body) }),
+  },
   rascunho: {
     get: () => request<{ dados: Record<string, unknown> | null; versao: number }>("/rascunhos/cotacao"),
     save: (dados: object, versao: number) => request<{ versao: number }>("/rascunhos/cotacao", { method: "PUT", body: JSON.stringify({ dados, versao }) }),
@@ -163,6 +168,7 @@ export const api = {
         body: JSON.stringify(body),
       }),
     get: (id: string) => request<Cotacao>(`/cotacoes/${id}`),
+    status: (id: string) => request<Pick<Cotacao, "id" | "status" | "premio_total" | "proposta_id" | "numero_apolice">>(`/cotacoes/${id}/status`),
     list: (params?: { page?: number; page_size?: number; ramo?: string; status?: string; q?: string; dias?: number; cia?: string; order_by?: string }) => {
       const p = new URLSearchParams();
       if (params?.page) p.set("page", String(params.page));
@@ -191,10 +197,13 @@ export const api = {
       `${BASE}/cotacoes/${id}/comparativo/pdf`,
     pdfUrl: (id: string, tipo: "cotacao" | "proposta" = "cotacao") =>
       `${BASE}/cotacoes/${id}/pdf?tipo=${tipo}`,
-    repricing: (id: string, cia: string, coverages_selected: Record<string, string | null>) =>
+    repricing: (id: string, cia: string, coverages_selected: Record<string, string | null>, confirmation?: RepricingResult) =>
       request<RepricingResult>(`/cotacoes/${id}/repricing`, {
         method: "POST",
-        body: JSON.stringify({ cia, coverages_selected }),
+        body: JSON.stringify({ cia, coverages_selected, ...(confirmation ? {
+          aplicar: true, revisao_base: confirmation.revisao_base,
+          monthly_confirmado: confirmation.monthly_total, annual_confirmado: confirmation.annual_total,
+        } : {}) }),
       }),
     transmitir: (id: string, body: TransmitirInput) =>
       request<Proposta>(`/cotacoes/${id}/transmitir`, {
@@ -502,12 +511,34 @@ export interface PaginatedCotacoes {
 }
 
 export interface TransmitirInput {
+  opcao_pagamento?: number;
+  revisao_base?: string;
+  chave_idempotencia?: string;
   plano_pagamento: string;
   n_parcelas: number;
   comissao_pct: string;
   inicio_vigencia?: string;
   dados_negocio?: Record<string, unknown>;
   cia?: string;
+}
+
+export interface TransmissionState {
+  cotacao_id: string;
+  tentativa_id: string | null;
+  versao: number | null;
+  cia: string | null;
+  estado: string;
+  bloqueada: boolean;
+  atualizado_em: string | null;
+}
+
+export interface TransmissionReviewInput {
+  tentativa_id: string;
+  versao: number;
+  resultado: "nao_aceita" | "aceita";
+  conferido_na_seguradora: true;
+  justificativa: string;
+  referencia?: string;
 }
 
 export interface Proposta {
@@ -522,6 +553,8 @@ export interface Proposta {
   inicio_vigencia: string | null;
   transmitida_em: string;
   numero_apolice: string | null;
+  /** Link volátil da seguradora, só na resposta da transmissão. */
+  link_checkout?: string | null;
 }
 
 export interface Parcela {
@@ -556,10 +589,13 @@ export interface Peril {
 }
 
 export interface ItemComparativo {
+  condicoes_pagamento?: PaymentOption[];
+  comissao_pct_cotada?: string | null;
+  revisao_base?: string;
   nome?: string;
   logo_url?: string | null;
   iniciado_em?: string | null;
-  coberturas_comparaveis?: { conceito_id: string; nome_canonico: string; nome_original: string; limite: string | null }[];
+  coberturas_comparaveis?: { conceito_id: string; nome_canonico: string; nome_original: string; limite: string | null; limite_descricao?: string | null }[];
   cia: string;
   cotacao_id_cia: string | null;
   premio_total: string | null;
@@ -573,11 +609,20 @@ export interface ItemComparativo {
 }
 
 export interface RepricingResult {
+  condicoes_pagamento: PaymentOption[];
+  revisao_base: string;
   coberturas_comparaveis: NonNullable<ItemComparativo["coberturas_comparaveis"]>;
   monthly_total: string;
   annual_total: string;
   info: string;
   coverages_selected: Record<string, string | null>;
+}
+
+export interface PaymentOption {
+  periodicidade: "monthly" | "annual";
+  parcelas: number;
+  valor_parcela: string | null;
+  valor_total: string | null;
 }
 
 export interface RenovacaoCount {

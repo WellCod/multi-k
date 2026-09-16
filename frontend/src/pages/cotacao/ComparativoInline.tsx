@@ -13,7 +13,7 @@ interface Props {
   cotacaoId: string;
   itens: ItemComparativo[];
   proposta: Proposta | null;
-  onEmitir: (cia: string) => void;
+  onEmitir: (cia: string, revisao?: string) => void;
   onRecotar: () => void;
   onCancel?: (cia: string) => void;
 }
@@ -23,7 +23,7 @@ export function ComparativoInline({ cotacao, cotacaoId, itens, proposta, onEmiti
   const [overrides, setOverrides] = useState<Record<string, RepricingResult>>({});
   const effective = itens.map(item => {
     const override = overrides[item.cia];
-    return override ? { ...item, premio_total: override.monthly_total, annual_total: override.annual_total, coverages_selected: override.coverages_selected, coberturas_comparaveis: override.coberturas_comparaveis } : item;
+    return override ? { ...item, revisao_base: override.revisao_base, premio_total: override.monthly_total, annual_total: override.annual_total, coverages_selected: override.coverages_selected, coberturas_comparaveis: override.coberturas_comparaveis } : item;
   });
   const active = effective.find(i => i.cia === configurando);
   const pending = effective.filter(i => ["pendente", "aguardando", "processando"].includes(i.status));
@@ -47,7 +47,7 @@ export function ComparativoInline({ cotacao, cotacaoId, itens, proposta, onEmiti
         {["aguardando", "pendente", "processando"].includes(item.status) && onCancel && <Button variant="outline" onClick={() => onCancel(item.cia)}>Cancelar consulta</Button>}
         {["sucesso", "restricao"].includes(item.status) && !!item.coverages_available && <Button variant="outline" onClick={() => setConfigurando(item.cia)}>Configurar coberturas</Button>}
         {["sucesso", "restricao"].includes(item.status) && item.cia === "justos" && <a className="control inline-flex items-center rounded border border-line px-3 text-sm" href={api.cotacoes.pdfUrl(cotacaoId, "cotacao")} target="_blank" rel="noreferrer">Baixar PDF</a>}
-        {["sucesso", "restricao"].includes(item.status) && <Button onClick={() => onEmitir(item.cia)}>Revisar proposta</Button>}
+        {["sucesso", "restricao"].includes(item.status) && <Button onClick={() => onEmitir(item.cia, item.revisao_base)}>Revisar proposta</Button>}
       </>
     } />)}</div>
     <InsurerComparison items={effective} />
