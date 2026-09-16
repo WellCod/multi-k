@@ -18,6 +18,7 @@ export const step1Schema = z.object({
     .transform((v) => v.replace(/\D/g, ""))
     .pipe(z.string().length(8, "CEP deve ter 8 dígitos").or(z.literal("")))
     .optional(),
+  nome_social: z.string().trim().optional(),
   email: z.string().email("E-mail inválido").optional().or(z.literal("")),
   telefone: z.string().optional(),
   data_nascimento: z
