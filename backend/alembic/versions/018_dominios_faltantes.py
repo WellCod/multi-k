@@ -13,14 +13,17 @@ depends_on = None
 
 
 def upgrade() -> None:
+    """Completa apenas os tipos sem nenhuma opção.
+
+    A checagem é por tipo, não por código: a 001 semeou estado_civil em
+    MAIÚSCULA e o _SEED usa minúscula, então comparar código inseriria a
+    mesma opção duas vezes. Tipo que já tem opção fica como está.
+    """
     connection = op.get_bind()
     for row in dominio_rows():
         exists = connection.execute(
-            sa.text(
-                "SELECT 1 FROM dominio"
-                " WHERE tipo = :tipo AND codigo = :codigo AND cia IS NULL"
-            ),
-            {"tipo": row["tipo"], "codigo": row["codigo"]},
+            sa.text("SELECT 1 FROM dominio WHERE tipo = :tipo AND cia IS NULL"),
+            {"tipo": row["tipo"]},
         ).scalar()
         if not exists:
             connection.execute(
