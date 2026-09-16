@@ -134,11 +134,20 @@ _SEED: list[dict[str, str]] = [
 ]
 
 
+def dominio_rows() -> list[dict[str, str]]:
+    """Fonte única das opções de domínio — usada no seed e nas migrações.
+
+    O seed só popula tabela vazia, então opção acrescentada depois não chega a
+    banco já povoado; a migração completa o que faltar a partir daqui.
+    """
+    return [*_SEED, *ui_domain_rows()]
+
+
 async def seed_if_empty(db: AsyncSession) -> None:
     """Popula a tabela dominio se estiver vazia. Idempotente."""
     result = await db.execute(select(Dominio).limit(1))
     if result.scalar_one_or_none() is not None:
         return
-    for row in [*_SEED, *ui_domain_rows()]:
+    for row in dominio_rows():
         db.add(Dominio(**row))
     await db.commit()
