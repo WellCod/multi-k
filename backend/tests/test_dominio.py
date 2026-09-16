@@ -67,3 +67,37 @@ async def test_cache_retorna_mesmo_resultado(
     assert r1.status_code == 200
     assert r1.json() == r2.json()
     assert ("estado_civil", None) in dominio_router._dominio_cache
+
+
+def test_todo_tipo_usado_pelo_formulario_tem_opcao_semeada() -> None:
+    """Tipo sem linha semeada vira select vazio e trava o passo.
+
+    Aconteceu com profissao, tipo_imovel e tipo_construcao: entraram no _SEED
+    depois que a 001 já havia povoado a tabela, e seed_if_empty só popula
+    tabela vazia — então nunca chegaram a banco nenhum. A 018 completa o que
+    falta; esta lista impede que o próximo campo repita o percurso.
+    """
+    from app.infra.seed import dominio_rows
+
+    usados = {
+        "estado_civil",
+        "profissao",
+        "tipo_imovel",
+        "tipo_construcao",
+        "plano_pagamento",
+        "sexo",
+        "parentesco",
+        "bonus",
+        "categoria_moto",
+        "finalidade_auto",
+        "finalidade_moto",
+    }
+    semeados = {row["tipo"] for row in dominio_rows()}
+    assert not usados - semeados, f"sem opção semeada: {sorted(usados - semeados)}"
+
+
+def test_opcoes_de_dominio_nao_tem_codigo_repetido_no_mesmo_tipo() -> None:
+    from app.infra.seed import dominio_rows
+
+    chaves = [(row["tipo"], row["codigo"]) for row in dominio_rows()]
+    assert len(chaves) == len(set(chaves))
