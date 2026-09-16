@@ -161,13 +161,22 @@ curl http://localhost:8000/health   # → {"status": "ok", "version": "0.1.0"}
 cd frontend && npm run dev    # http://localhost:5173
 ```
 
-**Credenciais de demonstração** (seed carregado automaticamente no startup):
+**Usuários de demonstração** (seed carregado automaticamente no startup):
 
-| Papel | E-mail | Senha |
-|---|---|---|
-| Corretor | `ana.souza@demo.multik` | `Demo@2026` |
-| Corretor | `carlos.mendes@demo.multik` | `Demo@2026` |
-| Admin | `admin@demo.multik` | `Admin@2026` |
+| Papel | E-mail |
+|---|---|
+| Corretor | `ana.souza@demo.multik`, `carlos.mendes@demo.multik`, `fernanda.lima@demo.multik` |
+| Admin | `admin@demo.multik` |
+
+A senha é **gerada aleatoriamente a cada seed** e impressa uma única vez no log
+da API — não existe senha fixa no repositório. Para recuperá-la:
+
+```bash
+docker compose logs api | grep -A 3 "SEED DEMO"
+```
+
+Se o log já rotacionou, recrie o banco de desenvolvimento para disparar um novo
+seed.
 
 O seed cria ~40 clientes, ~120 cotações, ~60 propostas e veículos/imóveis para ~60%/25% dos clientes, com dados sintéticos plausíveis (CPFs válidos pelo algoritmo, nomes brasileiros, região Campinas). Idempotente — pode rodar várias vezes.
 
