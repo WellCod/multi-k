@@ -60,6 +60,11 @@
   button:not([role="option"]), a.control { min-height: 36px; }
   input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select { height: 36px; }
   input[type="checkbox"], input[type="radio"] { accent-color: var(--action); }
+  /* O Field já marcava o controle com aria-invalid; faltava o sinal visual.
+     Vale para os 45 campos sem tocar em cada chamada. */
+  input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
   input[type="date"], .font-mono { font-variant-numeric: tabular-nums; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
