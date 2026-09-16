@@ -12,8 +12,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <div className="w-full">
         <input
           className={cn(
-            "flex h-9 w-full rounded border border-line bg-surface px-3 py-1 text-sm text-ink shadow-panel transition-colors placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action disabled:cursor-not-allowed disabled:opacity-50",
-            error && "border-line focus-visible:ring-action",
+            "flex h-9 w-full rounded border border-line-strong bg-surface px-3 py-1 text-sm text-ink shadow-panel transition-colors placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action disabled:cursor-not-allowed disabled:opacity-50",
+            // O erro precisa aparecer no próprio controle, não só na mensagem.
+            error && "border-danger",
             className,
           )}
           ref={ref}
