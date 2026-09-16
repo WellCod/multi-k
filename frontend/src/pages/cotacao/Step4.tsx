@@ -1,4 +1,5 @@
 import { useForm } from "react-hook-form";
+import { InsurerIdentity } from "@/components/InsurerIdentity";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type Dominio, type Seguradora } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ export function Step4({
         <legend className="text-sm font-medium px-1">Seguradoras a consultar</legend>
         <div className="flex flex-wrap gap-4">{seguradoras.map(item => <label key={item.id} className="flex items-center gap-2">
           <input type="checkbox" checked={selecionadas.includes(item.id)} onChange={event => onSelecionadas(event.target.checked ? [...selecionadas, item.id] : selecionadas.filter(id => id !== item.id))} />
-          {item.logo_url && <img className="h-6 w-6 object-contain" src={item.logo_url} alt="" />}{item.nome}
+          <InsurerIdentity cia={item.id} nome={item.nome} logoUrl={item.logo_url} />
         </label>)}</div>
         {!selecionadas.length && <p className="text-warning text-xs">Selecione ao menos uma seguradora.</p>}
       </fieldset>
