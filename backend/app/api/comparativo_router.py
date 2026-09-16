@@ -2,13 +2,13 @@
 
 import uuid
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
@@ -18,15 +18,21 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.justos import client as justos_client
+from app.adapters.justos.payment import PaymentOption, payment_options
 from app.api.deps import CurrentUser
+from app.infra import audit, transmission_control
 from app.infra.db import get_db
-from app.infra.models import Cotacao, CotacaoJob
+from app.infra.models import Cotacao, CotacaoJob, Proposta
+from app.infra.quote_revision import quote_revision as _revision
 
 router = APIRouter(tags=["comparativo"])
 
 
 class ItemComparativoOut(BaseModel):
     cia: str
+    revisao_base: str
+    condicoes_pagamento: list[PaymentOption] = []
+    comissao_pct_cotada: Decimal | None = None
     nome: str | None = None
     iniciado_em: str | None = None
     cotacao_id_cia: str | None
@@ -44,14 +50,48 @@ class ItemComparativoOut(BaseModel):
 class RepricingInput(BaseModel):
     cia: str
     coverages_selected: dict[str, str | None]
+    aplicar: bool = False
+    revisao_base: str | None = Field(default=None, min_length=64, max_length=64)
+    monthly_confirmado: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
+    annual_confirmado: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def require_confirmation(self) -> "RepricingInput":
+        if self.aplicar and (
+            self.revisao_base is None
+            or self.monthly_confirmado is None
+            or self.annual_confirmado is None
+        ):
+            raise ValueError("Recalcule e confirme os valores antes de aplicar.")
+        return self
 
 
 class RepricingOutput(BaseModel):
+    revisao_base: str
+    condicoes_pagamento: list[PaymentOption] = []
     monthly_total: Decimal
     annual_total: Decimal
     info: str
     coverages_selected: dict[str, str | None]
     coberturas_comparaveis: list[dict[str, str | None]]
+
+
+def _confirmed_price(pricing: dict[str, Any], period: str) -> Decimal:
+    """Ausência ou resposta inválida não equivale a prêmio zero."""
+    section = pricing.get(period)
+    raw = section.get("total") if isinstance(section, dict) else None
+    if raw is not None and not isinstance(raw, (bool, dict, list)):
+        try:
+            value = Decimal(str(raw))
+            if value.is_finite() and value >= 0:
+                return value.quantize(Decimal("0.01"))
+        except InvalidOperation:
+            pass
+    raise HTTPException(
+        502,
+        "A seguradora não confirmou os valores do recálculo. "
+        "Revise antes de continuar.",
+    )
 
 
 async def _get_cotacao_ou_404(
@@ -89,23 +129,53 @@ def _coverage_options(job: CotacaoJob) -> dict[str, Any] | None:
     source = (job.payload_resposta or {}).get("coverages_available")
     if not isinstance(source, dict):
         return None
-    output = {}
+    output: dict[str, dict[str, Any]] = {}
     for code, coverage in source.items():
         if not isinstance(coverage, dict):
             continue
         options = []
-        for option in coverage.get("peril_options", []):
-            normalized = dict(option)
+        raw_options = coverage.get("peril_options", [])
+        for option in raw_options if isinstance(raw_options, list) else []:
+            if not isinstance(option, dict):
+                continue
+            normalized: dict[str, Any] = {
+                key: value
+                for key in ("slug", "name", "description")
+                if isinstance(value := option.get(key), str)
+            }
+            normalized["used_parts"] = option.get("used_parts") is True
             for field in ("price", "deductible", "coverage_amount"):
-                raw = normalized.get(field)
-                normalized[field] = (
-                    str(Decimal(str(raw)).quantize(Decimal("0.01")))
-                    if raw is not None
-                    else None
-                )
+                raw = option.get(field)
+                normalized[field] = None
+                if raw is not None and not isinstance(raw, (bool, dict, list)):
+                    try:
+                        value_decimal = Decimal(str(raw))
+                        if value_decimal.is_finite():
+                            normalized[field] = str(
+                                value_decimal.quantize(Decimal("0.01"))
+                            )
+                    except InvalidOperation:
+                        pass
             options.append(normalized)
-        output[code] = {**coverage, "peril_options": options}
+        output[code] = {
+            key: value
+            for key in ("name", "description", "conceito_id", "nome_canonico")
+            if isinstance(value := coverage.get(key), str)
+        }
+        output[code].update(
+            mandatory=coverage.get("mandatory") is True, peril_options=options
+        )
     return output
+
+
+def _fipe_integral(raw: object) -> bool:
+    """J1/J2 §4.4: coverage_amount zerado é 100% da FIPE, não cobertura nula."""
+    if raw is None or isinstance(raw, (bool, dict, list)):
+        return False
+    try:
+        return Decimal(str(raw)) == 0
+    except InvalidOperation:
+        return False
 
 
 def _comparison_coverages(
@@ -126,6 +196,7 @@ def _comparison_coverages(
         )
         if option is None:
             continue
+        integral = _fipe_integral(option.get("coverage_amount"))
         rows.append(
             {
                 "conceito_id": str(coverage.get("conceito_id") or f"{job.cia}:{code}"),
@@ -133,10 +204,30 @@ def _comparison_coverages(
                     coverage.get("nome_canonico") or coverage.get("name") or code
                 ),
                 "nome_original": str(coverage.get("name") or code),
-                "limite": option.get("coverage_amount"),
+                # Sem inventar o valor FIPE: o percentual fica como texto.
+                "limite": None if integral else option.get("coverage_amount"),
+                "limite_descricao": "100% da tabela FIPE" if integral else None,
             }
         )
     return rows
+
+
+def _validate_selection(job: CotacaoJob, selected: dict[str, str | None]) -> None:
+    available = _coverage_options(job)
+    if not available:
+        raise HTTPException(409, "Coberturas indisponíveis. Atualize a cotação.")
+    if any(code not in available for code in selected):
+        raise HTTPException(422, "A seleção contém uma cobertura não disponível.")
+    for code, coverage in available.items():
+        choice = selected.get(code)
+        if choice is None:
+            if coverage["mandatory"]:
+                raise HTTPException(422, "Selecione todas as coberturas obrigatórias.")
+            continue
+        if not any(
+            option.get("slug") == choice for option in coverage["peril_options"]
+        ):
+            raise HTTPException(422, "A opção selecionada não pertence à cobertura.")
 
 
 def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparativoOut]:
@@ -144,6 +235,11 @@ def _build_itens(cotacao: Cotacao, jobs: list[CotacaoJob]) -> list[ItemComparati
     return [
         ItemComparativoOut(
             cia=j.cia,
+            revisao_base=_revision(j),
+            condicoes_pagamento=(j.payload_resposta or {}).get(
+                "condicoes_pagamento", []
+            ),
+            comissao_pct_cotada=(j.payload_resposta or {}).get("comissao_pct_cotada"),
             iniciado_em=j.criado_em.isoformat() if j.criado_em else None,
             cotacao_id_cia=j.cotacao_id_cia,
             premio_total=j.premio_total,
@@ -259,7 +355,33 @@ async def repricing(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RepricingOutput:
     """Recalcula o preço de uma cotação Justos com novas coberturas selecionadas."""
-    await _get_cotacao_ou_404(cotacao_id, usuario.id, db)
+    cotacao = await _get_cotacao_ou_404(cotacao_id, usuario.id, db)
+
+    # Este endpoint ainda não possui implementação de recálculo para outras CIAs.
+    if body.cia != "justos":
+        raise HTTPException(422, "Recálculo não disponível para esta seguradora.")
+
+    if body.aplicar:
+        actor = transmission_control.Actor(usuario.id, usuario.tenant_id, usuario.papel)
+        cotacao = await transmission_control.quote_for_user(
+            db, cotacao_id, actor, lock=True
+        )
+        previous = await transmission_control.latest(db, cotacao)
+        proposal = (
+            await db.execute(
+                select(Proposta.id)
+                .where(
+                    Proposta.cotacao_id == cotacao_id,
+                    Proposta.tenant_id == actor.tenant_id,
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if proposal or (previous and previous.tipo != "transmissao.liberada"):
+            raise HTTPException(
+                409,
+                "Há uma transmissão registrada. Confira antes de alterar coberturas.",
+            )
 
     result = await db.execute(
         select(CotacaoJob)
@@ -273,6 +395,18 @@ async def repricing(
             status_code=status.HTTP_404_NOT_FOUND, detail="Job não encontrado."
         )
 
+    if job.status != "concluido" or job.status_resultado not in (
+        "sucesso",
+        "restricao",
+    ):
+        raise HTTPException(409, "Aguarde um resultado válido antes de recalcular.")
+    _validate_selection(job, body.coverages_selected)
+    revision = _revision(job)
+    if body.aplicar and body.revisao_base != revision:
+        raise HTTPException(
+            409, "A cotação mudou em outra operação. Atualize e recalcule."
+        )
+
     quote_id: str | None = job.payload_resposta.get("quote_id")
     if not quote_id:
         raise HTTPException(
@@ -281,14 +415,61 @@ async def repricing(
         )
 
     pricing = await justos_client.calcular_preco(quote_id, body.coverages_selected)
-    monthly = Decimal(str(pricing.get("monthly", {}).get("total", 0))).quantize(
-        Decimal("0.01")
-    )
-    annual = Decimal(str(pricing.get("annual", {}).get("total", 0))).quantize(
-        Decimal("0.01")
-    )
+    monthly = _confirmed_price(pricing, "monthly")
+    annual = _confirmed_price(pricing, "annual")
+
+    if body.aplicar:
+        if monthly != body.monthly_confirmado or annual != body.annual_confirmado:
+            raise HTTPException(
+                409,
+                "A seguradora alterou o preço. Recalcule e confira os novos valores.",
+            )
+        job.payload_resposta = {
+            **job.payload_resposta,
+            "coverages_selected": dict(body.coverages_selected),
+            "monthly_total": str(monthly),
+            "annual_total": str(annual),
+            "condicoes_pagamento": [p.model_dump() for p in payment_options(pricing)],
+            "info": pricing.get("info", ""),
+            "revisao_id": str(uuid.uuid4()),
+        }
+        job.premio_total = monthly
+        job.mensagens = [pricing["info"]] if pricing.get("info") else []
+        # Preserve a escolha legada do representante; não compare periodicidades.
+        representative = (
+            await db.execute(
+                select(CotacaoJob)
+                .where(
+                    CotacaoJob.cotacao_id == cotacao_id,
+                    CotacaoJob.status_resultado == cotacao.status,
+                )
+                .order_by(CotacaoJob.criado_em, CotacaoJob.id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if representative and representative.id == job.id:
+            cotacao.premio_total = monthly
+            cotacao.mensagens = job.mensagens
+        await audit.registrar(
+            db,
+            "cotacao.coberturas_revisadas",
+            {
+                "cotacao_id": str(cotacao_id),
+                "cia": body.cia,
+                "revisao_anterior": revision,
+                "revisao_atual": _revision(job),
+                "monthly_total": str(monthly),
+                "annual_total": str(annual),
+                "coverages_selected": dict(body.coverages_selected),
+            },
+            usuario_id=usuario.id,
+            tenant_id=usuario.tenant_id,
+        )
+        await db.commit()
 
     return RepricingOutput(
+        revisao_base=_revision(job),
+        condicoes_pagamento=payment_options(pricing),
         monthly_total=monthly,
         annual_total=annual,
         info=pricing.get("info", ""),

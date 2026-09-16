@@ -836,7 +836,10 @@ async def test_pdf_cotacao_erro_gcf(
         r = await client.get(f"/cotacoes/{cotacao_id}/pdf")
 
     assert r.status_code == 502
-    assert "GCF timeout" in r.json()["detail"]
+    assert r.json()["detail"] == (
+        "Não foi possível obter o PDF da seguradora. Tente novamente mais tarde."
+    )
+    assert "GCF timeout" not in r.text
 
 
 async def test_cotacao_cia_invalida_retorna_422(

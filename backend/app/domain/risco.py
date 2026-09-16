@@ -21,7 +21,8 @@ class TipoImovel(StrEnum):
 
 
 class Proponente(BaseModel):
-    cpf: str = Field(pattern=r"^\d{11}$")
+    # CPF (PF) ou CNPJ (PJ) — J2 §4 aceita ambos como segurado.
+    cpf: str = Field(pattern=r"^(\d{11}|\d{14})$")
     nome: str
     nascimento: date
     sexo: str = Field(pattern=r"^[MF]$")
