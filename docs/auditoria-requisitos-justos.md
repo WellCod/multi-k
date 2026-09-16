@@ -35,7 +35,7 @@ Os caminhos de código abaixo são relativos à raiz do repositório.
 | Enum de parentesco e finalidade (J2 §4) | `_mapear_finalidade`, `_mapear_parentesco`, seed de domínio e migração 017 | Corrigido neste lote: os dois enums são fechados e valor fora da lista é erro, não default. O parentesco ia cru (`conjuge` em vez de `spouse`); agora traduz, e `empregado`/`socio` entraram no domínio. |
 | Placa/chassi, FIPE, ano, bônus e leilão (J2 §4) | Adapter + formulário Auto, `test_justos_veiculo` | Corrigido neste lote: mapeamento coberto por teste — placa vazia com chassi, chave legada do código FIPE, ano como texto, bônus e marcadores booleanos. Obrigatoriedade de FIPE e ano verificada. |
 | Comissão inteira 10–25 na cotação (J1/J2 §4) | `_comissao_cotada` no adapter; `comissao_pct_cotada` no payload; `prepare_transmission`; teto de 30% no servidor | Corrigido: a cotação usa a comissão configurada por CIA/ramo, fora da faixa 10–25 é erro explícito, e a transmissão só registra a comissão cotada — divergência exige recotação. A faixa passou a ser declarada em `Capacidades` e validada no cadastro de comissão. |
-| Catálogo atualizado de seguradora anterior GET /brokers/insurer (J1/J2 §4.2) | Cliente não oferece esse endpoint; adapter aceita insurer_code | Lacuna: consulta/cache e seleção de renovação ainda não integrados. |
+| Catálogo atualizado de seguradora anterior GET /brokers/insurer (J1/J2 §4.2) | `client.listar_seguradoras` com cache de 6 h; capacidade `CatalogoRenovacao`; rota `/dominios/seguradoras-anteriores`; seleção no formulário Auto | Corrigido neste lote: a consulta existe, é cacheada e alimenta a seleção da renovação. `insurer_code` passou a ser recusado fora de renovação, e entrada sem código utilizável é descartada em vez de virar opção quebrada. |
 | Mandatory, slug e opções (J2 §4–6) | `_validate_selection`, testes de repricing | Parcial: recálculo valida catálogo; verificar todos os caminhos de cotação/transmissão e comportamento staging de seleção core. |
 | coverage_amount=0 significa 100% FIPE (J1/J2 §4.4) | `_fipe_integral`, campo `limite_descricao`, `InsurerComparison.tsx` e `CoverageConfigurator.tsx` | Corrigido neste lote: zero vira "100% da tabela FIPE" no comparativo e no configurador, sem inventar valor monetário. Validação visual pendente. |
 | Pricing é prévia; PUT coverages persiste remotamente (J2 §5–6) | Repricing não envia PUT; adapter envia PUT antes de formalizar | Fluxo existe. Aplicar e fechar salva LOCALMENTE; PDF remoto pode continuar com seleção anterior até o PUT. Explicitar e corrigir consistência do PDF sem PUT oculto em consulta GET. |
@@ -79,6 +79,13 @@ Ruff dos arquivos envolvidos, build e lint frontend aprovados; diff sem erros.
 Testes usam banco exclusivo de regressão e respostas sintéticas, sem transmissão
 real. A validação visual do novo seletor, comissão e calendário continuam
 pendentes; este gate não significa aderência integral à documentação Justos.
+
+Gate do catálogo de renovação (16/09/2026): 567 testes backend aprovados com
+96% de cobertura, 14 testes de frontend, Ruff, mypy, `tsc --noEmit`, ESLint e
+build aprovados. Fecha a última lacuna fora do gate de fase. Restam o item 6,
+que depende desse gate, e o item 7. Nenhuma chamada remota foi feita: o catálogo
+foi exercitado com respostas sintéticas e a lista real ainda não foi conferida
+contra o ambiente da seguradora.
 
 Gate de valores, observação e formalização (16/09/2026): 553 testes backend
 aprovados com 96% de cobertura, Ruff, mypy, `tsc --noEmit`, ESLint e build do

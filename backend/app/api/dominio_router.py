@@ -3,12 +3,14 @@
 import time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.registry import catalogo_seguradoras
+from app.adapters.base import CatalogoRenovacao
+from app.adapters.registry import catalogo_seguradoras, get_adapter
 from app.api.deps import CurrentUser
 from app.infra.db import get_db
 from app.infra.models import Dominio
@@ -19,6 +21,39 @@ router = APIRouter(prefix="/dominios", tags=["dominios"])
 @router.get("/seguradoras")
 async def seguradoras(_usuario: CurrentUser) -> list[dict[str, object]]:
     return catalogo_seguradoras()
+
+
+class SeguradoraAnteriorOut(BaseModel):
+    codigo: int
+    nome: str
+
+
+@router.get("/seguradoras-anteriores", response_model=list[SeguradoraAnteriorOut])
+async def seguradoras_anteriores(
+    _usuario: CurrentUser,
+    cia: str = Query(..., min_length=1),
+) -> list[SeguradoraAnteriorOut]:
+    """Seguradoras aceitas como apólice anterior na renovação (J2 §4.2)."""
+    try:
+        adapter = get_adapter(cia)
+    except ValueError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Seguradora desconhecida."
+        ) from exc
+    if not isinstance(adapter, CatalogoRenovacao):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"{cia} não publica catálogo de seguradora anterior.",
+        )
+    try:
+        catalogo = await adapter.seguradoras_anteriores()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "Não foi possível consultar o catálogo da seguradora. "
+            "Tente novamente antes de cotar a renovação.",
+        ) from exc
+    return [SeguradoraAnteriorOut(codigo=s.codigo, nome=s.nome) for s in catalogo]
 
 
 _DOMINIO_TTL = 30 * 60  # 30 minutos — domínios mudam só via migration
