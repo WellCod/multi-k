@@ -19,7 +19,7 @@ from app.api._utils import get_or_404
 from app.api.deps import CurrentUser
 from app.infra import audit
 from app.infra.db import get_db
-from app.infra.models import Cotacao, CotacaoJob, EventoDB, Proposta
+from app.infra.models import Cliente, Cotacao, CotacaoJob, EventoDB, Proposta
 
 router = APIRouter(prefix="/cotacoes", tags=["cotacoes"])
 
@@ -111,6 +111,8 @@ def _cotacao_out(
     c: Cotacao,
     proposta_id: uuid.UUID | None = None,
     numero_apolice: str | None = None,
+    *,
+    resumo: bool = False,
 ) -> CotacaoOut:
     restricoes: list[dict[str, str]] = [
         {"codigo": r["codigo"], "mensagem": r.get("mensagem") or r.get("descricao", "")}
@@ -129,10 +131,19 @@ def _cotacao_out(
         necessita_vistoria=c.necessita_vistoria,
         versao_anterior_id=c.versao_anterior_id,
         criado_em=c.criado_em.isoformat(),
-        dados_risco=c.dados_risco,
+        dados_risco=_risco_resumo(c.dados_risco) if resumo else c.dados_risco,
         proposta_id=proposta_id,
         numero_apolice=numero_apolice,
     )
+
+
+def _risco_resumo(dados: dict[str, Any]) -> dict[str, Any]:
+    """O histórico só precisa do nome; detalhes exigem consulta individual."""
+    proponente = dados.get("proponente")
+    nome = proponente.get("nome") if isinstance(proponente, dict) else None
+    if not isinstance(nome, str):
+        nome = dados.get("nome")
+    return {"proponente": {"nome": nome if isinstance(nome, str) else ""}}
 
 
 async def _get_cotacao_ou_404(
@@ -157,6 +168,16 @@ async def criar_cotacao(
     selected = list(dict.fromkeys(body.cias)) if body.cias is not None else available
     if not selected or any(cia not in available for cia in selected):
         raise HTTPException(422, "Selecione uma seguradora disponível para o ramo.")
+    if body.cliente_id is not None:
+        await get_or_404(
+            select(Cliente).where(
+                Cliente.id == body.cliente_id, Cliente.usuario_id == usuario.id
+            ),
+            db,
+            "Cliente não encontrado.",
+        )
+    if body.versao_anterior_id is not None:
+        await _get_cotacao_ou_404(body.versao_anterior_id, usuario.id, db)
     cotacao = Cotacao(
         id=uuid.uuid4(),
         cliente_id=body.cliente_id,
@@ -219,6 +240,46 @@ async def obter_cotacao(
     proposta_id: uuid.UUID | None = p_tuple[0] if p_tuple else None
     numero_apolice: str | None = p_tuple[1] if p_tuple else None
     return _cotacao_out(c, proposta_id, numero_apolice)
+
+
+class CotacaoStatusOut(BaseModel):
+    id: uuid.UUID
+    status: str
+    premio_total: Decimal | None
+    proposta_id: uuid.UUID | None
+    numero_apolice: str | None
+
+
+@router.get("/{cotacao_id}/status", response_model=CotacaoStatusOut)
+async def obter_status_cotacao(
+    cotacao_id: uuid.UUID,
+    usuario: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CotacaoStatusOut:
+    row = (
+        await db.execute(
+            select(Cotacao.id, Cotacao.status, Cotacao.premio_total).where(
+                Cotacao.id == cotacao_id, Cotacao.usuario_id == usuario.id
+            )
+        )
+    ).first()
+    if row is None:
+        raise HTTPException(404, "Cotação não encontrada.")
+    proposal = (
+        await db.execute(
+            select(Proposta.id, Proposta.numero_apolice)
+            .where(Proposta.cotacao_id == cotacao_id, Proposta.usuario_id == usuario.id)
+            .order_by(Proposta.transmitida_em.desc())
+            .limit(1)
+        )
+    ).first()
+    return CotacaoStatusOut(
+        id=row.id,
+        status=row.status,
+        premio_total=row.premio_total,
+        proposta_id=proposal.id if proposal else None,
+        numero_apolice=proposal.numero_apolice if proposal else None,
+    )
 
 
 class PaginatedCotacoes(BaseModel):
@@ -306,7 +367,8 @@ async def listar_cotacoes(
     pages = max(1, -(-total // page_size))  # ceiling division
     return PaginatedCotacoes(
         items=[
-            _cotacao_out(c, *proposta_map.get(c.id, (None, None))) for c in cotacoes
+            _cotacao_out(c, *proposta_map.get(c.id, (None, None)), resumo=True)
+            for c in cotacoes
         ],
         total=total,
         page=page,
@@ -394,7 +456,10 @@ async def baixar_pdf_cotacao(
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Erro ao gerar PDF na Justos: {exc}",
+            detail=(
+                "Não foi possível obter o PDF da seguradora. "
+                "Tente novamente mais tarde."
+            ),
         ) from exc
 
     filename = f"{tipo}-{cotacao_id}.pdf"
