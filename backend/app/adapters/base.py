@@ -25,6 +25,10 @@ class Capacidades:
     coberturas: list[str]
     franquias: list[str]
     parcelamentos: list[str]
+    # Faixa de comissão aceita, em pontos percentuais. O padrão é permissivo:
+    # só a seguradora que impõe limite precisa declará-lo.
+    comissao_min: int = 0
+    comissao_max: int = 100
 
 
 @dataclass(frozen=True)

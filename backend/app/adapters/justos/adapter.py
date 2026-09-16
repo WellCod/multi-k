@@ -48,7 +48,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, date, datetime
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
@@ -64,13 +64,19 @@ from app.adapters.base import (
     SelecaoTransmissao,
 )
 from app.adapters.justos import client
-from app.adapters.justos.payment import payment_options, prepare_transmission
+from app.adapters.justos.payment import (
+    payment_options,
+    prepare_transmission,
+    to_decimal,
+)
 
 _log = logging.getLogger(__name__)
 
 
-def _dec(valor: float) -> Decimal:
-    return Decimal(str(valor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+def _total(pricing: dict[str, Any], periodo: str) -> Decimal | None:
+    """Total explícito do período; resposta incompleta não vira prêmio zero."""
+    secao = pricing.get(periodo)
+    return to_decimal(secao.get("total")) if isinstance(secao, dict) else None
 
 
 # Perils considerados obrigatórios/core quando a API staging retorna mandatory=False
@@ -108,8 +114,13 @@ def _selecionar_coberturas(
         options: list[dict[str, Any]] = peril["peril_options"]
         is_core = slug in _PERILS_CORE
         if peril.get("mandatory") or (not tem_mandatory and is_core):
-            cheapest = min(options, key=lambda o: float(o.get("price", 0)))
-            selected[slug] = str(cheapest["slug"])
+            # Opção sem preço não é opção grátis: fica de fora da comparação.
+            precificadas = [
+                (preco, o) for o in options if (preco := to_decimal(o.get("price")))
+            ]
+            if not precificadas:
+                raise ValueError(f"Justos não informou preço para a cobertura {slug}")
+            selected[slug] = str(min(precificadas, key=lambda par: par[0])[1]["slug"])
         else:
             selected[slug] = None
     return selected
@@ -173,6 +184,18 @@ def _mapear_parentesco(parentesco: str) -> str:
     if chave not in _PARENTESCOS:
         raise ValueError(f"condutor_parentesco fora do enum da Justos: {parentesco!r}")
     return _PARENTESCOS[chave]
+
+
+def _validar_contato(email: str, telefone: str) -> str | None:
+    """Devolve a pendência de contato, ou None quando está tudo presente."""
+    if "@" not in email.strip("@ "):
+        return "E-mail do segurado é obrigatório para formalizar a proposta."
+    if len([c for c in telefone if c.isdigit()]) < 10:
+        return (
+            "Telefone do segurado é obrigatório para formalizar a proposta "
+            "(DDD e número)."
+        )
+    return None
 
 
 def _documento(valor: str) -> str:
@@ -280,14 +303,30 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
         "broker_commission_percentage": _comissao_cotada(dados),
     }
 
-    condutor_cpf = str(dados.get("condutor_cpf") or "")
+    condutor_cpf = "".join(
+        c for c in str(dados.get("condutor_cpf") or "") if c.isdigit()
+    )
     if condutor_cpf:
-        condutor_nome = str(dados.get("condutor_nome") or "")
+        # J2 §4: o bloco main_driver é omitido quando o segurado dirige. Uma vez
+        # presente, os campos deixam de ser opcionais — enviar vazio é pior que
+        # não enviar, porque a seguradora precifica com o que recebe.
+        if len(condutor_cpf) != 11:
+            raise ValueError("condutor_cpf deve ter 11 dígitos")
+        obrigatorios = {
+            "condutor_nome": str(dados.get("condutor_nome") or "").strip(),
+            "condutor_sexo": str(dados.get("condutor_sexo") or "").strip(),
+            "condutor_nascimento": str(dados.get("condutor_nascimento") or "").strip(),
+        }
+        faltando = sorted(campo for campo, valor in obrigatorios.items() if not valor)
+        if faltando:
+            raise ValueError(
+                "condutor principal informado exige " + ", ".join(faltando)
+            )
         condutor: dict[str, Any] = {
             "cpf": condutor_cpf,
-            "legal_name": condutor_nome,
-            "gender": str(dados.get("condutor_sexo") or ""),
-            "birth_date": str(dados.get("condutor_nascimento") or ""),
+            "legal_name": obrigatorios["condutor_nome"],
+            "gender": obrigatorios["condutor_sexo"],
+            "birth_date": obrigatorios["condutor_nascimento"],
             "relationship": _mapear_parentesco(
                 str(dados.get("condutor_parentesco") or "outro")
             ),
@@ -329,6 +368,8 @@ class JustosSeguradora:
             ],
             franquias=["franquia-5", "franquia-15", "franquia-25"],
             parcelamentos=["AVISTA", "2X", "3X", "6X", "10X", "12X"],
+            comissao_min=_COMISSAO_MIN,
+            comissao_max=_COMISSAO_MAX,
         )
 
     async def cotar(self, r: RiscoCanonico) -> ResultadoCotacao:
@@ -375,20 +416,35 @@ class JustosSeguradora:
                     "Revise os dados ou tente novamente mais tarde."
                 ],
             )
+        except ValueError as exc:
+            return ResultadoCotacao(
+                sucesso=False,
+                cotacao_id=None,
+                premio_total=None,
+                mensagens=[f"Resposta da Justos incompleta: {exc}"],
+            )
 
-        monthly_total: float = pricing_resp.get("monthly", {}).get("total", 0.0)
-        annual_total: float = pricing_resp.get("annual", {}).get("total", 0.0)
-        info_text: str = pricing_resp.get("info", "")
-
-        mensagens: list[str] = []
-        if info_text:
-            mensagens.append(info_text)
+        monthly_total = _total(pricing_resp, "monthly")
+        annual_total = _total(pricing_resp, "annual")
+        if monthly_total is None:
+            return ResultadoCotacao(
+                sucesso=False,
+                cotacao_id=None,
+                premio_total=None,
+                mensagens=[
+                    "Justos não informou o prêmio mensal. "
+                    "Recalcule antes de comparar ou transmitir."
+                ],
+            )
+        # J4: info é texto informativo da seguradora. Não vira mensagem do
+        # sistema nem fonte de preço — segue em campo próprio.
+        info_text = str(pricing_resp.get("info") or "")
 
         return ResultadoCotacao(
             sucesso=True,
             cotacao_id=quote_id,
-            premio_total=_dec(monthly_total),
-            mensagens=mensagens,
+            premio_total=monthly_total,
+            mensagens=[],
             payload_resposta={
                 "quote_id": quote_id,
                 "coverages_selected": coverages_selected,
@@ -397,8 +453,8 @@ class JustosSeguradora:
                     Decimal(payload["broker_commission_percentage"]) / 100
                 ),
                 "coverages_available": coverages_available,
-                "monthly_total": monthly_total,
-                "annual_total": annual_total,
+                "monthly_total": str(monthly_total),
+                "annual_total": str(annual_total) if annual_total is not None else None,
                 "condicoes_pagamento": [
                     p.model_dump() for p in payment_options(pricing_resp)
                 ],
@@ -461,6 +517,14 @@ class JustosSeguradora:
                     "Renovação exige o código CI da apólice anterior, "
                     "que consta no PDF da apólice."
                 ],
+            )
+
+        # J2 §7: e-mail e telefone vão na formalização; validar antes evita
+        # queimar a tentativa de transmissão com dado obviamente ausente.
+        contato = _validar_contato(email, telefone)
+        if contato is not None:
+            return ResultadoTransmissao(
+                sucesso=False, protocolo=None, mensagens=[contato]
             )
 
         if not coverages_selected:
@@ -545,8 +609,7 @@ class JustosSeguradora:
             tipo = "cancelamento" if status == "INACTIVE" else "emissao"
 
             premium_data: dict[str, Any] = policy.get("premium") or {}
-            total_premium = premium_data.get("totalPremium")
-            valor = _dec(float(total_premium)) if total_premium is not None else None
+            valor = to_decimal(premium_data.get("totalPremium"))
 
             result.append(
                 MovimentoCanonico(

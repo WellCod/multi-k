@@ -591,6 +591,8 @@ export interface Peril {
 export interface ItemComparativo {
   condicoes_pagamento?: PaymentOption[];
   comissao_pct_cotada?: string | null;
+  /** Observação da seguradora (J4), separada das mensagens do sistema. */
+  info?: string | null;
   revisao_base?: string;
   nome?: string;
   logo_url?: string | null;
