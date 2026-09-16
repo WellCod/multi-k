@@ -64,6 +64,11 @@ export const step2AutoSchema = z.object({
   bonus_anterior: z.coerce.number().int().min(0).max(10).optional().default(0),
   tipo_negocio: z.enum(["novo", "renovacao"]).optional().default("novo"),
   ci_code: z.string().trim().optional(),
+  // Select vazio é "não informado", não zero.
+  insurer_code: z.preprocess(
+    (value) => (value === "" || value === null ? undefined : value),
+    z.coerce.number().int().positive().optional()
+  ),
   condutor_diferente: z.boolean().optional().default(false),
   condutor_cpf: z
     .string()

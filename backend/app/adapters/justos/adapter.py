@@ -61,6 +61,7 @@ from app.adapters.base import (
     ResultadoCotacao,
     ResultadoTransmissao,
     RiscoCanonico,
+    SeguradoraAnterior,
     SelecaoTransmissao,
 )
 from app.adapters.justos import client
@@ -336,8 +337,11 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
             condutor["social_name"] = condutor_social
         payload["main_driver"] = condutor
 
+    # J2 §4.2: o código da seguradora anterior só existe em renovação.
     insurer_code = dados.get("insurer_code")
-    if insurer_code is not None:
+    if insurer_code is not None and str(insurer_code).strip() != "":
+        if _tipo_negocio(dados) != "renovacao":
+            raise ValueError("insurer_code só se aplica a renovação")
         payload["insurer_code"] = int(insurer_code)
 
     return payload
@@ -350,6 +354,17 @@ class JustosSeguradora:
         self, payload: dict[str, object], selecao: SelecaoTransmissao
     ) -> PreparacaoTransmissao:
         return prepare_transmission(payload, selecao)
+
+    async def seguradoras_anteriores(self) -> list[SeguradoraAnterior]:
+        """Catálogo para renovação; entrada sem código utilizável é descartada."""
+        catalogo: list[SeguradoraAnterior] = []
+        for item in await client.listar_seguradoras():
+            codigo = item.get("code")
+            nome = str(item.get("name") or "").strip()
+            if not isinstance(codigo, int) or isinstance(codigo, bool) or not nome:
+                continue
+            catalogo.append(SeguradoraAnterior(codigo=codigo, nome=nome))
+        return sorted(catalogo, key=lambda s: s.nome)
 
     def capacidades(self) -> Capacidades:
         return Capacidades(
