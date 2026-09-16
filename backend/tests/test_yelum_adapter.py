@@ -272,3 +272,75 @@ async def test_cotar_proponente_aninhado() -> None:
 
     assert resultado.sucesso is True
     assert resultado.premio_total is not None
+
+
+_SEGREDO_DO_PROVEDOR = {
+    "error": "internal",
+    "trace": "yelum-trace-privado-9f2",
+    "token": "bearer-interno-nao-vaza",
+}
+
+
+async def test_cotar_error_does_not_expose_provider_body() -> None:
+    """Corpo de erro da seguradora não vira mensagem para o corretor."""
+    with respx.mock as r:
+        _mock_auth(r)
+        r.post(_QUOTE_URL).mock(return_value=Response(500, json=_SEGREDO_DO_PROVEDOR))
+
+        resultado = await YelumSeguradora().cotar(
+            RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA)
+        )
+
+    assert resultado.sucesso is False
+    mensagem = " ".join(resultado.mensagens)
+    assert "500" in mensagem
+    for segredo in _SEGREDO_DO_PROVEDOR.values():
+        assert segredo not in mensagem
+
+
+async def test_recotar_error_does_not_expose_provider_body() -> None:
+    quote_url = (
+        "https://integracao-tst.grupohdiseguros.com.br"
+        "/offer/property/sandbox/v1/quote/YELUM-2026-001"
+    )
+    with respx.mock as r:
+        _mock_auth(r)
+        r.put(quote_url).mock(return_value=Response(502, json=_SEGREDO_DO_PROVEDOR))
+
+        resultado = await YelumSeguradora().recotar(
+            "YELUM-2026-001", RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA)
+        )
+
+    assert resultado.sucesso is False
+    mensagem = " ".join(resultado.mensagens)
+    # Confirma que o caminho exercitado é o do erro HTTP, não outro qualquer.
+    assert "502" in mensagem
+    assert "yelum-trace-privado-9f2" not in mensagem
+
+
+async def test_transmission_error_does_not_expose_provider_body() -> None:
+    proposta_url = (
+        "https://integracao-tst.grupohdiseguros.com.br"
+        "/offer/property/sandbox/v1/proposal"
+    )
+    with respx.mock as r:
+        _mock_auth(r)
+        r.post(proposta_url).mock(return_value=Response(400, json=_SEGREDO_DO_PROVEDOR))
+
+        resultado = await YelumSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="YELUM-2026-001",
+                risco=RiscoCanonico(ramo="imovel", dados=_RISCO_RESIDENCIA),
+                dados_negocio={
+                    "BrokerCode": "001",
+                    "BrokerBranchCode": "01",
+                    "broker_proposal_number": "YELUM-2026-001",
+                },
+            )
+        )
+
+    assert resultado.sucesso is False
+    mensagem = " ".join(resultado.mensagens)
+    assert "antes de repetir" in mensagem
+    for segredo in _SEGREDO_DO_PROVEDOR.values():
+        assert segredo not in mensagem
