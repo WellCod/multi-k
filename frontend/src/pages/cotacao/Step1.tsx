@@ -38,7 +38,7 @@ export function Step1({
 
   const searchByCpf = async (cpf: string) => {
     const digits = stripCPF(cpf);
-    if (digits.length !== 11) return;
+    if (digits.length !== 11 && digits.length !== 14) return;
     setSearching(true);
     setCpfSearchError(null);
     try {
@@ -87,9 +87,9 @@ export function Step1({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <Field label="CPF" error={errors.cpf?.message}>
+      <Field label="CPF / CNPJ" error={errors.cpf?.message}>
         <Input
-          placeholder="000.000.000-00"
+          placeholder="000.000.000-00 ou 00.000.000/0000-00"
           {...register("cpf")}
           onBlur={(e) => searchByCpf(e.target.value)}
           disabled={searching}
@@ -107,9 +107,18 @@ export function Step1({
         </p>
       )}
 
-      <Field label="Nome completo" error={errors.nome?.message}>
+      <Field label="Nome completo ou razão social" error={errors.nome?.message}>
         <Input {...register("nome")} />
       </Field>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Nome social (opcional)" error={errors.nome_social?.message}>
+          <Input {...register("nome_social")} />
+        </Field>
+        <Field label="CEP do segurado" error={errors.cep?.message}>
+          <Input placeholder="00000-000" {...register("cep")} />
+        </Field>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="E-mail" error={errors.email?.message}>
