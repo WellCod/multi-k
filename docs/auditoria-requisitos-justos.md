@@ -36,7 +36,7 @@ Os caminhos de código abaixo são relativos à raiz do repositório.
 | Placa/chassi, FIPE, ano, bônus e leilão (J2 §4) | Adapter + formulário Auto, `test_justos_veiculo` | Corrigido neste lote: mapeamento coberto por teste — placa vazia com chassi, chave legada do código FIPE, ano como texto, bônus e marcadores booleanos. Obrigatoriedade de FIPE e ano verificada. |
 | Comissão inteira 10–25 na cotação (J1/J2 §4) | `_comissao_cotada` no adapter; `comissao_pct_cotada` no payload; `prepare_transmission`; teto de 30% no servidor | Corrigido: a cotação usa a comissão configurada por CIA/ramo, fora da faixa 10–25 é erro explícito, e a transmissão só registra a comissão cotada — divergência exige recotação. A faixa passou a ser declarada em `Capacidades` e validada no cadastro de comissão. |
 | Catálogo atualizado de seguradora anterior GET /brokers/insurer (J1/J2 §4.2) | `client.listar_seguradoras` com cache de 6 h; capacidade `CatalogoRenovacao`; rota `/dominios/seguradoras-anteriores`; seleção no formulário Auto | Corrigido neste lote: a consulta existe, é cacheada e alimenta a seleção da renovação. `insurer_code` passou a ser recusado fora de renovação, e entrada sem código utilizável é descartada em vez de virar opção quebrada. |
-| Mandatory, slug e opções (J2 §4–6) | `_validate_selection`, testes de repricing | Parcial: recálculo valida catálogo; verificar todos os caminhos de cotação/transmissão e comportamento staging de seleção core. |
+| Mandatory, slug e opções (J2 §4–6) | `_validate_selection`, `_selecionar_coberturas`, `test_justos_selecao_coberturas` | Corrigido neste lote: os três caminhos ficaram cobertos — a cotação escolhe a opção obrigatória mais barata e deixa add-on opcional de fora, o quirk de staging seleciona apenas o núcleo, o recálculo valida o catálogo e a transmissão recusa seleção que não passou pela revisão. |
 | coverage_amount=0 significa 100% FIPE (J1/J2 §4.4) | `_fipe_integral`, campo `limite_descricao`, `InsurerComparison.tsx` e `CoverageConfigurator.tsx` | Corrigido neste lote: zero vira "100% da tabela FIPE" no comparativo e no configurador, sem inventar valor monetário. Validação visual pendente. |
 | Pricing é prévia; PUT coverages persiste remotamente (J2 §5–6) | Repricing não envia PUT; adapter envia PUT antes de formalizar | Fluxo existe. Aplicar e fechar salva LOCALMENTE; PDF remoto pode continuar com seleção anterior até o PUT. Explicitar e corrigir consistência do PDF sem PUT oculto em consulta GET. |
 | Valores e opções monthly/annual (J1/J2 §5, J4) | `payment.py`, adapter, repricing, comparativo e modal | Integrado o seletor por revisão e a validação no servidor: parcela usa valor explícito; desconhecido bloqueia, sem divisão do mensal. Cotações legadas exigem recálculo. Comissão e calendário permanecem parciais. |
@@ -47,7 +47,7 @@ Os caminhos de código abaixo são relativos à raiz do repositório.
 | Checkout separado da emissão efetiva (J2 §8) | Adapter devolve `protocolo=quote_id` e links em `ResultadoTransmissao.dados`; servidor recusa protocolo acima de 100 caracteres | Corrigido neste lote: identificador estável persistido, link volátil devolvido só na resposta e exibido sem compartilhamento automático. Falta endpoint para reobter o link depois da transmissão. |
 | Exportação updatedSince, skip/take≤100, policyId (J3 §4) | `client.py::exportar_apolices`, `adapter.py::movimentos` | Parcial: paginação existe; sem consumidor/scheduler identificado. Perde precisão para date; falha HTTP encerra loop como resultado parcial. |
 | ACTIVE/INACTIVE não determina causa de encerramento (J3 §4.3) | `movimentos` converte INACTIVE em cancelamento, demais em emissão | Divergência: preservar estado/circunstância sem inventar causa ou emitir evento incorreto. |
-| Incremental, deduplicação e vínculos de renovação (J3 §4–5) | Retorna policyId, descarta previousPolicyId/parte dos dados | Lacuna: cursor durável por updatedAt e projeções idempotentes não implementados. Gate de fase antes de ativar sincronização. |
+| Incremental, deduplicação e vínculos de renovação (J3 §4–5) | Retorna policyId, descarta previousPolicyId/parte dos dados | Lacuna: cursor durável por updatedAt e projeções idempotentes seguem não implementados. Desenho em `justos/plano-exportacao-incremental.md`; gate de fase antes de ativar sincronização. |
 | Mensal é ciclo, não parcela anual; comissão e IOF reais (J3 §5.6–5.7) | Proposta gera parcelas e datas a cada30dias; exportação não integra cobranças | Divergência: não tratar calendário estimado como cobrança real; remodelar com dados explícitos e leitura compatível. |
 | PDFs assinados expiram15min e não devem ser armazenados como URL (J3 §5–6) | Movimentos não copia URLs; não há importação de documentos | Sem vazamento dessas URLs nesse caminho, mas requisito de obtenção/documentos ainda não implementado. Não confundir PDF de apólice, bilhete mensal e endosso. |
 | Valores em reais/Decimal (J3 §6 e regra interna) | `payment.to_decimal` usado pelo adapter; `_total`; `_selecionar_coberturas` | Corrigido neste lote: acabaram os `float` e os zeros de default. Prêmio mensal ausente recusa a cotação em vez de exibir R$ 0,00, e opção sem preço deixou de ser a mais barata. Testes negativos cobrem valor ilegível, negativo e ausente. |
@@ -67,6 +67,13 @@ Os caminhos de código abaixo são relativos à raiz do repositório.
 5. Separar checkout de protocolo e emissão; revisar erros e dados expostos.
 6. Planejar exportação e documentos com cursor, idempotência e eventos corretos;
    somente ativar após aprovação do gate de fase, não nesta auditoria.
+   Desenho concluído em `justos/plano-exportacao-incremental.md` (16/09/2026):
+   cursor por instante, varredura que falha em vez de devolver parcial,
+   projeção idempotente por policyId, encerramento sem causa inventada, vínculo
+   de renovação, ciclo mensal separado de parcela anual e URLs assinadas nunca
+   persistidas. Implementação e agendamento continuam bloqueados pelo gate.
+   As cinco perguntas ao contrato estão redigidas em
+   `justos/email-perguntas-exportacao.md`, ainda não enviadas.
 7. Ampliar testes de contrato com respostas sintéticas, regressão completa,
    validação visual e homologação autorizada. Nenhum teste deve usar dados reais
    ou credenciais de produção por padrão.
@@ -79,6 +86,11 @@ Ruff dos arquivos envolvidos, build e lint frontend aprovados; diff sem erros.
 Testes usam banco exclusivo de regressão e respostas sintéticas, sem transmissão
 real. A validação visual do novo seletor, comissão e calendário continuam
 pendentes; este gate não significa aderência integral à documentação Justos.
+
+Gate da seleção de coberturas (16/09/2026): 575 testes backend aprovados com
+96% de cobertura, 14 de frontend, Ruff, mypy, `tsc --noEmit`, ESLint e build
+aprovados. Fecha o item 39 da matriz. O item 6 recebeu desenho escrito, sem
+uma linha de código de sincronização — o gate de fase continua fechado.
 
 Gate do catálogo de renovação (16/09/2026): 567 testes backend aprovados com
 96% de cobertura, 14 testes de frontend, Ruff, mypy, `tsc --noEmit`, ESLint e
