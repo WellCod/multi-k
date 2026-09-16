@@ -59,7 +59,7 @@ function NovoClienteModal({
   const [err, setErr] = useState<string | null>(null);
 
   const cpfDigits = cpf.replace(/\D/g, "");
-  const cpfValid = cpfDigits.length === 11;
+  const cpfValid = cpfDigits.length === 11 || cpfDigits.length === 14;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
