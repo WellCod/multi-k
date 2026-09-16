@@ -13,7 +13,6 @@ export const step1Schema = z.object({
         "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos)"
       )
     ),
-  nome_social: z.string().trim().optional(),
   cep: z
     .string()
     .transform((v) => v.replace(/\D/g, ""))
