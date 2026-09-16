@@ -137,6 +137,14 @@ class PreparacaoTransmissao:
     comissao_pct: Decimal
 
 
+@dataclass(frozen=True)
+class SeguradoraAnterior:
+    """Seguradora da apólice anterior, usada só em renovação."""
+
+    codigo: int
+    nome: str
+
+
 class CondicaoTransmissaoError(ValueError):
     """Mensagem segura para revisão pelo usuário, sem resposta bruta do provedor."""
 
@@ -148,6 +156,13 @@ class PreparadorTransmissao(Protocol):
     def preparar_transmissao(
         self, payload: dict[str, object], selecao: SelecaoTransmissao
     ) -> PreparacaoTransmissao: ...
+
+
+@runtime_checkable
+class CatalogoRenovacao(Protocol):
+    """Capacidade opcional: catálogo de seguradoras aceitas na renovação."""
+
+    async def seguradoras_anteriores(self) -> list[SeguradoraAnterior]: ...
 
 
 @runtime_checkable

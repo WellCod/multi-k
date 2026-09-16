@@ -330,6 +330,12 @@ export function CotacaoPage() {
     } else {
       delete step2Limpo.condutor_diferente;
     }
+    // Trocar de renovação para negócio novo não pode deixar rastro: o código
+    // da seguradora anterior seria recusado na cotação.
+    if (step2Limpo.tipo_negocio !== "renovacao") {
+      delete step2Limpo.ci_code;
+      delete step2Limpo.insurer_code;
+    }
 
     const dados: Record<string, unknown> = {
       ...step2Limpo,

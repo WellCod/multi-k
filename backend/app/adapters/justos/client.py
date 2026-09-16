@@ -97,6 +97,47 @@ async def _obter_token() -> str:
     return _cache.token
 
 
+# O catálogo de seguradoras muda raramente; evita uma ida à rede por cotação.
+_CATALOGO_TTL = 6 * 3600
+
+
+@dataclass
+class _CatalogoCache:
+    seguradoras: list[dict[str, Any]] | None = None
+    expira_em: float = field(default=0.0)
+
+
+_catalogo = _CatalogoCache()
+
+
+def _invalida_catalogo() -> None:
+    """Zera o cache de seguradoras (uso exclusivo em testes)."""
+    _catalogo.seguradoras = None
+    _catalogo.expira_em = 0.0
+
+
+async def listar_seguradoras() -> list[dict[str, Any]]:
+    """GET /brokers/insurer — catálogo de seguradoras para renovação (J2 §4.2)."""
+    agora = time.monotonic()
+    if _catalogo.seguradoras is not None and _catalogo.expira_em > agora:
+        return _catalogo.seguradoras
+
+    token = await _obter_token()
+    async with httpx.AsyncClient() as c:
+        resp = await c.get(
+            f"{_base_url()}/brokers/insurer",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        dados = resp.json()
+
+    seguradoras = [item for item in dados if isinstance(item, dict)]
+    _catalogo.seguradoras = seguradoras
+    _catalogo.expira_em = agora + _CATALOGO_TTL
+    return seguradoras
+
+
 async def criar_cotacao(payload: dict[str, Any]) -> dict[str, Any]:
     """POST /brokers/quote — cria cotação e retorna coberturas disponíveis."""
     token = await _obter_token()

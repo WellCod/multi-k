@@ -39,3 +39,21 @@ test("coberturas: exige seleção e vigência válida", () => {
   assert.equal(step4Schema.safeParse({ ...data, inicio_vigencia: "2024-02-29" }).success, true);
   assert.equal(step4Schema.safeParse({ ...data, inicio_vigencia: "2025-02-29" }).success, false);
 });
+
+test("renovação: exige CI e não transforma seleção vazia em zero", () => {
+  const base = { finalidade: "TESTE" };
+  assert.equal(riskStepSchemas.auto.profile.safeParse({ ...base, tipo_negocio: "renovacao" }).success, false);
+
+  const renovacao = riskStepSchemas.auto.profile.parse({ ...base, tipo_negocio: "renovacao", ci_code: "CI-1", insurer_code: "6467" });
+  assert.equal(renovacao.ci_code, "CI-1");
+  assert.equal(renovacao.insurer_code, 6467);
+
+  const semSelecao = riskStepSchemas.auto.profile.parse({ ...base, tipo_negocio: "renovacao", ci_code: "CI-1", insurer_code: "" });
+  assert.equal(semSelecao.insurer_code, undefined);
+});
+
+test("negócio novo: é o padrão e dispensa CI", () => {
+  const novo = riskStepSchemas.auto.profile.parse({ finalidade: "TESTE" });
+  assert.equal(novo.tipo_negocio, "novo");
+  assert.equal(novo.ci_code, undefined);
+});
