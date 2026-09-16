@@ -40,6 +40,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const menuButton = useRef<HTMLButtonElement>(null);
   const [renovCount, setRenovCount] = useState<RenovacaoCount | null>(null);
   const [isStaging, setIsStaging] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -73,7 +75,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const groups = GROUPS.map(group => ({ ...group, items: group.items.filter(item => !item.admin || user?.papel === "admin") })).filter(group => group.items.length);
   const active = (to: string) => pathname === to || pathname.startsWith(to + "/") || (to === "/historico" && pathname.startsWith("/cotacoes/"));
   const context = pathname.startsWith("/cotacoes/") ? "Comparativo" : groups.flatMap(group => group.items).find(item => active(item.to))?.label ?? "multi-K";
-  const handleLogout = async () => { await logout(); navigate("/login"); };
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      await logout();
+      navigate("/login");
+    } catch {
+      setLogoutError("Não foi possível confirmar a saída. Verifique sua conexão e tente novamente.");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   function navigation(compact: boolean) {
     return <nav aria-label="Navegação principal" className="space-y-4 p-3">
@@ -127,7 +141,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <summary className="cursor-pointer list-none rounded px-3 py-2 text-sm hover:bg-canvas"><span className="hidden sm:inline">{user?.nome ?? "Minha conta"}</span><span className="sm:hidden">Conta</span><span aria-hidden="true" className="ml-2 text-muted">▾</span></summary>
               <div className="absolute right-0 mt-2 w-56 rounded-lg border border-line bg-surface p-2 shadow-lg">
                 <p className="px-3 py-2 text-sm break-words text-muted">{user?.nome}</p>
-                <button onClick={handleLogout} className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm hover:bg-canvas"><LogOut size={16} />Sair</button>
+                <button onClick={handleLogout} disabled={loggingOut} className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm hover:bg-canvas disabled:opacity-50"><LogOut size={16} />{loggingOut ? "Saindo…" : "Sair"}</button>
+                {logoutError && <p role="alert" className="px-3 py-2 text-sm text-danger">{logoutError}</p>}
               </div>
             </details>
           </div>

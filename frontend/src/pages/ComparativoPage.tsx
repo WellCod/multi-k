@@ -1,5 +1,6 @@
 import { DataTable } from "@/components/DataTable";
 import { InsurerResult } from "@/components/InsurerResult";
+import { InsurerIdentity } from "@/components/InsurerIdentity";
 import { InsurerComparison } from "@/components/InsurerComparison";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -147,6 +148,10 @@ export function ComparativoPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [transmitirCia, setTransmitirCia] = useState<string | null>(null);
+  const [transmitirRevisao, setTransmitirRevisao] = useState<string>();
+  const revisarProposta = (item: ItemComparativo) => {
+    setTransmitirCia(item.cia); setTransmitirRevisao(item.revisao_base);
+  };
   const [proposta, setProposta] = useState<Proposta | null>(null);
   const [apoliceInput, setApoliceInput] = useState("");
   const [apoliceLoading, setApoliceLoading] = useState(false);
@@ -159,14 +164,20 @@ export function ComparativoPage() {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const started = Date.now();
+    let loadedQuote: Cotacao | null = null;
+    const loadQuote = async (): Promise<Cotacao> => {
+      if (!loadedQuote) return api.cotacoes.get(cotacaoId);
+      return { ...loadedQuote, ...await api.cotacoes.status(cotacaoId) };
+    };
     setLoading(true);
     setErr(null);
     setRefreshNotice("");
     setProposta(null);
     const refresh = async () => {
       try {
-        const [c, comp] = await Promise.all([api.cotacoes.get(cotacaoId), api.cotacoes.comparativo(cotacaoId)]);
+        const [c, comp] = await Promise.all([loadQuote(), api.cotacoes.comparativo(cotacaoId)]);
         if (disposed) return;
+        loadedQuote = c;
         setCotacao(c);
         // Mantém a ordem da API sem converter valores monetários em float.
         setItens(comp);
@@ -225,7 +236,7 @@ export function ComparativoPage() {
         </div>
       <p className="text-sm text-muted">{vehicle ? `${vehicle} · ` : ""}Cotação de {formatDate(cotacao.criado_em)}</p>
 
-      {/* Card de proposta emitida */}
+      {/* Card de proposta transmitida — transmissão não é emissão */}
       {proposta && (
         <div className="rounded border border-line bg-canvas p-4">
           <div className="flex items-start gap-3">
@@ -240,6 +251,17 @@ export function ComparativoPage() {
                   {proposta.protocolo}
                 </span>
               </p>
+              {proposta.link_checkout && (
+                <p className="text-sm mt-1">
+                  Link de contratação do cliente:{" "}
+                  <a href={proposta.link_checkout} target="_blank" rel="noopener noreferrer" className="underline break-all">
+                    {proposta.link_checkout}
+                  </a>
+                  <span className="block text-xs text-muted">
+                    Link temporário da seguradora. Envie ao cliente quando quiser — não é comprovante de emissão.
+                  </span>
+                </p>
+              )}
               <p className="text-sm text-success mt-1">
                 {proposta.n_parcelas}× de {formatBRL(proposta.valor_parcela)}{" "}
                 &nbsp;|&nbsp; Comissão: {formatBRL(proposta.comissao_parcela)}/parcela
@@ -318,7 +340,7 @@ export function ComparativoPage() {
 
       {single ? <section className="quote-summary" aria-label="Resumo da cotação">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold capitalize">{single.nome || single.cia}</h2>
+          <h2 className="text-lg font-semibold"><InsurerIdentity cia={single.cia} nome={single.nome} logoUrl={single.logo_url} /></h2>
           <StatusBadge status={single.status} />
         </div>
         <div className="flex flex-wrap gap-6 items-end">
@@ -329,14 +351,14 @@ export function ComparativoPage() {
         {single.restricoes.map((restriction, index) => <p key={index} className="text-sm text-warning">{restriction.mensagem}</p>)}
         {single.necessita_vistoria && <p className="text-sm text-warning">Vistoria prévia obrigatória.</p>}
         <div className="flex flex-wrap gap-3 border-t border-line pt-4">
-          {podeTransmitir && ["sucesso", "restricao"].includes(single.status) && <Button onClick={() => setTransmitirCia(single.cia)}>Revisar proposta</Button>}
+          {podeTransmitir && ["sucesso", "restricao"].includes(single.status) && <Button onClick={() => revisarProposta(single)}>Revisar proposta</Button>}
           <a className="control inline-flex items-center px-3 text-sm text-action" href={api.cotacoes.comparativoPdfUrl(cotacaoId)} target="_blank" rel="noreferrer">Baixar PDF</a>
         </div>
         <p className="text-xs text-muted">Você revisará os dados antes de confirmar a transmissão.</p>
       </section> : <div className="result-grid">
         {itens.map(item => <InsurerResult key={item.cia} result={item} actions={
           podeTransmitir && ["sucesso", "restricao"].includes(item.status)
-              ? <Button onClick={() => setTransmitirCia(item.cia)}>Revisar proposta</Button>
+              ? <Button onClick={() => revisarProposta(item)}>Revisar proposta</Button>
             : undefined
         } />)}
       </div>}
@@ -373,6 +395,7 @@ export function ComparativoPage() {
         <TransmitirModal
           cotacaoId={cotacaoId}
           cia={transmitirCia}
+          revisaoBase={transmitirRevisao}
           ramo={cotacao.ramo}
           onClose={() => setTransmitirCia(null)}
           onSuccess={(p) => {

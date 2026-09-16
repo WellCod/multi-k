@@ -16,6 +16,12 @@ function fmtData(iso: string) {
 }
 
 const TIPO_META: Record<string, { label: string; color: string; icon: string }> = {
+  "cotacao.coberturas_revisadas": { label: "Coberturas revisadas", icon: "✓", color: "bg-canvas text-action" },
+  "transmissao.iniciada": { label: "Envio iniciado", icon: "→", color: "bg-canvas text-muted" },
+  "transmissao.incerta": { label: "Envio a conferir", icon: "!", color: "bg-canvas text-warning" },
+  "transmissao.liberada": { label: "Reenvio liberado", icon: "↺", color: "bg-canvas text-warning" },
+  "transmissao.confirmada": { label: "Aceite conferido", icon: "✓", color: "bg-canvas text-success" },
+  "transmissao.concluida": { label: "Envio concluído", icon: "✓", color: "bg-canvas text-success" },
   login:                    { label: "Login",                  icon: "→", color: "bg-canvas text-success " },
   logout:                   { label: "Logout",                 icon: "←", color: "bg-canvas text-muted " },
   falha_login:              { label: "Falha de login",         icon: "✕", color: "bg-canvas text-danger " },

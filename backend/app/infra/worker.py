@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.adapters.base import RiscoCanonico
 from app.adapters.registry import get_adapter
 from app.infra import events_bus
-from app.infra.models import Cotacao, CotacaoJob
+from app.infra.models import ComissaoConfig, Cotacao, CotacaoJob
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,12 @@ async def processar_job(
         ramo = cotacao.ramo
         dados_risco: dict[str, Any] = dict(cotacao.dados_risco)
         cia = job.cia
+        # A comissão configurada entra no preço da seguradora; sem ela a
+        # transmissão registraria um percentual que nunca foi cotado.
+        if "comissao_pct" not in dados_risco:
+            cfg = await db.get(ComissaoConfig, (cia, ramo))
+            if cfg is not None:
+                dados_risco["comissao_pct"] = str(cfg.pct_padrao)
 
     adapter = get_adapter(cia)
     risco = RiscoCanonico(ramo=ramo, dados=dados_risco)
@@ -83,60 +89,8 @@ async def processar_job(
                 dict(resultado.payload_resposta) if resultado.payload_resposta else None
             )
 
-            # Check if all jobs for this cotacao are complete
-            all_jobs = (
-                (
-                    await db.execute(
-                        select(CotacaoJob).where(CotacaoJob.cotacao_id == cotacao_id)
-                    )
-                )
-                .scalars()
-                .all()
-            )
-
-            pending = [j for j in all_jobs if j.status not in ("concluido", "erro")]
-            if not pending:
-                # All done — compute best cotacao status
-                resultados = [
-                    j.status_resultado for j in all_jobs if j.status == "concluido"
-                ]
-                if "sucesso" in resultados:
-                    cotacao_status = "sucesso"
-                elif "restricao" in resultados:
-                    cotacao_status = "restricao"
-                else:
-                    cotacao_status = "erro"
-
-                cot = (
-                    await db.execute(select(Cotacao).where(Cotacao.id == cotacao_id))
-                ).scalar_one()
-                cot.status = cotacao_status
-                events_bus.publish(
-                    cot.usuario_id,
-                    {
-                        "tipo": "cotacao.pronta",
-                        "cotacao_id": str(cot.id),
-                        "status": cotacao_status,
-                        "premio_total": (
-                            str(cot.premio_total) if cot.premio_total else None
-                        ),
-                    },
-                )
-
-                # For backwards-compat: store the "best" job's result on cotacao
-                best_job = next(
-                    (j for j in all_jobs if j.status_resultado == cotacao_status),
-                    None,
-                )
-                if best_job:
-                    cot.cotacao_id_cia = best_job.cotacao_id_cia
-                    cot.premio_total = best_job.premio_total
-                    cot.restricoes = best_job.restricoes
-                    cot.mensagens = best_job.mensagens
-                    cot.necessita_vistoria = best_job.necessita_vistoria
-
     except Exception:
-        logger.exception("Erro ao processar job %s", job_id)
+        logger.error("worker_job_failed")
         async with factory() as db, db.begin():
             err_jb = (
                 await db.execute(
@@ -149,64 +103,65 @@ async def processar_job(
                 err_jb.status = "erro"
                 err_jb.processado_em = _utcnow()
 
-            # Check if all jobs are done after marking this one as erro
-            all_jobs_err = (
-                (
-                    await db.execute(
-                        select(CotacaoJob).where(CotacaoJob.cotacao_id == cotacao_id)
-                    )
-                )
-                .scalars()
-                .all()
+    await _finalizar_cotacao(cotacao_id, factory)
+
+
+async def _finalizar_cotacao(
+    cotacao_id: uuid.UUID,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Agrega resultados já gravados e notifica somente depois do commit."""
+    async with factory() as db, db.begin():
+        cot = (
+            await db.execute(
+                select(Cotacao).where(Cotacao.id == cotacao_id).with_for_update()
             )
-
-            pending_err = [
-                j for j in all_jobs_err if j.status not in ("concluido", "erro")
-            ]
-            if not pending_err:
-                resultados_err = [
-                    j.status_resultado for j in all_jobs_err if j.status == "concluido"
-                ]
-                if "sucesso" in resultados_err:
-                    cotacao_status_err = "sucesso"
-                elif "restricao" in resultados_err:
-                    cotacao_status_err = "restricao"
-                else:
-                    cotacao_status_err = "erro"
-
-                err_cot = (
-                    await db.execute(select(Cotacao).where(Cotacao.id == cotacao_id))
-                ).scalar_one_or_none()
-                if err_cot is not None:
-                    err_cot.status = cotacao_status_err
-                    events_bus.publish(
-                        err_cot.usuario_id,
-                        {
-                            "tipo": "cotacao.pronta",
-                            "cotacao_id": str(err_cot.id),
-                            "status": cotacao_status_err,
-                            "premio_total": (
-                                str(err_cot.premio_total)
-                                if err_cot.premio_total
-                                else None
-                            ),
-                        },
-                    )
-
-                    best_job_err = next(
-                        (
-                            j
-                            for j in all_jobs_err
-                            if j.status_resultado == cotacao_status_err
-                        ),
-                        None,
-                    )
-                    if best_job_err:
-                        err_cot.cotacao_id_cia = best_job_err.cotacao_id_cia
-                        err_cot.premio_total = best_job_err.premio_total
-                        err_cot.restricoes = best_job_err.restricoes
-                        err_cot.mensagens = best_job_err.mensagens
-                        err_cot.necessita_vistoria = best_job_err.necessita_vistoria
+        ).scalar_one_or_none()
+        if cot is None:
+            return
+        jobs = list(
+            (
+                await db.execute(
+                    select(CotacaoJob)
+                    .where(CotacaoJob.cotacao_id == cotacao_id)
+                    .order_by(CotacaoJob.criado_em, CotacaoJob.id)
+                )
+            ).scalars()
+        )
+        if not jobs or any(j.status not in ("concluido", "erro") for j in jobs):
+            return
+        states = {j.status_resultado for j in jobs if j.status == "concluido"}
+        final_status = (
+            "sucesso"
+            if "sucesso" in states
+            else "restricao"
+            if "restricao" in states
+            else "erro"
+        )
+        previous = (cot.status, cot.premio_total, cot.cotacao_id_cia)
+        cot.status = final_status
+        # Mantém a projeção legada, sem comparar prêmios de periodicidades distintas.
+        representative = next(
+            (j for j in jobs if j.status_resultado == final_status), None
+        )
+        if representative is not None:
+            cot.cotacao_id_cia = representative.cotacao_id_cia
+            cot.premio_total = representative.premio_total
+            cot.restricoes = representative.restricoes
+            cot.mensagens = representative.mensagens
+            cot.necessita_vistoria = representative.necessita_vistoria
+        if previous == (cot.status, cot.premio_total, cot.cotacao_id_cia):
+            return
+        uid = cot.usuario_id
+        notification = {
+            "tipo": "cotacao.pronta",
+            "cotacao_id": str(cot.id),
+            "status": cot.status,
+            "premio_total": str(cot.premio_total)
+            if cot.premio_total is not None
+            else None,
+        }
+    events_bus.publish(uid, notification)
 
 
 async def _safe_processar(
@@ -217,7 +172,7 @@ async def _safe_processar(
     try:
         await processar_job(job_id, cotacao_id, factory)
     except Exception:
-        logger.exception("Exceção não tratada no job %s", job_id)
+        logger.error("worker_job_unhandled_failure")
 
 
 async def _worker_loop(factory: async_sessionmaker[AsyncSession]) -> None:
@@ -253,13 +208,18 @@ async def _worker_loop(factory: async_sessionmaker[AsyncSession]) -> None:
                 await asyncio.sleep(_POLL_INTERVAL)
                 continue
 
-            for job_id, cotacao_id in jobs_batch:
-                asyncio.create_task(_safe_processar(job_id, cotacao_id, factory))
+            # Não reservar outro lote enquanto este ainda consome conexões externas.
+            await asyncio.gather(
+                *(
+                    _safe_processar(job_id, cotacao_id, factory)
+                    for job_id, cotacao_id in jobs_batch
+                )
+            )
 
         except asyncio.CancelledError:
             break
         except Exception:
-            logger.exception("Erro no worker loop")
+            logger.error("worker_loop_failed")
             await asyncio.sleep(_POLL_INTERVAL)
 
 

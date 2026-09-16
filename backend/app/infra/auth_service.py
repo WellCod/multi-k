@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.models import Sessao, TentativaLogin, Usuario
@@ -55,27 +55,19 @@ async def buscar_sessao_valida(
 ) -> Usuario | None:
     agora = datetime.now(UTC)
     res = await db.execute(
-        select(Sessao).where(Sessao.id == sessao_id).where(Sessao.expira_em > agora)
+        select(Sessao)
+        .where(Sessao.id == sessao_id, Sessao.expira_em > agora)
+        .where(Sessao.criada_em > agora - SESSION_DURATION)
     )
     sessao = res.scalar_one_or_none()
     if sessao is None:
         return None
     if current_ip and sessao.ip_origem and sessao.ip_origem != current_ip:
         if _IP_CHECK_MODE == "strict":
-            _log.warning(
-                "session_ip_mismatch_rejected sessao=%s stored=%s current=%s",
-                sessao_id,
-                sessao.ip_origem,
-                current_ip,
-            )
+            _log.warning("session_ip_mismatch_rejected")
             return None
         if _IP_CHECK_MODE != "off":
-            _log.warning(
-                "session_ip_mismatch sessao=%s stored=%s current=%s",
-                sessao_id,
-                sessao.ip_origem,
-                current_ip,
-            )
+            _log.warning("session_ip_mismatch")
     res2 = await db.execute(
         select(Usuario)
         .where(Usuario.id == sessao.usuario_id)
@@ -92,19 +84,33 @@ async def invalidar_sessao(db: AsyncSession, sessao_id: UUID) -> None:
         await db.flush()
 
 
-async def prorrogar_sessao(db: AsyncSession, sessao_id: UUID) -> bool:
-    """Estende a expiração da sessão por SESSION_DURATION a partir de agora.
+async def invalidar_sessoes_usuario(db: AsyncSession, usuario_id: UUID) -> None:
+    """Revoga credenciais existentes na mesma transação da mudança de acesso."""
+    await db.execute(
+        update(Sessao)
+        .where(Sessao.usuario_id == usuario_id)
+        .values(expira_em=datetime.now(UTC))
+    )
 
-    Retorna False se a sessão não existir ou já estiver expirada.
-    """
+
+async def prorrogar_sessao(
+    db: AsyncSession, sessao_id: UUID, current_ip: str | None = None
+) -> bool:
+    """Renova somente sessões válidas, sem ultrapassar oito horas desde o login."""
+    if await buscar_sessao_valida(db, sessao_id, current_ip) is None:
+        return False
     agora = datetime.now(UTC)
     res = await db.execute(
-        select(Sessao).where(Sessao.id == sessao_id).where(Sessao.expira_em > agora)
+        select(Sessao)
+        .where(Sessao.id == sessao_id, Sessao.expira_em > agora)
+        .with_for_update()
     )
     sessao = res.scalar_one_or_none()
     if sessao is None:
         return False
-    sessao.expira_em = agora + SESSION_DURATION
+    sessao.expira_em = min(
+        agora + SESSION_DURATION, sessao.criada_em + SESSION_DURATION
+    )
     await db.flush()
     return True
 

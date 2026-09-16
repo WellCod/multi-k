@@ -34,6 +34,7 @@ export function Step2Auto({
   });
 
   const condutorDiferente = watch("condutor_diferente");
+  const renovacao = watch("tipo_negocio") === "renovacao";
 
   function handleFipe(fipe: FipeResult) {
     setValue("codigo_fipe", fipe.codigo_fipe, { shouldValidate: true });
@@ -94,6 +95,10 @@ export function Step2Auto({
           <input type="checkbox" {...register("ja_segurado")} />
           Já tem seguro
         </label>
+        <label className="flex items-center gap-2 text-sm text-ink ">
+          <input type="checkbox" {...register("leilao")} />
+          Veículo de leilão
+        </label>
       </div>
 
       <Field label="Bônus atual (0–10)" error={undefined}>
@@ -101,6 +106,20 @@ export function Step2Auto({
           <DomainOptions tipo="bonus" />
         </Select>
       </Field>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Tipo de negócio" error={undefined}>
+          <Select {...register("tipo_negocio")}>
+            <option value="novo">Negócio novo</option>
+            <option value="renovacao">Renovação</option>
+          </Select>
+        </Field>
+        {renovacao && (
+          <Field label="Código CI da apólice anterior" error={errors.ci_code?.message}>
+            <Input placeholder="Consta no PDF da apólice" {...register("ci_code")} />
+          </Field>
+        )}
+      </div>
 
       <div className="border border-line rounded p-4 space-y-3">
         <label

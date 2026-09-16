@@ -8,6 +8,7 @@ import { Pagination } from "@/components/Pagination";
 import { Tooltip } from "@/components/Tooltip";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { useInsurers } from "@/hooks/useInsurers";
+import { PendingTransmissions } from "@/components/TransmissionReview";
 
 const PAGE_SIZE = 20;
 
@@ -248,6 +249,7 @@ export function HistoricoPage() {
       </div>
 
       {/* Filtros */}
+      <PendingTransmissions />
       <div className="comparison-panel p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           <Input
