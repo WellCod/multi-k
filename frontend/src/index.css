@@ -20,22 +20,37 @@
     --warning: rgb(146 64 14);
     --danger: rgb(185 28 28);
     --divergence: rgb(157 23 77);
+    /* Borda de controle: >= 3:1 contra a superfície (WCAG 1.4.11). A --line
+       fica para divisores, que não precisam desse contraste. */
+    --line-strong: rgb(122 135 152);
+    --shadow-panel: 0 4px 16px rgb(30 41 59 / 0.12);
     color-scheme: light;
   }
+  /* Rampa neutra de baixa saturação: o tom navy anterior tinha 46–54% de
+     saturação e tingia a tela inteira. Passos de ~5–6 L* separam as camadas. */
   .dark {
-    --surface: rgb(17 29 46);
-    --canvas: rgb(9 17 30);
-    --ink: rgb(235 243 250);
-    --muted: rgb(160 179 199);
-    --line: rgb(46 65 87);
-    --action: rgb(56 189 248);
-    --button-bg: rgb(56 189 248);
-    --button-text: rgb(9 17 30);
-    --selected: rgb(20 48 66);
-    --success: rgb(110 231 183);
-    --warning: rgb(252 211 77);
-    --danger: rgb(253 164 175);
-    --divergence: rgb(216 180 254);
+    --canvas: rgb(15 18 22);
+    --surface: rgb(25 29 36);
+    --selected: rgb(36 42 51);
+    --line: rgb(46 53 64);
+    --line-strong: rgb(98 109 124);
+    /* Texto a 90 L* em vez de 95: contraste alto demais sobre fundo escuro
+       causa halação, o texto "vibra" nas bordas. */
+    --ink: rgb(222 228 234);
+    --muted: rgb(152 162 175);
+    --action: rgb(88 166 255);
+    /* Botão sólido com texto branco, como no tema claro. O ciano com texto
+       escuro invertia a leitura ao trocar de tema. */
+    --button-bg: rgb(31 111 235);
+    --button-text: rgb(255 255 255);
+    /* Semânticas deixam de ser pastéis de mesma claridade: no tema anterior
+       danger era rosa-claro e não lia como erro. */
+    --success: rgb(63 185 80);
+    --warning: rgb(210 153 34);
+    --danger: rgb(248 81 73);
+    --divergence: rgb(188 140 255);
+    /* Sombra azulada a 12% é invisível no escuro. */
+    --shadow-panel: 0 4px 16px rgb(0 0 0 / 0.5);
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
