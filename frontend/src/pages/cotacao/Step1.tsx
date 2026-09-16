@@ -54,13 +54,16 @@ export function Step1({
       if (results.length > 0) {
         const c = results[0];
         setFoundCliente(c);
-        setValue("nome", c.nome);
-        if (c.email) setValue("email", c.email);
-        if (c.telefone) setValue("telefone", c.telefone);
-        if (c.estado_civil) setValue("estado_civil", c.estado_civil);
-        if (c.profissao) setValue("profissao", c.profissao);
-        if (c.data_nascimento) setValue("data_nascimento", c.data_nascimento);
-        if (c.sexo) setValue("sexo", c.sexo);
+        // shouldValidate: preencher sem revalidar deixava na tela o erro
+        // calculado enquanto o campo ainda estava vazio.
+        const preenche = { shouldValidate: true } as const;
+        setValue("nome", c.nome, preenche);
+        if (c.email) setValue("email", c.email, preenche);
+        if (c.telefone) setValue("telefone", c.telefone, preenche);
+        if (c.estado_civil) setValue("estado_civil", c.estado_civil, preenche);
+        if (c.profissao) setValue("profissao", c.profissao, preenche);
+        if (c.data_nascimento) setValue("data_nascimento", c.data_nascimento, preenche);
+        if (c.sexo) setValue("sexo", c.sexo, preenche);
       }
     } catch (e) {
       if (!(e instanceof ApiError) || e.status >= 500) {
