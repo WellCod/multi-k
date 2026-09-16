@@ -348,6 +348,7 @@ export function ComparativoPage() {
           {single.annual_total && <div><p className="text-xs text-muted mb-1">Opção anual</p><p className="text-lg font-medium"><Money value={single.annual_total} /></p></div>}
         </div>
         {single.mensagens.map((message, index) => <p key={index} className="text-sm text-muted">{message}</p>)}
+        {single.info && <p className="text-sm text-muted"><span className="font-medium">Observação da seguradora:</span> {single.info}</p>}
         {single.restricoes.map((restriction, index) => <p key={index} className="text-sm text-warning">{restriction.mensagem}</p>)}
         {single.necessita_vistoria && <p className="text-sm text-warning">Vistoria prévia obrigatória.</p>}
         <div className="flex flex-wrap gap-3 border-t border-line pt-4">

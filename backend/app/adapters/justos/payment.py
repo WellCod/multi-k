@@ -19,16 +19,22 @@ class PaymentOption(BaseModel):
     valor_total: str | None
 
 
-def _money(raw: object) -> str | None:
+def to_decimal(raw: object) -> Decimal | None:
+    """Valor monetário explícito. Ausência, lixo ou negativo não viram zero."""
     if raw is None or isinstance(raw, (bool, dict, list)):
         return None
     try:
         amount = Decimal(str(raw))
-        if amount.is_finite() and amount >= 0:
-            return str(amount.quantize(Decimal("0.01")))
     except InvalidOperation:
-        pass
-    return None
+        return None
+    if not amount.is_finite() or amount < 0:
+        return None
+    return amount.quantize(Decimal("0.01"))
+
+
+def _money(raw: object) -> str | None:
+    amount = to_decimal(raw)
+    return None if amount is None else str(amount)
 
 
 def payment_options(pricing: dict[str, object]) -> list[PaymentOption]:

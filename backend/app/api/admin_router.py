@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.registry import get_adapter
 from app.api.deps import AdminUser, CurrentUser
 from app.infra import audit
 from app.infra.auth_service import hash_senha, invalidar_sessoes_usuario
@@ -259,6 +260,24 @@ async def upsert_comissao(
     db: Db,
     body: ComissaoConfigIn,
 ) -> ComissaoConfigOut:
+    # Comissão fora da faixa da seguradora faria toda cotação dessa CIA
+    # falhar depois; recusar aqui mostra o limite a quem configura.
+    try:
+        caps = get_adapter(cia).capacidades()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Seguradora desconhecida.",
+        ) from exc
+    pct = body.pct_padrao * 100
+    if not caps.comissao_min <= pct <= caps.comissao_max:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"{cia} aceita comissão entre {caps.comissao_min}% "
+                f"e {caps.comissao_max}%."
+            ),
+        )
     existing = await db.get(ComissaoConfig, (cia, ramo))
     if existing is not None:
         existing.pct_padrao = body.pct_padrao

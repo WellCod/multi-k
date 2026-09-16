@@ -85,16 +85,43 @@ def test_finalidade_desconhecida_nao_vira_particular() -> None:
         _payload(finalidade="frota")
 
 
+_CONDUTOR: dict[str, Any] = {
+    "condutor_cpf": "98765432100",
+    "condutor_nome": "João Souza",
+    "condutor_sexo": "M",
+    "condutor_nascimento": "1990-03-12",
+}
+
+
+def test_segurado_condutor_omite_o_bloco_main_driver() -> None:
+    assert "main_driver" not in _payload()
+
+
 def test_parentesco_traduz_para_o_enum() -> None:
-    payload = _payload(condutor_cpf="98765432100", condutor_parentesco="conjuge")
+    payload = _payload(**_CONDUTOR, condutor_parentesco="conjuge")
     assert payload["main_driver"]["relationship"] == "spouse"
 
 
 def test_parentesco_desconhecido_nao_passa_cru() -> None:
     with pytest.raises(ValueError, match="condutor_parentesco fora do enum"):
-        _payload(condutor_cpf="98765432100", condutor_parentesco="primo")
+        _payload(**_CONDUTOR, condutor_parentesco="primo")
 
 
 def test_nome_social_do_condutor_tambem_e_declarado() -> None:
-    payload = _payload(condutor_cpf="98765432100", condutor_nome="João Souza")
-    assert "social_name" not in payload["main_driver"]
+    assert "social_name" not in _payload(**_CONDUTOR)["main_driver"]
+    payload = _payload(**_CONDUTOR, condutor_nome_social="Jo")
+    assert payload["main_driver"]["social_name"] == "Jo"
+
+
+@pytest.mark.parametrize(
+    "ausente", ["condutor_nome", "condutor_sexo", "condutor_nascimento"]
+)
+def test_condutor_informado_nao_aceita_campo_vazio(ausente: str) -> None:
+    """J2 §4: opcionais só enquanto o bloco não existe."""
+    with pytest.raises(ValueError, match=ausente):
+        _payload(**{**_CONDUTOR, ausente: ""})
+
+
+def test_cpf_do_condutor_fora_do_formato_e_recusado() -> None:
+    with pytest.raises(ValueError, match="condutor_cpf"):
+        _payload(**{**_CONDUTOR, "condutor_cpf": "9876543210"})

@@ -12,6 +12,8 @@ Fluxos cobertos:
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 import respx
 from httpx import Response
@@ -87,6 +89,7 @@ _RISCO_AUTO_ANINHADO: dict[str, object] = {
         "sexo": "M",
         "data_nascimento": "1990-05-10",
         "telefone": "11999990000",
+        "email": "joao@test.com",
     },
     "cep_pernoite": "01310100",
     "codigo_fipe": "023108-8",
@@ -152,7 +155,11 @@ async def test_transmission_error_does_not_expose_provider_body() -> None:
             PropostaCanonica(
                 cotacao_id="Q-001",
                 risco=RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO),
-                dados_negocio={"coverages_selected": {"collision": "full"}},
+                dados_negocio={
+                    "email": "joao@test.com",
+                    "telefone": "11999990000",
+                    "coverages_selected": {"collision": "full"},
+                },
             )
         )
     assert not result.sucesso
@@ -174,7 +181,9 @@ async def test_cotar_sucesso() -> None:
     assert resultado.sucesso is True
     assert resultado.cotacao_id == "Q-001"
     assert resultado.premio_total is not None
-    assert resultado.mensagens == ["Desconto de 5% para pagamento anual."]
+    # J4: a observação da seguradora não vira mensagem do sistema.
+    assert resultado.mensagens == []
+    assert resultado.payload_resposta["info"] == "Desconto de 5% para pagamento anual."
     assert resultado.payload_resposta is not None
     assert resultado.payload_resposta["fipe_price_percentage_covered"] == 100
     assert resultado.payload_resposta["commission"] == 15
@@ -269,7 +278,7 @@ async def test_transmitir_email_de_risco_dados() -> None:
         )
 
     assert len(captured) == 1
-    assert captured[0]["email"] == ""
+    assert captured[0]["email"] == "joao@test.com"
     assert captured[0]["given_phone_number"] == "11999990000"
 
 
@@ -376,6 +385,71 @@ async def test_protocolo_e_identificador_estavel_nao_o_link() -> None:
     assert resultado.protocolo == "Q-001"
     assert len(resultado.protocolo) <= 100
     assert resultado.dados["checkout_url"] == _RESP_CHECKOUT["checkout_url"]
+
+
+async def test_cotar_sem_premio_mensal_nao_inventa_zero() -> None:
+    """Resposta sem total mensal recusa a cotação em vez de exibir R$ 0,00."""
+    with respx.mock as r:
+        _mock_auth(r)
+        r.post(_QUOTE_URL).mock(return_value=Response(200, json=_RESP_COTACAO))
+        r.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
+        r.post(_PRICING_URL).mock(
+            return_value=Response(200, json={"annual": {"total": 2800.0}})
+        )
+        resultado = await JustosSeguradora().cotar(
+            RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO)
+        )
+
+    assert resultado.sucesso is False
+    assert resultado.premio_total is None
+    assert "não informou o prêmio mensal" in resultado.mensagens[0]
+
+
+async def test_cotar_devolve_premio_em_decimal() -> None:
+    with respx.mock as r:
+        _mock_auth(r)
+        _mock_cotar(r)
+        resultado = await JustosSeguradora().cotar(
+            RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO)
+        )
+
+    assert resultado.premio_total == Decimal("250.00")
+    assert resultado.payload_resposta["monthly_total"] == "250.00"
+    assert resultado.payload_resposta["annual_total"] == "2800.00"
+
+
+@pytest.mark.parametrize(
+    ("negocio", "esperado"),
+    [
+        ({"telefone": "11999990000"}, "E-mail do segurado"),
+        ({"email": "joao@test.com"}, "Telefone do segurado"),
+        ({"email": "joao@test.com", "telefone": "999"}, "Telefone do segurado"),
+    ],
+)
+async def test_contato_incompleto_bloqueia_antes_da_chamada_externa(
+    negocio: dict[str, object], esperado: str
+) -> None:
+    """J2 §7: sem contato a formalização nem chega a consumir a tentativa."""
+    with respx.mock as r:
+        _mock_auth(r)
+        coberturas = r.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
+        convert = r.post(_CONVERT_URL).mock(return_value=Response(200, json={}))
+
+        resultado = await JustosSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="Q-001",
+                risco=RiscoCanonico(ramo="auto", dados={"cpf": "12345678901"}),
+                dados_negocio={
+                    **negocio,
+                    "coverages_selected": {"colisao": "opcao"},
+                },
+            )
+        )
+
+    assert resultado.sucesso is False
+    assert esperado in resultado.mensagens[0]
+    assert coberturas.call_count == 0
+    assert convert.call_count == 0
 
 
 # ---------------------------------------------------------------------------
