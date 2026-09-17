@@ -28,6 +28,7 @@ from app.api.rascunho_router import router as rascunho_router
 from app.api.relatorio_router import router as relatorio_router
 from app.api.renovacao_router import router as renovacao_router
 from app.api.transmissao_router import router as transmissao_router
+from app.infra import events_bus
 from app.infra.db import AsyncSessionLocal
 from app.infra.logging_config import configure_logging
 from app.infra.secrets import get_optional_secret
@@ -49,6 +50,10 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
         worker_task = start_worker(AsyncSessionLocal)
 
     yield
+
+    # Antes de encerrar o worker: stream SSE não fecha sozinho e seguraria o
+    # desligamento gracioso, que espera as respostas em curso terminarem.
+    events_bus.sinalizar_parada()
 
     if worker_task is not None:
         worker_task.cancel()
