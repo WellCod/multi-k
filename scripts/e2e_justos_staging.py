@@ -40,7 +40,7 @@ TEST_PLACA = "DVK0101"
 TEST_FIPE = "024201-2"           # Peugeot 308 CC Roland Garros 1.6 Turbo 2014
 TEST_ANO_MODELO = "2014"
 TEST_CEP = "01310100"
-TEST_EMAIL = "teste@klubi.com.br"
+TEST_EMAIL = os.getenv("E2E_TEST_EMAIL", "teste@exemplo.com.br")
 TEST_TELEFONE = "11999990000"
 
 # ---------------------------------------------------------------------------

@@ -73,5 +73,5 @@ subir pra valer.
 
 Abraço,
 **Weslley Gonçalves**
-Klubi Corretora de Seguros
-weslley.goncalves@klubi.com.br
+[corretora]
+[e-mail do remetente]

@@ -150,7 +150,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 w-full"><Page>{children}</Page></main>
-      <footer className="mt-auto border-t border-line px-4 py-3 text-xs text-muted flex flex-wrap justify-between gap-2"><span>multi-K — Klubi Corretora de Seguros</span><span>v{import.meta.env.VITE_APP_VERSION ?? "0.1.0"}</span></footer>
+      <footer className="mt-auto border-t border-line px-4 py-3 text-xs text-muted flex flex-wrap justify-between gap-2"><span>multi-K{import.meta.env.VITE_APP_ORG ? ` — ${import.meta.env.VITE_APP_ORG}` : ""}</span><span>v{import.meta.env.VITE_APP_VERSION ?? "0.1.0"}</span></footer>
     </div>
     {menuOpen && <dialog ref={drawer} id="mobile-navigation" aria-label="Menu de navegação" onCancel={() => setMenuOpen(false)} onClick={event => { if (event.target === event.currentTarget) setMenuOpen(false); }}
       className="fixed inset-y-0 left-0 right-auto m-0 h-[100dvh] max-h-none w-72 max-w-[85vw] border-0 bg-surface text-ink p-0 backdrop:bg-black/40">

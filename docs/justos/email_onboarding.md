@@ -6,13 +6,13 @@
 ---
 
 **Para:** [ponto focal Justos]
-**Assunto:** Integração Klubi × Justos — chave pública EC + perguntas de staging
+**Assunto:** Integração [corretora] × Justos — chave pública EC + perguntas de staging
 
 ---
 
 Olá, [nome],
 
-Somos a **Klubi Corretora de Seguros**. Desenvolvemos uma plataforma própria de multicálculo e estamos prontos para a integração com a API da Justos (ramo Auto).
+Somos a **[corretora]**. Desenvolvemos uma plataforma própria de multicálculo e estamos prontos para a integração com a API da Justos (ramo Auto).
 
 Nossa implementação já cobre o fluxo completo descrito na documentação v2:
 autenticação ES256 → cotação → pricing → seleção de coberturas → proposta → checkout link.
@@ -31,7 +31,7 @@ Com ela, pedimos que nos forneçam:
 | `partner_name` | campo `iss` do JWT de autenticação |
 | `brokerId` | campo `brokerId` no POST `/brokers/auth/api-token` |
 
-O CNPJ da corretora que usaremos no campo `cpf_cnpj` é: **33.911.704/0001-75** (Klubi Corretora de Seguros Ltda.).
+O CNPJ da corretora que usaremos no campo `cpf_cnpj` é: **[CNPJ da corretora]**.
 
 ---
 
@@ -71,5 +71,5 @@ e iniciamos os testes de paridade.
 
 Atenciosamente,
 **Weslley Gonçalves**
-Klubi Corretora de Seguros
-weslley.goncalves@klubi.com.br
+[corretora]
+[e-mail do remetente]

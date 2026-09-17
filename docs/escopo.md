@@ -1,6 +1,6 @@
 # multi-K — Escopo
 
-Multicálculo e gestão da Klubi. Substitui o documento anterior baseado em Porto Auto.
+Multicálculo e gestão de seguros. Substitui o documento anterior baseado em Porto Auto.
 
 **Decisões fechadas:** Yelum primeiro (Porto na fase 2 de acoplamento) · Auto como produto, Residência como banco de provas · Python/FastAPI + React/Vite + Postgres · auth própria · local no MVP, GCP depois · Marketplace + E-Retorno no escopo · 2–5 corretores · carteira 70%+ auto.
 
@@ -143,7 +143,7 @@ Prioridade estrutural: **o Security Assessment assinado é pré-requisito para l
 
 ### Ativo crítico: credenciais Yelum
 
-Quatro segredos, e dois deles são o login humano do portal. Vazou = terceiro operando como a Klubi.
+Quatro segredos, e dois deles são o login humano do portal. Vazou = terceiro operando como a corretora.
 
 - **Pede um usuário de portal dedicado à integração**, separado do login pessoal de qualquer corretor
 - Local (mock): `.env` no `.gitignore` é aceitável **enquanto não houver credencial real**
@@ -190,6 +190,12 @@ Os PDFs da Yelum têm cláusula explícita de não-reprodução. Não vão para 
 
 Ferramenta de trabalho para 2–5 corretores que a usam 30×/dia. **Densidade e velocidade, não impressão.** Otimiza para repetição: tab order correto, Enter avança, autosave por passo, recotar a partir de cotação anterior.
 
+Deliberadamente **não** é: cream + serif + terracota, nem dark + acid green, nem broadsheet com hairlines. Esses são defaults de IA e leem como template. A direção aqui é **ferramenta densa e neutra** — tipografia utilitária, hierarquia por peso e espaço, cor só onde carrega informação (status, alerta, divergência). Uma decisão de cor com significado vale mais que uma paleta bonita.
+
+### Copy
+
+Nomeia pelo que a pessoa controla, não pelo sistema. Voz ativa, sentence case. Botão que diz "Transmitir" gera toast "Transmitida". Erro diz o que aconteceu e o que fazer: "Veículo com restrição de aceitação para o perfil informado" — nunca `HTTP 422`. Tela vazia é convite para agir.
+
 ### Funil de cotação
 
 ```
@@ -201,6 +207,16 @@ Ferramenta de trabalho para 2–5 corretores que a usam 30×/dia. **Densidade e 
                     → PDF · WhatsApp · Salvar · (Transmitir = humano)
 ```
 
+**Carregamento honesto:** "Consultando Yelum… 12s" com cancelar. Spinner mudo destrói confiança.
+
+### Home por papel
+
+Gestor vê KPIs. Corretor vê fila de trabalho: renovações na janela atribuídas a mim, propostas paradas, parcelas vencendo, cotações abandonadas há 2+ dias. KPI é consequência, tarefa é o que abre o dia.
+
+### Dashboard
+
+KPIs: segurados vigentes, apólices vigentes, cotações em andamento, renovações efetivadas, prêmio líquido, **comissão produzida × recebida** (a lacuna entre os dois é a conciliação, e deixá-la visível é o que faz alguém agir). Período 15/30/90/custom. Corte por ramo e por seguradora. Barra horizontal ordenada em vez de donut.
+
 ---
 
 ## 7. MVP
@@ -209,9 +225,11 @@ Ferramenta de trabalho para 2–5 corretores que a usam 30×/dia. **Densidade e 
 
 **Fora:** multi-tenant (só a coluna `tenant_id`), transmissão automática, MCP/bot, outras cias, gestão de sinistro, app nativo.
 
+**Transmissão de proposta:** implementada, disparada por humano. Automatizar só depois do gate de paridade.
+
 ### Critério de sucesso
 
-**≥99% de paridade exata em 200 cotações, sustentado por 30 dias sem intervenção.**
+**≥99% de paridade exata em 200 cotações, sustentado por 30 dias sem intervenção.** Nada mais. 95% parece bom e destrói a confiança do corretor em duas semanas.
 
 ---
 
@@ -230,6 +248,8 @@ Ferramenta de trabalho para 2–5 corretores que a usam 30×/dia. **Densidade e 
 | 8 | Deploy GCP + endurecimento | 3–4 sem | precede chave produção |
 | 9 | MCP para o bot | 2–3 sem | após paridade |
 
+**Demo em 4 semanas. Produção com corretor usando: 6–9 meses**, dominado por NDA, validação EH e Security Assessment — nenhum deles acelera com dev.
+
 ---
 
 ## 9. Riscos
@@ -242,7 +262,7 @@ Ferramenta de trabalho para 2–5 corretores que a usam 30×/dia. **Densidade e 
 | Paridade < 99% | Gate da Fase 6. Kill criterion |
 | Canônico em formato Yelum | Dois ramos desde o início |
 | Vazamento de credencial | §5. Usuário dedicado, Secret Manager na homologação |
-| Rate limit / allowlist por IP | Rodando local, o IP é o do escritório |
+| Rate limit / allowlist por IP | Rodando local, o IP é o do escritório. Perguntar se produção exige allowlist |
 
 ### Kill criteria
 
@@ -254,7 +274,7 @@ Ferramenta de trabalho para 2–5 corretores que a usam 30×/dia. **Densidade e 
 
 ## 10. Pedido consolidado ao ponto focal Yelum
 
-1. Descrição da companhia, objetivo e modelo de negócio
+1. Descrição da companhia, objetivo e modelo de negócio (o que o PDF pede)
 2. **Credencial de mock sai antes do NDA?**
 3. Documentação de **Auto** (Quote e Proposal) — prioridade máxima
 4. Documentação de **Domínios**, **E-Retorno**, **Impressão**
