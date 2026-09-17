@@ -44,23 +44,45 @@ produção **tem de ser diferente** da de staging.
 
 ## 3. Fluxo exercitado contra a seguradora
 
-O que já rodou em staging contra a API real, e o que não:
+E2E executado em 17/09/2026 contra `api.staging.justos.com.br`.
 
 | Etapa | Estado |
 |---|---|
 | Autenticação (JWT ES256) | ✅ |
-| Criação de cotação | ✅ |
-| Pricing | ✅ |
-| Seleção de coberturas (`PUT /coverages`) | ⏳ não confirmado nos logs da seguradora |
-| Proposta formal (`convert-formal-quote`) | ⏳ não fechou |
-| Link de contratação (`checkout-link`) | ⏳ não confirmado |
+| `POST /brokers/quote` | ✅ |
+| `POST /pricing` | ✅ mensal R$ 921,36 · anual R$ 10.516,92 |
+| `PUT /coverages` | ✅ HTTP 200 |
+| `convert-formal-quote` | ❌ HTTP 400 `failure_on_creating_user` |
+| `checkout-link` | ⏸️ não alcançado |
 
-Em 09/09/2026 o ponto focal informou que não encontrou chamadas de `/coverages`,
-`convert-formal-quote` nem `checkout-link` nos logs de staging. **O ciclo
-completo ainda não foi exercitado ponta a ponta contra a API deles** — o que
-existe é cobertura por resposta sintética.
+Dois pontos fecharam nesta execução: o **veículo do script é válido na base
+real** (placa e código FIPE aceitos) e o **`PUT /coverages` funcionou**, uma das
+chamadas que a seguradora não encontrava nos logs em 09/09.
 
-Essa é a maior lacuna para produção, e é anterior a qualquer configuração.
+### O bloqueio, com evidência
+
+```
+400 {"error":"failure_on_creating_user",
+     "context":{"title":"Erro ao validar o CPF",
+     "description":"Tivemos uma instabilidade temporária ao validar o CPF.
+                    Tente novamente em instantes."}}
+```
+
+A mensagem diz "temporária". As tentativas dizem outra coisa:
+
+| Variação | Resultado |
+|---|---|
+| CPF sintético, cotação `90f10912-cd87-4cd2-924b-9a8cabc823e7` | 400 |
+| CPF válido de pessoa real, cotação `214996d3-584b-473e-b8dd-bae4e078a944` | 400 |
+| Mesma cotação, duas tentativas espaçadas em 30 s | 400 nas duas |
+| Mesmo erro registrado em 09/09/2026 | persiste há mais de uma semana |
+
+**Não é o tipo de CPF, não é transitório e não é o nosso payload** — as etapas
+anteriores passam com os mesmos dados. O ponto de falha é a criação de usuário
+no ambiente de staging da seguradora.
+
+Isso precisa de ação do lado deles. O ponto focal ofereceu diagnosticar a partir
+do `quote_uuid`, e há dois para consultar.
 
 ## 4. Aderência ao contrato
 
