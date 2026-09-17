@@ -37,7 +37,8 @@ export function ComparativoInline({ cotacao, cotacaoId, itens, proposta, onEmiti
   return <Stack>
     <Row className="justify-between flex-wrap">
       <h2 className="text-lg font-semibold">Resultado da cotação</h2>
-      <p className="text-xs text-muted tabular-nums" role="status">{effective.length - pending.length} de {effective.length} consultas concluídas</p>
+      {/* Contador serve enquanto há consulta em curso; depois é só ruído. */}
+      {!!pending.length && <p className="text-xs text-muted tabular-nums" role="status">{effective.length - pending.length} de {effective.length} consultas concluídas</p>}
     </Row>
     {!pending.length && !successes.length && (effective.length > 0 || cotacao.status === "erro") &&
       <div className="border border-line rounded p-3" role="status"><h3 className="font-semibold">Nenhuma proposta disponível</h3><p>Confira o retorno de cada seguradora abaixo e tente recotar.</p></div>}
