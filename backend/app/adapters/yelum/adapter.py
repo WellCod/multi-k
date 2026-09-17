@@ -213,12 +213,14 @@ class YelumSeguradora:
         try:
             resp = await client.cotar(payload)
         except httpx.HTTPStatusError as exc:
-            trecho = exc.response.text[:300]
             return ResultadoCotacao(
                 sucesso=False,
                 cotacao_id=None,
                 premio_total=None,
-                mensagens=[f"API Yelum {exc.response.status_code}: {trecho}"],
+                mensagens=[
+                    f"Yelum não concluiu a cotação (HTTP {exc.response.status_code}). "
+                    "Revise os dados ou tente novamente mais tarde."
+                ],
             )
 
         if not _sucesso_yelum(resp):
@@ -285,12 +287,14 @@ class YelumSeguradora:
         try:
             resp = await client.recotar(id, payload)
         except httpx.HTTPStatusError as exc:
-            trecho = exc.response.text[:300]
             return ResultadoCotacao(
                 sucesso=False,
                 cotacao_id=None,
                 premio_total=None,
-                mensagens=[f"API Yelum {exc.response.status_code}: {trecho}"],
+                mensagens=[
+                    f"Yelum não concluiu a cotação (HTTP {exc.response.status_code}). "
+                    "Revise os dados ou tente novamente mais tarde."
+                ],
             )
 
         if not _sucesso_yelum(resp):
@@ -329,11 +333,14 @@ class YelumSeguradora:
         try:
             resp = await client.propor(payload)
         except httpx.HTTPStatusError as exc:
-            trecho = exc.response.text[:300]
             return ResultadoTransmissao(
                 sucesso=False,
                 protocolo=None,
-                mensagens=[f"API Yelum {exc.response.status_code}: {trecho}"],
+                mensagens=[
+                    "Yelum não confirmou a transmissão "
+                    f"(HTTP {exc.response.status_code}). "
+                    "Verifique a situação na seguradora antes de repetir o envio."
+                ],
             )
 
         if not _sucesso_yelum(resp):
