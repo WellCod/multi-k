@@ -12,6 +12,28 @@ from typing import Any
 
 _subscribers: dict[uuid.UUID, set[asyncio.Queue[dict[str, Any]]]] = defaultdict(set)
 
+# O desligamento gracioso espera as respostas terminarem, e um stream SSE não
+# termina sozinho. Este sinal avisa os streams abertos para encerrarem.
+_parada = asyncio.Event()
+
+
+def sinalizar_parada() -> None:
+    """Pede que os streams abertos se encerrem — chamado no shutdown."""
+    _parada.set()
+
+
+def limpar_parada() -> None:
+    """Reabre para novos streams (uso em teste e em reinício no mesmo processo)."""
+    _parada.clear()
+
+
+def parando() -> bool:
+    return _parada.is_set()
+
+
+async def aguardar_parada() -> None:
+    await _parada.wait()
+
 
 def subscribe(usuario_id: uuid.UUID) -> asyncio.Queue[dict[str, Any]]:
     q: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=50)
