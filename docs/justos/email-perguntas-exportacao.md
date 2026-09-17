@@ -62,8 +62,8 @@ pagamento, e precisaremos de outra fonte para conciliar comissão recebida.
 **3. Janela e volume da carga inicial**
 
 A seção 4.2 orienta usar "uma data bem antiga" na primeira carga. Há limite para
-essa janela? E qual a ordem de grandeza de registros esperada para o brokerId
-[brokerId da corretora] em produção?
+essa janela? E qual a ordem de grandeza de registros esperada para o brokerId da
+nossa corretora em produção?
 
 Já entendemos que staging tem banco separado e não traz as apólices que temos com
 vocês, então a carga inicial de verdade só acontece em produção — por isso

@@ -31,7 +31,7 @@ Com ela, pedimos que nos forneçam:
 | `partner_name` | campo `iss` do JWT de autenticação |
 | `brokerId` | campo `brokerId` no POST `/brokers/auth/api-token` |
 
-O CNPJ da corretora que usaremos no campo `cpf_cnpj` é: **[CNPJ da corretora]** ([razão social da corretora]).
+O CNPJ da corretora que usaremos no campo `cpf_cnpj` é: **[CNPJ da corretora]**.
 
 ---
 
