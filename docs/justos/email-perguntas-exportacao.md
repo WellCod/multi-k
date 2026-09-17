@@ -5,7 +5,7 @@
 > delas corrigiram código: o gatilho do `ci_code` e a origem da comissão
 > gravada. Mantido como registro do que foi perguntado.
 >
-> **Rascunho original.** Destinatário: o ponto focal (`[e-mail do ponto focal]`),
+> **Rascunho original.** Destinatário: o ponto focal da Justos,
 > que respondeu as trocas anteriores. As perguntas da parte A vêm de
 > [`plano-exportacao-incremental.md`](plano-exportacao-incremental.md) §11 e
 > bloqueiam o desenho da importação automática; as da parte B saem de
@@ -16,7 +16,7 @@
 
 ---
 
-**Para:** o ponto focal — Justos
+**Para:** [ponto focal Justos]
 **Assunto:** Integração Klubi × Justos — exportação de apólices e regras de renovação
 
 ---
