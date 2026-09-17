@@ -111,31 +111,12 @@ export const step2MotoSchema = z.object({
   garagem: z.boolean().optional(),
 });
 
-const moneyInput = z.string().trim()
-  .transform(value => value.includes(",") ? value.replace(/\./g, "").replace(",", ".") : value)
-  .refine(value => /^\d+(?:\.\d{1,2})?$/.test(value), "Informe um valor com até duas casas decimais");
-
-export const step2ImovelSchema = z.object({
-  cep: z
-    .string()
-    .transform((v) => v.replace(/\D/g, ""))
-    .pipe(z.string().length(8, "CEP deve ter 8 dígitos")),
-  tipo_imovel: z.string().min(1, "Obrigatório"),
-  tipo_construcao: z.string().min(1, "Obrigatório"),
-  valor_imovel: moneyInput.refine(value => /[1-9]/.test(value), "Valor do imóvel deve ser maior que zero"),
-  valor_conteudo: z.string().optional().transform(value => value || "0").pipe(moneyInput),
-  alarme: z.boolean().optional().default(false),
-  cerca_eletrica: z.boolean().optional().default(false),
-  grades: z.boolean().optional().default(false),
-});
-
 export const step3Schema = z.object({
   coberturas: z.array(z.string()).min(1, "Selecione ao menos uma cobertura"),
 });
 
 const autoObjectFields = { cep_pernoite: true, codigo_fipe: true, placa: true, marca: true, modelo: true, ano_modelo: true, combustivel: true, valor_fipe: true } as const;
 const motoObjectFields = { ...autoObjectFields, cilindrada: true, categoria: true } as const;
-const imovelObjectFields = { cep: true, tipo_imovel: true, tipo_construcao: true, valor_imovel: true, valor_conteudo: true } as const;
 
 // O CI da apólice anterior é exigido pela renovação, não pelo bônus.
 const autoProfileSchema = step2AutoSchema.omit(autoObjectFields).superRefine((data, ctx) => {
@@ -147,7 +128,6 @@ const autoProfileSchema = step2AutoSchema.omit(autoObjectFields).superRefine((da
 export const riskStepSchemas = {
   auto: { object: step2AutoSchema.pick(autoObjectFields), profile: autoProfileSchema },
   moto: { object: step2MotoSchema.pick(motoObjectFields), profile: step2MotoSchema.omit(motoObjectFields) },
-  imovel: { object: step2ImovelSchema.pick(imovelObjectFields), profile: step2ImovelSchema.omit(imovelObjectFields) },
 };
 
 const calendarDate = z.string().refine(value => {
