@@ -38,15 +38,38 @@ def _invalida_cache() -> None:
     _cache.expira_em = 0.0
 
 
+_AMBIENTES = ("staging", "production")
+
+
+def ambiente() -> str:
+    """Ambiente configurado, validado.
+
+    Valor desconhecido antes caía em staging sem avisar: a aplicação seguia
+    cotando em teste enquanto a interface deixava de marcar STAGING.
+    """
+    env = (get_optional_secret("JUSTOS_ENV", "staging") or "staging").strip()
+    if env not in _AMBIENTES:
+        raise RuntimeError(
+            f"JUSTOS_ENV inválido: {env!r}. Use 'staging' ou 'production'."
+        )
+    return env
+
+
 def _base_url() -> str:
-    env = get_optional_secret("JUSTOS_ENV", "staging")
-    return _BASE_PROD if env == "production" else _BASE_STAGING
+    return _BASE_PROD if ambiente() == "production" else _BASE_STAGING
 
 
 def _gerar_jwt() -> str:
     # JUSTOS_PRIVATE_KEY_PATH: caminho do arquivo (dev local, fora do projeto)
     # JUSTOS_PRIVATE_KEY: conteúdo PEM inline (produção via GCP Secret Manager)
     key_path = get_optional_secret("JUSTOS_PRIVATE_KEY_PATH")
+    if key_path and ambiente() == "production":
+        # O par de produção é distinto do de staging: um caminho herdado do
+        # ambiente de desenvolvimento assinaria com a chave errada.
+        raise RuntimeError(
+            "JUSTOS_PRIVATE_KEY_PATH não vale em produção. "
+            "Configure a chave de produção em JUSTOS_PRIVATE_KEY."
+        )
     if key_path:
         import pathlib
 
@@ -242,9 +265,8 @@ async def gerar_pdf_cotacao(quote_id: str) -> bytes:
     Ref: https://justos.notion.site/Gerador-de-PDF-a655524fb78a4ade834cc5947a944e41
     """
     token = await _obter_token()
-    env = get_optional_secret("JUSTOS_ENV", "staging")
     params = {"id": quote_id}
-    if env != "production":
+    if ambiente() != "production":
         params["staging"] = "true"
     async with httpx.AsyncClient() as c:
         resp = await c.get(
@@ -260,9 +282,8 @@ async def gerar_pdf_cotacao(quote_id: str) -> bytes:
 async def gerar_pdf_proposta(quote_id: str) -> bytes:
     """GCF corretor-pdfProposta — retorna PDF da proposta formalizada em bytes."""
     token = await _obter_token()
-    env = get_optional_secret("JUSTOS_ENV", "staging")
     params = {"id": quote_id}
-    if env != "production":
+    if ambiente() != "production":
         params["staging"] = "true"
     async with httpx.AsyncClient() as c:
         resp = await c.get(
