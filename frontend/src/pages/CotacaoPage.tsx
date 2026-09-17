@@ -14,7 +14,6 @@ import { Dialog } from "@/components/Dialog";
 import { Step1 } from "./cotacao/Step1";
 import { Step2Auto } from "./cotacao/Step2Auto";
 import { Step2Moto } from "./cotacao/Step2Moto";
-import { Step2Imovel } from "./cotacao/Step2Imovel";
 import { Step4 } from "./cotacao/Step4";
 import { TransmitirModal } from "./cotacao/TransmitirModal";
 import { ComparativoInline } from "./cotacao/ComparativoInline";
@@ -461,7 +460,7 @@ export function CotacaoPage() {
 
       {step === 1 && (
         <div className="mb-6 flex gap-3">
-          {(["auto", "moto", "imovel"] as const).map((r) => (
+          {(["auto", "moto"] as const).map((r) => (
             <button
               key={r}
               type="button"
@@ -472,7 +471,7 @@ export function CotacaoPage() {
                   : "bg-surface text-ink border-line hover:border-line"
               }`}
             >
-              {r === "auto" ? "Auto" : r === "moto" ? "Moto" : "Imóvel"}
+              {r === "auto" ? "Auto" : "Moto"}
             </button>
           ))}
         </div>
@@ -527,20 +526,8 @@ export function CotacaoPage() {
           />
         )}
 
-        {(step === 2 || step === 3) && ramo === "imovel" && (
-          <Step2Imovel
-            key={step}
-            stage={step === 2 ? "object" : "profile"}
-            dominios={dominios}
-            defaultValues={step2Data}
-            onBack={() => setStep(step - 1)}
-            onNext={step === 2 ? handleStep2 : handleStep3}
-          />
-        )}
-
         {step === 4 && (
           <Step4
-            ramo={ramo}
             coberturasIniciais={step3Data?.coberturas}
             seguradoras={insurers.filter(item => item.ramos.includes(ramo))}
             selecionadas={selectedInsurers}

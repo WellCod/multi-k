@@ -5,20 +5,17 @@ import { Button } from "@/components/ui/button";
 import { step3Schema, type Step3Data } from "./types";
 
 export function Step3({
-  ramo,
   dominios,
   defaultValues,
   onBack,
   onNext,
 }: {
-  ramo: string;
   dominios: Dominio[];
   defaultValues?: Step3Data;
   onBack: () => void;
   onNext: (data: Step3Data) => void;
 }) {
-  const tipo = ramo === "auto" || ramo === "moto" ? "cobertura_auto" : "cobertura_imovel";
-  const coberturas = dominios.filter((d) => d.tipo === tipo);
+  const coberturas = dominios.filter((d) => d.tipo === "cobertura_auto");
 
   const {
     register,
