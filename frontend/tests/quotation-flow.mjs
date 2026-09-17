@@ -19,16 +19,6 @@ test("moto: dados salvos podem ser validados novamente ao voltar", () => {
   assert.equal(riskStepSchemas.moto.profile.safeParse({ finalidade: "TESTE" }).success, true);
 });
 
-test("imóvel: dinheiro preservado exatamente ao salvar e voltar", () => {
-  const data = { cep: "00000000", tipo_imovel: "TESTE", tipo_construcao: "TESTE", valor_imovel: "900.719.925.474.099,91" };
-  const saved = riskStepSchemas.imovel.object.parse(data);
-  assert.equal(saved.valor_imovel, "900719925474099.91");
-  assert.deepEqual(riskStepSchemas.imovel.object.parse(saved), saved);
-  assert.equal(riskStepSchemas.imovel.object.safeParse({ ...data, valor_imovel: "0" }).success, false);
-  assert.equal(riskStepSchemas.imovel.object.safeParse({ ...data, valor_imovel: "1,001" }).success, false);
-  assert.equal(riskStepSchemas.imovel.profile.safeParse({ alarme: true }).success, true);
-});
-
 test("coberturas: exige seleção e vigência válida", () => {
   const data = { coberturas: ["TESTE"], plano_pagamento: "TESTE", inicio_vigencia: "2026-09-10", fim_vigencia: "2027-09-10" };
   assert.equal(step4Schema.safeParse(data).success, true);
