@@ -9,7 +9,6 @@ import { step4Schema, type Step4Data } from "./types";
 import { Field } from "./shared";
 
 export function Step4({
-  ramo,
   coberturasIniciais,
   dominios,
   defaultValues,
@@ -21,7 +20,6 @@ export function Step4({
   selecionadas,
   onSelecionadas,
 }: {
-  ramo: string;
   coberturasIniciais?: string[];
   seguradoras: Seguradora[];
   selecionadas: string[];
@@ -33,7 +31,7 @@ export function Step4({
   submitting?: boolean;
   serverError?: string | null;
 }) {
-  const coberturas = dominios.filter(d => d.tipo === (ramo === "imovel" ? "cobertura_imovel" : "cobertura_auto"));
+  const coberturas = dominios.filter(d => d.tipo === "cobertura_auto");
   const planos = dominios.filter(
     (d) => d.tipo === "plano_pagamento" || d.tipo === "parcelamento",
   );

@@ -285,7 +285,6 @@ export function RenovacaoPage() {
           >
             <option value="">Todos os ramos</option>
             <option value="auto">Auto</option>
-            <option value="imovel">Imóvel</option>
           </select>
 
           <select
