@@ -4,7 +4,7 @@ import { api, type ComissaoConfigOut } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const RAMOS = ["auto", "imovel", "vida", "empresarial"];
+const RAMOS = ["auto", "moto"];
 
 function pctDisplay(pct: string): string {
   return `${(parseFloat(pct) * 100).toFixed(2)}%`;
