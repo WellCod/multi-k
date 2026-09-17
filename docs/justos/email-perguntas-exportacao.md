@@ -1,6 +1,11 @@
 # E-mail — exportação de apólices e regras de renovação
 
-> **Rascunho. Não enviado.** Destinatário: o ponto focal (`[e-mail do ponto focal]`),
+> **Enviado e respondido em 17/09/2026.** As respostas estão consolidadas em
+> [`plano-exportacao-incremental.md`](plano-exportacao-incremental.md) §0, e duas
+> delas corrigiram código: o gatilho do `ci_code` e a origem da comissão
+> gravada. Mantido como registro do que foi perguntado.
+>
+> **Rascunho original.** Destinatário: o ponto focal (`[e-mail do ponto focal]`),
 > que respondeu as trocas anteriores. As perguntas da parte A vêm de
 > [`plano-exportacao-incremental.md`](plano-exportacao-incremental.md) §11 e
 > bloqueiam o desenho da importação automática; as da parte B saem de

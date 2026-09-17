@@ -30,15 +30,18 @@ test("coberturas: exige seleção e vigência válida", () => {
   assert.equal(step4Schema.safeParse({ ...data, inicio_vigencia: "2025-02-29" }).success, false);
 });
 
-test("renovação: exige CI e não transforma seleção vazia em zero", () => {
+test("CI acompanha o bônus, não a renovação", () => {
   const base = { finalidade: "TESTE" };
-  assert.equal(riskStepSchemas.auto.profile.safeParse({ ...base, tipo_negocio: "renovacao" }).success, false);
+  // bônus zero: renovação declarada não exige CI
+  assert.equal(riskStepSchemas.auto.profile.safeParse({ ...base, tipo_negocio: "renovacao" }).success, true);
+  // bônus acima de zero exige, mesmo em negócio novo
+  assert.equal(riskStepSchemas.auto.profile.safeParse({ ...base, bonus_anterior: 5 }).success, false);
 
-  const renovacao = riskStepSchemas.auto.profile.parse({ ...base, tipo_negocio: "renovacao", ci_code: "CI-1", insurer_code: "6467" });
-  assert.equal(renovacao.ci_code, "CI-1");
-  assert.equal(renovacao.insurer_code, 6467);
+  const comCi = riskStepSchemas.auto.profile.parse({ ...base, bonus_anterior: 5, ci_code: "CI-1", tipo_negocio: "renovacao", insurer_code: "6467" });
+  assert.equal(comCi.ci_code, "CI-1");
+  assert.equal(comCi.insurer_code, 6467);
 
-  const semSelecao = riskStepSchemas.auto.profile.parse({ ...base, tipo_negocio: "renovacao", ci_code: "CI-1", insurer_code: "" });
+  const semSelecao = riskStepSchemas.auto.profile.parse({ ...base, bonus_anterior: 2, ci_code: "CI-1", insurer_code: "" });
   assert.equal(semSelecao.insurer_code, undefined);
 });
 
