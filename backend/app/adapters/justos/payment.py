@@ -10,6 +10,7 @@ from app.adapters.base import (
     PreparacaoTransmissao,
     SelecaoTransmissao,
 )
+from app.adapters.money import to_decimal
 
 
 class PaymentOption(BaseModel):
@@ -17,19 +18,6 @@ class PaymentOption(BaseModel):
     parcelas: int
     valor_parcela: str | None
     valor_total: str | None
-
-
-def to_decimal(raw: object) -> Decimal | None:
-    """Valor monetário explícito. Ausência, lixo ou negativo não viram zero."""
-    if raw is None or isinstance(raw, (bool, dict, list)):
-        return None
-    try:
-        amount = Decimal(str(raw))
-    except InvalidOperation:
-        return None
-    if not amount.is_finite() or amount < 0:
-        return None
-    return amount.quantize(Decimal("0.01"))
 
 
 def _money(raw: object) -> str | None:
