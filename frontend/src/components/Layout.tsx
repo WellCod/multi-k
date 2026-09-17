@@ -47,7 +47,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     if (!user) return;
     let disposed = false;
     api.renovacoes.count().then(value => { if (!disposed) setRenovCount(value); }).catch(() => undefined);
-    api.health().then(h => { if (!disposed) setIsStaging(h.justos_env === "staging"); }).catch(() => undefined);
+    api.health().then(h => { if (!disposed) // Só "production" tira o aviso: valor desconhecido é tratado como staging.
+        setIsStaging(h.justos_env !== "production"); }).catch(() => undefined);
     return () => { disposed = true; };
   }, [user]);
 
