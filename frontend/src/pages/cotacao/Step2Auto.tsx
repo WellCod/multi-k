@@ -36,6 +36,8 @@ export function Step2Auto({
 
   const condutorDiferente = watch("condutor_diferente");
   const renovacao = watch("tipo_negocio") === "renovacao";
+  // O CI acompanha o bônus, não a renovação.
+  const exigeCi = Number(watch("bonus_anterior") ?? 0) > 0;
   const [anteriores, setAnteriores] = useState<SeguradoraAnterior[] | null>(null);
   const [anterioresErro, setAnterioresErro] = useState(false);
 
@@ -137,7 +139,7 @@ export function Step2Auto({
             <option value="renovacao">Renovação</option>
           </Select>
         </Field>
-        {renovacao && (
+        {exigeCi && (
           <Field label="Código CI da apólice anterior" error={errors.ci_code?.message}>
             <Input placeholder="Consta no PDF da apólice" {...register("ci_code")} />
           </Field>
