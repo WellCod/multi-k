@@ -27,7 +27,7 @@ Sistema desenvolvido do zero para uma corretora de seguros substituir planilhas 
 | Módulo | O que faz |
 |---|---|
 | **Multicálculo async** | Fan-out para N seguradoras com fila em Postgres (SKIP LOCKED), timeout por CIA, resultado parcial exibido conforme chega |
-| **Funil de cotação** | 5 passos (Auto, Moto e Imóvel), autosave por passo, recotar a partir de cotação anterior, finalidade Uber/Táxi |
+| **Funil de cotação** | 5 passos (Auto e Moto), autosave por passo, recotar a partir de cotação anterior, finalidade Uber/Táxi |
 | **Tabela FIPE integrada** | Seleção Marca → Modelo → Ano com busca inline, valor FIPE em tempo real, proxy com cache 30 dias no backend |
 | **Integração Justos (auto)** | Autenticação ES256, cotação, pricing, configurador de coberturas, recotação em lote, proposta formal, link de contratação e PDF de cotação/proposta |
 | **Configurador de coberturas** | Recálculo é prévia sem gravação; aplicar reconfirma o preço na seguradora e grava seleção, valores e auditoria em uma transação |
@@ -46,12 +46,12 @@ Sistema desenvolvido do zero para uma corretora de seguros substituir planilhas 
 
 ## Estado da integração com seguradoras
 
-O código não depende de nenhuma seguradora específica. O que muda por integração é o estágio:
+O produto atende **Auto e Moto**. O código não depende de nenhuma seguradora específica — o que muda por integração é o estágio:
 
 | Seguradora | Ramo | Estado |
 |---|---|---|
 | **Justos** | Auto | Credenciais recebidas. Autenticação, cotação, pricing e seleção de coberturas exercitados em staging; o ciclo completo até a proposta formal ainda não fechou em ambiente da seguradora. Produção depende de novo par de chaves EC. |
-| **Yelum** | Imóvel | Adapter pronto e isolado. Entra sozinho via `cias_para_ramo("imovel")` assim que a credencial de homologação chegar — zero código novo. |
+| **Yelum** | Imóvel | Adapter pronto e isolado, **sem uso no produto por ora**: o ramo imóvel está fora de escopo e não é oferecido na interface. O código permanece, com as mesmas regras da Justos; reativar é devolver a opção no frontend. Depende também da credencial de homologação. |
 | **Fake** | Todos | Simulador usado em desenvolvimento e nos testes. Nenhum teste da suíte faz chamada real. |
 
 A aderência da integração Justos ao contrato publicado é acompanhada requisito a requisito em [`docs/auditoria-requisitos-justos.md`](docs/auditoria-requisitos-justos.md): cada linha aponta evidência no código, teste e lacuna.
@@ -231,13 +231,14 @@ Os testes usam banco exclusivo de regressão e respostas sintéticas. **Nenhum t
 | — | SEC: CSRF, AES-256-GCM, SHA-256, rate-limit, CORS | ✅ concluída | — |
 | — | Transmissão controlada, revisão de coberturas e condições de pagamento | ✅ concluída | — |
 | — | Aderência ao contrato Justos v2 (auditoria requisito a requisito) | 🔨 em andamento | — |
-| 5 | Adapter Yelum + Justos em produção | 🔨 Justos em staging; Yelum aguarda | Credencial Yelum · chave EC de produção |
+| 5 | Justos em produção | 🔨 em staging | Chave EC de produção |
+| — | Adapter Yelum (ramo imóvel) | ⏸️ fora de escopo por ora | Decisão de produto · credencial de homologação |
 | 6 | Paridade ≥ 99% em 200 cotações | ⏳ aguardando | Gate da Fase 5 |
 | 7 | E-Retorno (comissão recebida, sinistro) | 📐 desenhado, não ligado | Gate de fase · respostas da seguradora |
 | 8 | Deploy GCP + endurecimento | ⏳ aguardando | Precede chave de produção |
 | 9 | MCP / bot de cotação | ⏳ aguardando | Após paridade |
 
-Fases 0–4 não dependem de nenhum terceiro. As barreiras seguintes são credencial, homologação e decisão de fase — não código pendente.
+Fases 0–4 não dependem de nenhum terceiro. As barreiras seguintes são credencial, homologação e decisão de produto ou de fase — não código pendente.
 
 ---
 
