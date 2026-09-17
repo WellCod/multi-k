@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from app.adapters.justos.adapter import _selecionar_coberturas, _total
-from app.adapters.justos.payment import to_decimal
+from app.adapters.money import to_decimal
 
 
 def _peril(*precos: object, mandatory: bool = True) -> dict[str, Any]:

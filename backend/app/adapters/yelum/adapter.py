@@ -36,7 +36,7 @@ Campos obrigatórios em dados_negocio para transmitir():
 from __future__ import annotations
 
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -50,6 +50,7 @@ from app.adapters.base import (
     ResultadoTransmissao,
     RiscoCanonico,
 )
+from app.adapters.money import to_decimal
 from app.adapters.yelum import client
 
 _PRODUCT_CODE_RESIDENCIA = "11030"
@@ -60,9 +61,9 @@ def _bool_yelum(v: bool) -> str:
     return "T" if v else "F"
 
 
-def _dec(raw: Any) -> Decimal:
-    """Normaliza valor monetário da Yelum para Decimal (string ou número)."""
-    return Decimal(str(raw)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+def _premio(resp: dict[str, Any]) -> Decimal | None:
+    """Prêmio informado pela Yelum. Resposta sem valor não vira R$ 0,00."""
+    return to_decimal(resp.get("TotalPremiumValue"))
 
 
 def _sucesso_yelum(resp: dict[str, Any]) -> bool:
@@ -103,10 +104,11 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
     email = str(dados.get("email") or prop.get("email") or "")
     telefone = str(dados.get("telefone") or prop.get("telefone") or "")
     cep = str(dados.get("cep") or "")
-    tipo_imovel = str(dados.get("tipo_imovel") or dados.get("tipo") or "casa")
-    tipo_construcao = str(dados.get("tipo_construcao") or "1")
-    valor_imovel = Decimal(str(dados.get("valor_imovel") or "0"))
-    valor_conteudo = Decimal(str(dados.get("valor_conteudo") or "0"))
+    tipo_imovel = str(dados.get("tipo_imovel") or dados.get("tipo") or "")
+    tipo_construcao = str(dados.get("tipo_construcao") or "")
+    valor_imovel = to_decimal(dados.get("valor_imovel"))
+    # Conteúdo ausente é zero de verdade: imóvel sem conteúdo segurado existe.
+    valor_conteudo = to_decimal(dados.get("valor_conteudo")) or Decimal("0.00")
     alarme = bool(dados.get("alarme", False))
     cerca_eletrica = bool(dados.get("cerca_eletrica", False))
     grades = bool(dados.get("grades", False))
@@ -121,6 +123,14 @@ def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("cpf é obrigatório para cotação Yelum")
     if not cep:
         raise ValueError("cep é obrigatório para cotação Yelum")
+    # Assumir "casa" ou uma construção padrão altera o risco cotado sem o
+    # corretor ter declarado nada — o formulário já exige os dois.
+    if not tipo_imovel:
+        raise ValueError("tipo_imovel é obrigatório para cotação Yelum")
+    if not tipo_construcao:
+        raise ValueError("tipo_construcao é obrigatório para cotação Yelum")
+    if valor_imovel is None or valor_imovel <= 0:
+        raise ValueError("valor_imovel deve ser informado e maior que zero")
 
     return {
         "CommercialProductCode": _PRODUCT_CODE_RESIDENCIA,
@@ -234,9 +244,17 @@ class YelumSeguradora:
             )
 
         broker_proposal_number = str(resp.get("BrokerProposalNumber") or "")
-        # TotalPremiumValue é número no topo (não string)
-        raw_premio = resp.get("TotalPremiumValue") or 0
-        premio_total = _dec(raw_premio)
+        premio_total = _premio(resp)
+        if premio_total is None:
+            return ResultadoCotacao(
+                sucesso=False,
+                cotacao_id=None,
+                premio_total=None,
+                mensagens=[
+                    "Yelum não informou o prêmio. "
+                    "Recalcule antes de comparar ou transmitir."
+                ],
+            )
 
         restricoes_raw = resp.get("Restricao") or resp.get("Restriction") or []
         restricoes = [
@@ -308,8 +326,17 @@ class YelumSeguradora:
             )
 
         broker_proposal_number = str(resp.get("BrokerProposalNumber") or "")
-        raw_premio = resp.get("TotalPremiumValue") or 0
-        premio_total = _dec(raw_premio)
+        premio_total = _premio(resp)
+        if premio_total is None:
+            return ResultadoCotacao(
+                sucesso=False,
+                cotacao_id=None,
+                premio_total=None,
+                mensagens=[
+                    "Yelum não informou o prêmio. "
+                    "Recalcule antes de comparar ou transmitir."
+                ],
+            )
         necessita_vistoria = bool(resp.get("NeedInspectionRisk", False))
 
         return ResultadoCotacao(

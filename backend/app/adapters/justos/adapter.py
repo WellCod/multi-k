@@ -65,11 +65,8 @@ from app.adapters.base import (
     SelecaoTransmissao,
 )
 from app.adapters.justos import client
-from app.adapters.justos.payment import (
-    payment_options,
-    prepare_transmission,
-    to_decimal,
-)
+from app.adapters.justos.payment import payment_options, prepare_transmission
+from app.adapters.money import to_decimal
 
 _log = logging.getLogger(__name__)
 
