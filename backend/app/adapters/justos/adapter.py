@@ -235,6 +235,28 @@ def _comissao_cotada(dados: dict[str, Any]) -> int:
     return valor
 
 
+def _comissao_confirmada(resposta: dict[str, Any], enviado: dict[str, Any]) -> Decimal:
+    """Percentual que a seguradora aplicou, em fração. Cai no enviado se calar."""
+    devolvida = to_decimal(resposta.get("commission"))
+    if devolvida is not None:
+        return devolvida / 100
+    return Decimal(enviado["broker_commission_percentage"]) / 100
+
+
+def _bonus_anterior(dados: dict[str, Any]) -> int:
+    """Classe de bônus declarada (0–10). Lixo é erro, não bônus zero."""
+    bruto = dados.get("bonus_anterior")
+    if bruto is None or bruto == "":
+        return 0
+    try:
+        bonus = int(str(bruto))
+    except ValueError as exc:
+        raise ValueError(f"bonus_anterior inválido: {bruto!r}") from exc
+    if not 0 <= bonus <= 10:
+        raise ValueError(f"bonus_anterior fora da faixa 0–10: {bonus}")
+    return bonus
+
+
 def _payload_cotacao(dados: dict[str, Any]) -> dict[str, Any]:
     """Mapeia dados_risco canônicos → payload da API Justos v2.
 
@@ -460,10 +482,10 @@ class JustosSeguradora:
             payload_resposta={
                 "quote_id": quote_id,
                 "coverages_selected": coverages_selected,
-                # Comissão de fato cotada: a transmissão não pode divergir dela.
-                "comissao_pct_cotada": str(
-                    Decimal(payload["broker_commission_percentage"]) / 100
-                ),
+                # A comissão que vale é a que a seguradora devolveu: em renovação
+                # de apólice dela, um piso é aplicado na criação da cotação e o
+                # percentual volta diferente do enviado (Justos, 17/09/2026).
+                "comissao_pct_cotada": str(_comissao_confirmada(cotacao_resp, payload)),
                 "coverages_available": coverages_available,
                 "monthly_total": str(monthly_total),
                 "annual_total": str(annual_total) if annual_total is not None else None,
@@ -513,21 +535,21 @@ class JustosSeguradora:
         coverages_selected: dict[str, Any] = dict(dados.get("coverages_selected") or {})
 
         try:
-            tipo_negocio = _tipo_negocio(risco_dados)
+            _tipo_negocio(risco_dados)  # a declaração segue validada aqui
+            # O gatilho do CI é a classe de bônus, não a natureza do negócio
+            # (Justos, 17/09/2026): bônus transferido em negócio novo exige.
+            bonus = _bonus_anterior(risco_dados)
         except ValueError as exc:
             return ResultadoTransmissao(
                 sucesso=False, protocolo=None, mensagens=[str(exc)]
             )
-
-        # J2 §7: renovação exige o CI da apólice anterior. Bônus não indica
-        # renovação — a natureza do negócio vem declarada, nunca inferida.
-        if tipo_negocio == "renovacao" and not ci_code:
+        if bonus > 0 and not ci_code:
             return ResultadoTransmissao(
                 sucesso=False,
                 protocolo=None,
                 mensagens=[
-                    "Renovação exige o código CI da apólice anterior, "
-                    "que consta no PDF da apólice."
+                    "Classe de bônus maior que zero exige o código CI da apólice "
+                    "anterior, que consta no PDF da apólice."
                 ],
             )
 

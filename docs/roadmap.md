@@ -16,15 +16,38 @@
 ✅ FIPE        Proxy Parallelum + FipeSelector combobox
 ✅ UX-SEC      Qualidade e segurança do funil de cotação
 ✅ SEC         Endurecimento de segurança (auditoria 2026-08-26)
-✅ Fase 5      Adapters Yelum + Justos (Justos staging OK; Yelum gate: credencial)
+✅ Fase 5      Justos em staging; Yelum pronto porém fora de escopo (ramo imóvel)
 ✅ MELHORIAS   Análise completa: segurança, perf, UX, features (2026-09-02)
 ✅ SPRINT-03   Segurança, perf, UX, layout, features (2026-09-03)
 ✅ SPRINT-04   Justos staging, configurador coberturas, recotar lote (2026-09-08)
+✅ AUDITORIA   Aderência ao contrato Justos v2, requisito a requisito (2026-09-17)
 ⏳ Fase 6      Paridade (gate: ≥99% em 200 cotações reais Justos)
-⏳ Fase 7      E-Retorno (gate: Security Assessment)
+⏳ Fase 7      E-Retorno — desenho fechado com a seguradora (gate: fase)
 ⏳ Fase 8      Deploy GCP + endurecimento
 ⏳ Fase 9      MCP para o bot
 ```
+
+## Etapas do E-Retorno (fase 7)
+
+Desenho fechado em 17/09/2026 com as respostas da seguradora. Detalhe e
+critérios de aceite em [`justos/plano-exportacao-incremental.md`](justos/plano-exportacao-incremental.md).
+
+| # | Etapa | Estado |
+|---|---|---|
+| 1 | Cursor por instante; varredura falha em vez de devolver parcial | a fazer |
+| 2 | Projeção idempotente por `policyId`, sem emitir evento | a fazer |
+| 3 | Estado e encerramento, com tipo canônico novo | depende de decisão sobre a causa do `INACTIVE` |
+| 4 | Vínculo de renovação por `previousPolicyId` | a fazer |
+| 5 | Cobranças reais e leitura compatível do calendário estimado | a fazer |
+| 6 | Documentos (URLs assinadas, 15 min) | depende de decisão de retenção |
+| 7 | Agendamento de hora em hora — **liga a sincronização** | gate de fase |
+
+As etapas 1 e 2 não tocam o domínio nem ligam nada. São o maior avanço possível
+sem o gate.
+
+**Pendências com a seguradora:** responder se a ausência do campo de causa do
+`INACTIVE` é bloqueante, e acompanhar o changelog — a API de exportação está em
+homologação e o layout pode mudar.
 
 ---
 

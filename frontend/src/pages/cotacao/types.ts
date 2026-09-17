@@ -118,10 +118,11 @@ export const step3Schema = z.object({
 const autoObjectFields = { cep_pernoite: true, codigo_fipe: true, placa: true, marca: true, modelo: true, ano_modelo: true, combustivel: true, valor_fipe: true } as const;
 const motoObjectFields = { ...autoObjectFields, cilindrada: true, categoria: true } as const;
 
-// O CI da apólice anterior é exigido pela renovação, não pelo bônus.
+// O CI é exigido pela classe de bônus, não pela natureza do negócio: bônus
+// transferido em negócio novo também precisa (Justos, 17/09/2026).
 const autoProfileSchema = step2AutoSchema.omit(autoObjectFields).superRefine((data, ctx) => {
-  if (data.tipo_negocio === "renovacao" && !data.ci_code) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Renovação exige o código CI da apólice anterior", path: ["ci_code"] });
+  if ((data.bonus_anterior ?? 0) > 0 && !data.ci_code) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Bônus maior que zero exige o código CI da apólice anterior", path: ["ci_code"] });
   }
 });
 

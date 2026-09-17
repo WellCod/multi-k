@@ -56,7 +56,7 @@ O produto atende **Auto e Moto**. O código não depende de nenhuma seguradora e
 
 A aderência da integração Justos ao contrato publicado é acompanhada requisito a requisito em [`docs/auditoria-requisitos-justos.md`](docs/auditoria-requisitos-justos.md): cada linha aponta evidência no código, teste e lacuna.
 
-A importação automática de apólices vendidas (E-Retorno) está **desenhada e não ligada** — o desenho, com cursor durável, idempotência e as perguntas pendentes ao contrato, está em [`docs/justos/plano-exportacao-incremental.md`](docs/justos/plano-exportacao-incremental.md).
+A importação automática de apólices vendidas (E-Retorno) está **desenhada e não ligada**. O desenho — cursor durável, idempotência, encerramento sem causa inventada — e as etapas de execução estão em [`docs/justos/plano-exportacao-incremental.md`](docs/justos/plano-exportacao-incremental.md), já revisados com as respostas da seguradora. A API de exportação segue em homologação, com layout sujeito a ajuste.
 
 ---
 
@@ -234,7 +234,7 @@ Os testes usam banco exclusivo de regressão e respostas sintéticas. **Nenhum t
 | 5 | Justos em produção | 🔨 em staging | Chave EC de produção |
 | — | Adapter Yelum (ramo imóvel) | ⏸️ fora de escopo por ora | Decisão de produto · credencial de homologação |
 | 6 | Paridade ≥ 99% em 200 cotações | ⏳ aguardando | Gate da Fase 5 |
-| 7 | E-Retorno (comissão recebida, sinistro) | 📐 desenhado, não ligado | Gate de fase · respostas da seguradora |
+| 7 | E-Retorno (comissão recebida, sinistro) | 📐 desenho fechado, não ligado | Gate de fase |
 | 8 | Deploy GCP + endurecimento | ⏳ aguardando | Precede chave de produção |
 | 9 | MCP / bot de cotação | ⏳ aguardando | Após paridade |
 
