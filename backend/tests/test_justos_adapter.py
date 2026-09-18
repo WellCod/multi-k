@@ -21,6 +21,7 @@ from httpx import Response
 from app.adapters.base import PropostaCanonica, RiscoCanonico
 from app.adapters.justos.adapter import JustosSeguradora
 from app.infra.secrets import EnvSecretProvider, set_provider
+from tests.conftest import CHAVE_EC_TESTE as _TEST_EC_KEY
 
 _BASE = "https://api.staging.justos.com.br"
 _AUTH_URL = f"{_BASE}/brokers/auth/api-token"
@@ -36,13 +37,6 @@ _PDF_PROPOSTA_URL = f"{_GCF_BASE}/corretor-pdfProposta"
 
 _FAKE_TOKEN = "apitoken123"
 
-_TEST_EC_KEY = (
-    "-----BEGIN PRIVATE KEY-----\n"
-    "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgYqQQSZA0evZwbYt+\n"
-    "9jewzOhw0/IQm01U6mKufI1vo2OhRANCAAQt5Sb19Sv1EeFXd0/9nS9f2saBhQE0\n"
-    "kqQklcBPMV06ju1TZVaKL+6T9piYvnKWMgGkxYdalAOOnuA98qtllZXI\n"
-    "-----END PRIVATE KEY-----\n"
-)
 
 _RESP_AUTH = {"token": _FAKE_TOKEN}
 
@@ -502,6 +496,10 @@ async def test_gerar_pdf_cotacao_producao(
 ) -> None:
     """Em production, staging=true não é enviado."""
     monkeypatch.setenv("JUSTOS_ENV", "production")
+    # Em produção o PATH é recusado — o teste não pode depender de a variável
+    # estar ausente do ambiente de quem roda a suíte
+    monkeypatch.delenv("JUSTOS_PRIVATE_KEY_PATH", raising=False)
+    monkeypatch.setenv("JUSTOS_PRIVATE_KEY", _TEST_EC_KEY)
     set_provider(EnvSecretProvider())
 
     captured_urls: list[str] = []
