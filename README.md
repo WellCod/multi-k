@@ -18,6 +18,41 @@
 
 ---
 
+## Telas
+
+Capturas da aplicação rodando com o seed de demonstração — dados sintéticos,
+nenhum cliente real.
+
+### Minha fila — o que precisa de atenção hoje
+
+O corretor abre o dia numa fila de trabalho, não num painel de indicadores:
+renovações na janela, cotações sem proposta há dois dias, parcelas vencendo.
+
+![Fila de trabalho do corretor](docs/img/home.png)
+
+### Histórico de cotações
+
+Busca por proponente, filtro por ramo, status, período e seguradora. Cada
+cotação mostra o prêmio informado, se virou proposta e se teve restrição.
+
+![Histórico de cotações](docs/img/historico.png)
+
+### Resultado da cotação
+
+Prêmio por seguradora, condições de pagamento confirmadas, coberturas e o
+protocolo de transmissão. A apólice emitida é vinculada aqui.
+
+![Resultado da cotação](docs/img/comparativo.png)
+
+### Carteira de clientes
+
+Busca, cadastro e recotação a partir de um cliente existente. Pessoa física ou
+jurídica.
+
+![Carteira de clientes](docs/img/clientes.png)
+
+---
+
 ## O que é
 
 Sistema desenvolvido do zero para uma corretora de seguros substituir planilhas e sistemas legados. O corretor preenche os dados do cliente uma vez e o sistema consulta todas as seguradoras cadastradas simultaneamente, retornando um comparativo com prêmio, coberturas, restrições e vistoria por seguradora.
