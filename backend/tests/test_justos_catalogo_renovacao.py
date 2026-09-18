@@ -15,8 +15,8 @@ from app.adapters.justos.adapter import JustosSeguradora, _payload_cotacao
 from app.domain.auth import Papel
 from app.infra.secrets import EnvSecretProvider, set_provider
 from app.main import app
-from tests.conftest import CsrfAuth, criar_usuario
 from tests.conftest import CHAVE_EC_TESTE as _TEST_EC_KEY
+from tests.conftest import CsrfAuth, criar_usuario
 
 _BASE = "https://api.staging.justos.com.br"
 _AUTH_URL = f"{_BASE}/brokers/auth/api-token"

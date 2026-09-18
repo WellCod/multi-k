@@ -21,7 +21,6 @@ _AUTH_URL = "https://api.staging.justos.com.br/brokers/auth/api-token"
 _SEGREDO_SINTETICO = "segredo-sintetico-apenas-para-teste-32b"
 
 
-
 @pytest.fixture(autouse=True)
 def _ambiente(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JUSTOS_PARTNER_NAME", "test_partner")

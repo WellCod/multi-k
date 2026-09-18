@@ -17,7 +17,6 @@ from app.infra.secrets import EnvSecretProvider, set_provider
 from tests.conftest import CHAVE_EC_TESTE as _CHAVE
 
 
-
 @pytest.fixture(autouse=True)
 def _ambiente_limpo(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JUSTOS_PARTNER_NAME", "parceiro_teste")
