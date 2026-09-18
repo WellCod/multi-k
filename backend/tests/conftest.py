@@ -56,6 +56,8 @@ class CsrfAuth(httpx.Auth):
 from app.infra.auth_service import hash_senha  # noqa: E402
 from app.infra.models import Base, Usuario  # noqa: E402
 from app.infra.seed import seed_if_empty  # noqa: E402
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 
 _TEST_URL = os.environ["DATABASE_URL"]
 _TEST_DATABASE = make_url(_TEST_URL).database or ""
@@ -202,3 +204,21 @@ async def criar_usuario(
     db.add(u)
     await db.flush()
     return u
+
+
+def _gerar_chave_ec() -> str:
+    """Par EC P-256 novo a cada execução da suíte.
+
+    Chave fixa no repositório é achado de scanner de segredo para sempre, mesmo
+    sendo exclusiva de teste. Gerar aqui custa milissegundos e some com o falso
+    positivo.
+    """
+    chave = ec.generate_private_key(ec.SECP256R1())
+    return chave.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode()
+
+
+CHAVE_EC_TESTE = _gerar_chave_ec()

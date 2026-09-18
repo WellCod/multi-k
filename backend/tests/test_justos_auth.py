@@ -13,19 +13,13 @@ from httpx import Response
 
 from app.adapters.justos import client
 from app.infra.secrets import EnvSecretProvider, set_provider
+from tests.conftest import CHAVE_EC_TESTE as _TEST_EC_KEY
 
 _AUTH_URL = "https://api.staging.justos.com.br/brokers/auth/api-token"
 
 # Só assina o token devolvido pelo mock; nunca sai daqui.
 _SEGREDO_SINTETICO = "segredo-sintetico-apenas-para-teste-32b"
 
-_TEST_EC_KEY = (
-    "-----BEGIN PRIVATE KEY-----\n"
-    "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgYqQQSZA0evZwbYt+\n"
-    "9jewzOhw0/IQm01U6mKufI1vo2OhRANCAAQt5Sb19Sv1EeFXd0/9nS9f2saBhQE0\n"
-    "kqQklcBPMV06ju1TZVaKL+6T9piYvnKWMgGkxYdalAOOnuA98qtllZXI\n"
-    "-----END PRIVATE KEY-----\n"
-)
 
 
 @pytest.fixture(autouse=True)
