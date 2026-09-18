@@ -14,14 +14,7 @@ import pytest
 
 from app.adapters.justos import client
 from app.infra.secrets import EnvSecretProvider, set_provider
-
-_CHAVE = (
-    "-----BEGIN PRIVATE KEY-----\n"
-    "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgYqQQSZA0evZwbYt+\n"
-    "9jewzOhw0/IQm01U6mKufI1vo2OhRANCAAQt5Sb19Sv1EeFXd0/9nS9f2saBhQE0\n"
-    "kqQklcBPMV06ju1TZVaKL+6T9piYvnKWMgGkxYdalAOOnuA98qtllZXI\n"
-    "-----END PRIVATE KEY-----\n"
-)
+from tests.conftest import CHAVE_EC_TESTE as _CHAVE
 
 
 @pytest.fixture(autouse=True)

@@ -6,6 +6,9 @@ DATABASE_URL deve apontar para um Postgres de teste disponível.
 import os
 from collections.abc import Generator
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
 # Define antes de qualquer import do app para que db.py use este URL.
 os.environ.setdefault(
     "DATABASE_URL",
@@ -202,3 +205,21 @@ async def criar_usuario(
     db.add(u)
     await db.flush()
     return u
+
+
+def _gerar_chave_ec() -> str:
+    """Par EC P-256 novo a cada execução da suíte.
+
+    Chave fixa no repositório é achado de scanner de segredo para sempre, mesmo
+    sendo exclusiva de teste. Gerar aqui custa milissegundos e some com o falso
+    positivo.
+    """
+    chave = ec.generate_private_key(ec.SECP256R1())
+    return chave.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode()
+
+
+CHAVE_EC_TESTE = _gerar_chave_ec()
