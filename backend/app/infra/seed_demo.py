@@ -438,6 +438,10 @@ async def criar_demo(factory: async_sessionmaker[AsyncSession]) -> None:
                         dados = _dados_risco_imovel()
                         premio = _premio_imovel() if tem_premio else None
 
+                    # O histórico exibe dados_risco.proponente.nome — sem isso
+                    # toda a lista aparece como "Proponente não informado"
+                    dados["proponente"] = {"nome": cli.nome}
+
                     # Cotações "aguardando" ficam paradas há pelo menos 3 dias
                     if status == "aguardando":
                         criado_em = _2_dias_atras - timedelta(
@@ -540,7 +544,7 @@ async def criar_demo(factory: async_sessionmaker[AsyncSession]) -> None:
                 id=uuid.uuid4(),
                 cotacao_id=cotacao.id,
                 protocolo=f"DEMO-{uuid.uuid4().hex[:8].upper()}",
-                commissao_pct=pct,
+                comissao_pct=pct,
                 plano_pagamento=random.choice(
                     ["AVISTA", "2X", "3X", "6X", "10X", "12X"]
                 ),
