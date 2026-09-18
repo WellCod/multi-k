@@ -6,6 +6,9 @@ DATABASE_URL deve apontar para um Postgres de teste disponível.
 import os
 from collections.abc import Generator
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
 # Define antes de qualquer import do app para que db.py use este URL.
 os.environ.setdefault(
     "DATABASE_URL",
@@ -56,8 +59,6 @@ class CsrfAuth(httpx.Auth):
 from app.infra.auth_service import hash_senha  # noqa: E402
 from app.infra.models import Base, Usuario  # noqa: E402
 from app.infra.seed import seed_if_empty  # noqa: E402
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec
 
 _TEST_URL = os.environ["DATABASE_URL"]
 _TEST_DATABASE = make_url(_TEST_URL).database or ""
