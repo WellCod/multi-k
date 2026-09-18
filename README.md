@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat&logo=github-actions&logoColor=white" />
   <img src="https://img.shields.io/badge/Fase_5-em_andamento-f59e0b?style=flat" />
   <img src="https://img.shields.io/badge/Justos-staging-22c55e?style=flat" />
-  <img src="https://img.shields.io/badge/cobertura-96%25-22c55e?style=flat" />
+  <img src="https://img.shields.io/badge/cobertura-%E2%89%A585%25-22c55e?style=flat" />
 </p>
 
 <h1 align="center">multi-K</h1>
@@ -273,8 +273,12 @@ docs/
   escopo.md                        # escopo, requisitos e riscos
   plano-seguranca-fluxo-fase5.md   # plano de execução por lote, com gates
   auditoria-requisitos-justos.md   # matriz requisito → código → teste → lacuna
-  justos/                          # contratos da seguradora e planos derivados
+  justos/                          # planos e auditorias derivados do contrato
 ```
+
+A documentação das seguradoras e os arquivos de marca delas ficam **fora do
+versionamento** — vale para `docs/yelum/` e para `docs/justos/*.txt`. É material
+de parceiro, não nosso.
 
 ---
 
@@ -293,4 +297,4 @@ Decisões não óbvias documentadas em [`docs/adr.md`](docs/adr.md):
 
 ## Licença
 
-MIT
+AGPL-3.0 — ver [`LICENSE`](LICENSE).

@@ -13,6 +13,8 @@
 
 # Documentação confidencial da Yelum (cláusula de não-reprodução)
 docs/yelum/
+docs/justos/*.txt
+docs/justos/logo/
 *.pdf
 
 # Segredos, chaves e certificados
