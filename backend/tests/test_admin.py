@@ -522,14 +522,27 @@ async def test_direct_listar_comissoes(db: AsyncSession) -> None:
     assert exc2.value.status_code == 404
 
 
-async def test_upsert_comissao_fora_da_faixa_da_cia_retorna_422(
+async def test_upsert_comissao_acima_da_faixa_da_cia_retorna_422(
     db: AsyncSession, client: AsyncClient
 ) -> None:
-    """A Justos aceita 10–25%: configurar fora disso quebraria toda cotação."""
+    """A Justos aceita até 25%: configurar acima quebraria toda cotação."""
     await _login(client, db, Papel.ADMIN, "admin_comissao_faixa@test.com")
-    r = await client.put("/admin/comissoes/justos/auto", json={"pct_padrao": "0.0500"})
+    r = await client.put("/admin/comissoes/justos/auto", json={"pct_padrao": "0.3000"})
     assert r.status_code == 422
-    assert "entre 10% e 25%" in r.json()["detail"]
+    assert "entre 0% e 25%" in r.json()["detail"]
+
+
+async def test_upsert_comissao_baixa_e_aceita_pela_cia(
+    db: AsyncSession, client: AsyncClient
+) -> None:
+    """O mínimo da Justos é 0, não 10 (confirmado por eles em 17/09/2026).
+
+    A faixa do admin lê a capacidade declarada pelo adapter, então recusar
+    aqui abaixo de 10% barraria configuração legítima.
+    """
+    await _login(client, db, Papel.ADMIN, "admin_comissao_baixa@test.com")
+    r = await client.put("/admin/comissoes/justos/auto", json={"pct_padrao": "0.0500"})
+    assert r.status_code == 200
 
 
 async def test_upsert_comissao_cia_desconhecida_retorna_422(

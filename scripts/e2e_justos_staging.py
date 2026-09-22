@@ -7,6 +7,7 @@ Uso:
 
 Preencha as constantes TEST_* abaixo com um veículo real antes de rodar.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,11 +35,13 @@ if _ENV.exists():
 # ---------------------------------------------------------------------------
 # Dados de teste — substitua por veículo real para staging Justos
 # ---------------------------------------------------------------------------
-TEST_CPF = os.environ.get("TEST_CPF", "")  # passe via: set TEST_CPF=seucpf && python scripts/e2e_justos_staging.py
+TEST_CPF = os.environ.get(
+    "TEST_CPF", ""
+)  # passe via: set TEST_CPF=seucpf && python scripts/e2e_justos_staging.py
 TEST_NOME = "João Teste Silva"
 TEST_PLACA = "DVK0101"
-TEST_FIPE = "024201-2"           # Peugeot 308 CC Roland Garros 1.6 Turbo 2014
-TEST_ANO_MODELO = "2014"
+TEST_FIPE = "014050-3"  # Honda Civic Sedan EXS 1.8 Flex 16V Aut. 2007
+TEST_ANO_MODELO = "2007"
 TEST_CEP = "01310100"
 TEST_EMAIL = os.getenv("E2E_TEST_EMAIL", "teste@exemplo.com.br")
 TEST_TELEFONE = "11999990000"
@@ -66,7 +69,12 @@ def _gerar_jwt() -> str:
     now = int(time.time())
     return str(
         jwt.encode(
-            {"iss": _cfg("JUSTOS_PARTNER_NAME"), "aud": "justos", "iat": now, "exp": now + 600},
+            {
+                "iss": _cfg("JUSTOS_PARTNER_NAME"),
+                "aud": "justos",
+                "iat": now,
+                "exp": now + 600,
+            },
             pem,
             algorithm="ES256",
         )
@@ -132,15 +140,23 @@ async def run() -> None:
         quote_resp = r.json()
         quote_id: str = str(quote_resp["quote_id"])
         coverages_available: dict = quote_resp.get("coverages_available", {})
-        _ok("Quote criado", {"quote_id": quote_id, "coberturas": list(coverages_available.keys())})
+        _ok(
+            "Quote criado",
+            {"quote_id": quote_id, "coberturas": list(coverages_available.keys())},
+        )
 
         # Seleciona coberturas (opção mais barata de cada peril disponível)
         _PERILS_CORE = {
-            "colisao-e-desastres-naturais", "roubo-e-furto", "incendio",
-            "danos-materiais", "danos-corporais",
+            "colisao-e-desastres-naturais",
+            "roubo-e-furto",
+            "incendio",
+            "danos-materiais",
+            "danos-corporais",
         }
         tem_mandatory = any(
-            p.get("mandatory") for p in coverages_available.values() if p.get("peril_options")
+            p.get("mandatory")
+            for p in coverages_available.values()
+            if p.get("peril_options")
         )
         coverages_selected: dict[str, str | None] = {}
         for slug, peril in coverages_available.items():
@@ -162,11 +178,14 @@ async def run() -> None:
         )
         r.raise_for_status()
         pricing = r.json()
-        _ok("Pricing", {
-            "monthly_total": pricing.get("monthly", {}).get("total"),
-            "annual_total": pricing.get("annual", {}).get("total"),
-            "info": pricing.get("info", ""),
-        })
+        _ok(
+            "Pricing",
+            {
+                "monthly_total": pricing.get("monthly", {}).get("total"),
+                "annual_total": pricing.get("annual", {}).get("total"),
+                "info": pricing.get("info", ""),
+            },
+        )
 
         # 4. Coverages (PUT)
         r = await c.put(
@@ -176,6 +195,25 @@ async def run() -> None:
         )
         r.raise_for_status()
         _ok("Coverages selecionadas", {"status": r.status_code})
+
+        # 4b. Relê o orçamento depois de alterar as coberturas. Estava presente
+        # na única execução que fechou o ciclo; se a API exige ou não, não deu
+        # para isolar — o veículo de teste ficou preso a uma proposta ativa
+        # antes do teste de controle.
+        r = await c.post(
+            f"/brokers/quote/{quote_id}/pricing",
+            json={"coverages_selected": coverages_selected},
+            headers=headers,
+        )
+        r.raise_for_status()
+        pricing = r.json()
+        _ok(
+            "Repricing após coberturas",
+            {
+                "monthly_total": pricing.get("monthly", {}).get("total"),
+                "annual_total": pricing.get("annual", {}).get("total"),
+            },
+        )
 
         # 5. Convert-formal-quote
         r = await c.post(
@@ -189,6 +227,32 @@ async def run() -> None:
             },
             headers=headers,
         )
+        # ATALHO DE TESTE — não é o comportamento do produto.
+        #
+        # A seguradora recalcula a porcentagem da FIPE coberta entre a cotação
+        # e a transmissão, recusa, e pede concordância: "caso esteja de acordo,
+        # realize a transmissão novamente". Aqui confirmamos sozinhos só para
+        # fechar o ciclo automatizado.
+        #
+        # No adapter isso é deliberadamente diferente: a divergência volta para
+        # o corretor decidir, porque aceitar em silêncio venderia ao cliente
+        # cobertura menor que a exibida. Ver JustosSeguradora.transmitir.
+        if r.status_code == 400 and "fipe_price_percentage_covered_changed" in r.text:
+            nova_pct = r.json()["context"]["new_fipe_price_percentage_covered"]
+            print(f"[INFO] FIPE coberta mudou para {nova_pct}% — reconfirmando")
+            r = await c.post(
+                "/brokers/quote/convert-formal-quote",
+                json={
+                    "quote_uuid": quote_id,
+                    "email": TEST_EMAIL,
+                    "given_phone_number": TEST_TELEFONE,
+                    "policy_type": "monthly",
+                    "scheduling_date": None,
+                    "fipe_price_percentage_covered": nova_pct,
+                },
+                headers=headers,
+            )
+
         if not r.is_success:
             print(f"[ERRO convert-formal-quote] {r.status_code}: {r.text}")
         r.raise_for_status()

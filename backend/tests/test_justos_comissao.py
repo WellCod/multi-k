@@ -60,10 +60,21 @@ def test_fracao_canonica_vira_percentual_inteiro() -> None:
     )
 
 
-@pytest.mark.parametrize("bruto", ["0.05", "0.30", "0", "1"])
-def test_fora_da_faixa_da_seguradora_e_recusado(bruto: str) -> None:
+@pytest.mark.parametrize("bruto", ["0.30", "1"])
+def test_acima_da_faixa_da_seguradora_e_recusado(bruto: str) -> None:
     with pytest.raises(ValueError, match="faixa aceita pela Justos"):
         _comissao_cotada({"comissao_pct": bruto})
+
+
+@pytest.mark.parametrize(("bruto", "esperado"), [("0", 0), ("0.05", 5)])
+def test_comissao_baixa_e_aceita(bruto: str, esperado: int) -> None:
+    """O mínimo real é 0, não 10 (seguradora, 17/09/2026).
+
+    Renovação de apólice da própria seguradora tem piso próprio, aplicado por
+    eles na criação da cotação — recusar localmente abaixo de 10 barrava
+    cotação legítima.
+    """
+    assert _comissao_cotada({"comissao_pct": bruto}) == esperado
 
 
 def test_percentual_quebrado_nao_e_arredondado() -> None:
