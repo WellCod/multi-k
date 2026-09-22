@@ -18,10 +18,21 @@ from app.infra.models import Auditoria, Cotacao
 TYPES = (
     "transmissao.iniciada",
     "transmissao.incerta",
+    "transmissao.recusada",
     "transmissao.liberada",
     "transmissao.confirmada",
     "transmissao.concluida",
 )
+
+# Estados em que uma nova tentativa é permitida sem conferência humana.
+#
+# 'liberada' é a decisão de quem conferiu na seguradora. 'recusada' é a
+# seguradora dizendo que não criou nada — validação local reprovada, ou recusa
+# explícita dela. Nos dois casos não existe proposta para duplicar.
+#
+# 'incerta' fica de fora de propósito: é o estado de não saber, e reenviar sem
+# saber é justamente o que cria proposta em duplicidade.
+LIBERAM_NOVA_TENTATIVA = ("transmissao.liberada", "transmissao.recusada")
 
 
 @dataclass(frozen=True)
@@ -113,6 +124,42 @@ async def record(
     await audit.registrar(
         db, kind, data, usuario_id=user.id, ip_origem=ip, tenant_id=quote.tenant_id
     )
+
+
+async def mark_rejected(
+    db: AsyncSession,
+    quote_id: uuid.UUID,
+    user: Actor,
+    attempt_id: uuid.UUID,
+    cia: str,
+    ip: str | None,
+    motivo: str,
+) -> None:
+    """Fecha a tentativa como recusada: a seguradora não criou proposta.
+
+    Diferente de `mark_uncertain`, não bloqueia o reenvio — aqui existe
+    resposta, e ela foi 'não'.
+    """
+    await db.rollback()
+    await restore_context(db, user)
+    quote = await quote_for_user(db, quote_id, user, lock=True)
+    previous = await latest(db, quote)
+    if (
+        previous is not None
+        and previous.tipo == "transmissao.iniciada"
+        and previous.dados.get("tentativa_id") == str(attempt_id)
+    ):
+        await record(
+            db,
+            quote,
+            user,
+            "transmissao.recusada",
+            attempt_id,
+            cia,
+            ip=ip,
+            justification=motivo,
+        )
+    await db.commit()
 
 
 async def mark_uncertain(

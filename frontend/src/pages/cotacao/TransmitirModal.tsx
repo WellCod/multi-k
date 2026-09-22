@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type Proposta, type Seguradora, type PaymentOption } from "@/lib/api";
+import { ApiError, api, type Proposta, type Seguradora, type PaymentOption } from "@/lib/api";
 import { formatBRL } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,10 @@ export function TransmitirModal({ cotacaoId, ramo, cia, revisaoBase, vigenciaIni
   const [error, setError] = useState("");
   const [transmissionBlocked, setTransmissionBlocked] = useState(true);
   const [reviewVersion, setReviewVersion] = useState(0);
+  // A seguradora pode recalcular a cobertura entre a cotação e a transmissão e
+  // recusar até haver concordância. Não é erro: é uma decisão do corretor.
+  const [coberturaAlterada, setCoberturaAlterada] = useState<{ anterior?: number; nova: number } | null>(null);
+  const [coberturaAceita, setCoberturaAceita] = useState(false);
   useEffect(() => {
     let disposed = false;
     api.dominios.seguradoras().then(items => {
@@ -65,9 +69,22 @@ export function TransmitirModal({ cotacaoId, ramo, cia, revisaoBase, vigenciaIni
     const selectedMode = carrier.modos_transmissao.find(m => m.id === mode);
     const business = { ...selectedMode?.dados_negocio };
     if (selectedMode?.campo_parcelas) business[selectedMode.campo_parcelas] = plan.parcelas;
+    if (coberturaAlterada && coberturaAceita) business.fipe_pct_confirmada = coberturaAlterada.nova;
     try {
       onSuccess(await api.cotacoes.transmitir(cotacaoId, { ...(option ? { opcao_pagamento: Number(plano) } : {}), revisao_base: revisaoBase, chave_idempotencia: crypto.randomUUID(), cia, plano_pagamento: plan.codigo, n_parcelas: plan.parcelas, comissao_pct: (percent / 100).toFixed(4), inicio_vigencia: vigencia, dados_negocio: business }));
-    } catch (e) { setTransmissionBlocked(true); setReviewVersion(v => v + 1); setError(e instanceof Error ? e.message : "Não foi possível confirmar o envio. Consulte a situação antes de tentar novamente."); }
+    } catch (e) {
+      setTransmissionBlocked(true); setReviewVersion(v => v + 1);
+      const detalhe = e instanceof ApiError ? e.detalhe as Record<string, unknown> | undefined : undefined;
+      if (detalhe?.reconfirmacao === "fipe_pct" && typeof detalhe.fipe_pct_nova === "number") {
+        // Nada foi transmitido. A seguradora está pedindo concordância com uma
+        // cobertura menor, e quem decide é quem falou com o cliente.
+        setCoberturaAlterada({ nova: detalhe.fipe_pct_nova, anterior: typeof detalhe.fipe_pct_anterior === "number" ? detalhe.fipe_pct_anterior : undefined });
+        setCoberturaAceita(false); setError("");
+      } else {
+        setCoberturaAlterada(null);
+        setError(e instanceof Error ? e.message : "Não foi possível confirmar o envio. Consulte a situação antes de tentar novamente.");
+      }
+    }
     finally { setLoading(false); }
   }
   return <Dialog title="Transmitir proposta" onClose={() => { if (!loading) onClose(); }}>
@@ -92,13 +109,28 @@ export function TransmitirModal({ cotacaoId, ramo, cia, revisaoBase, vigenciaIni
         {quotedCommission !== null && <p className="text-xs text-muted">Comissão usada pela seguradora no cálculo do prêmio. Para alterar, recotize.</p>}
       </Field>
       <Field label="Início da vigência"><Input type="date" required value={vigencia} onChange={e=>setVigencia(e.target.value)} /></Field>
+      {coberturaAlterada && (
+        <div role="alert" className="rounded border border-warning/50 bg-warning/5 p-3 text-sm">
+          <p className="font-medium">A seguradora alterou a cobertura desta proposta.</p>
+          <p className="mt-1">
+            {coberturaAlterada.anterior !== undefined
+              ? <>Cotada a <strong>{coberturaAlterada.anterior}% da tabela FIPE</strong>, agora <strong>{coberturaAlterada.nova}%</strong>.</>
+              : <>A cobertura passou a ser de <strong>{coberturaAlterada.nova}% da tabela FIPE</strong>.</>}
+          </p>
+          <p className="mt-1 text-muted">Nada foi transmitido. Confirme com o cliente antes de prosseguir — o valor coberto em caso de sinistro muda.</p>
+          <label className="mt-2 flex items-start gap-2">
+            <input type="checkbox" className="mt-1" checked={coberturaAceita} onChange={e => setCoberturaAceita(e.target.checked)} disabled={loading} />
+            <span>Confirmo a cobertura de {coberturaAlterada.nova}% e autorizo a transmissão.</span>
+          </label>
+        </div>
+      )}
       {error && (
         <details open className="rounded border border-danger/40 bg-danger/5 p-2 text-sm text-danger">
           <summary className="cursor-pointer font-medium">Erro na transmissão</summary>
           <pre className="mt-1 whitespace-pre-wrap break-all text-xs">{error}</pre>
         </details>
       )}
-      <Row className="justify-end"><Button type="button" variant="outline" disabled={loading} onClick={onClose}>Voltar</Button><Button type="submit" disabled={!carrier || !plano || !revisaoBase || loading || transmissionBlocked}>{loading ? "Transmitindo…" : "Confirmar transmissão"}</Button></Row>
+      <Row className="justify-end"><Button type="button" variant="outline" disabled={loading} onClick={onClose}>Voltar</Button><Button type="submit" disabled={!carrier || !plano || !revisaoBase || loading || transmissionBlocked || (coberturaAlterada !== null && !coberturaAceita)}>{loading ? "Transmitindo…" : coberturaAlterada ? "Transmitir com a nova cobertura" : "Confirmar transmissão"}</Button></Row>
     </Stack></form>
   </Dialog>;
 }

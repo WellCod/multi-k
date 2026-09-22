@@ -208,6 +208,19 @@ async def selecionar_coberturas(
         resp.raise_for_status()
 
 
+class CoberturaFipeAlteradaError(Exception):
+    """A seguradora recalculou a porcentagem da FIPE coberta.
+
+    Não é falha técnica: é pedido de concordância. A seguradora recusa a
+    formalização até a corretora confirmar o novo percentual, para não vender
+    cobertura diferente da que foi cotada ao cliente. Quem decide é o corretor.
+    """
+
+    def __init__(self, nova_pct: float) -> None:
+        self.nova_pct = nova_pct
+        super().__init__(f"Porcentagem da FIPE coberta alterada para {nova_pct}%.")
+
+
 async def converter_proposta(
     quote_uuid: str,
     email: str,
@@ -216,8 +229,14 @@ async def converter_proposta(
     installments: int | None = None,
     scheduling_date: str | None = None,
     ci_code: str | None = None,
+    fipe_pct_confirmada: float | None = None,
 ) -> dict[str, Any]:
-    """POST /brokers/quote/convert-formal-quote — formaliza proposta."""
+    """POST /brokers/quote/convert-formal-quote — formaliza proposta.
+
+    `fipe_pct_confirmada` só é enviada quando o corretor já concordou com
+    um recálculo da cobertura; sem ela, a seguradora recusa e este cliente
+    levanta CoberturaFipeAlteradaError.
+    """
     token = await _obter_token()
     body: dict[str, Any] = {
         "quote_uuid": quote_uuid,
@@ -230,6 +249,8 @@ async def converter_proposta(
         body["installments"] = installments
     if ci_code is not None:
         body["ci_code"] = ci_code
+    if fipe_pct_confirmada is not None:
+        body["fipe_price_percentage_covered"] = fipe_pct_confirmada
     async with httpx.AsyncClient() as c:
         resp = await c.post(
             f"{_base_url()}/brokers/quote/convert-formal-quote",
@@ -237,8 +258,24 @@ async def converter_proposta(
             headers={"Authorization": f"Bearer {token}"},
             timeout=60.0,
         )
+        if resp.status_code == 400:
+            nova = _fipe_pct_recalculada(resp)
+            if nova is not None:
+                raise CoberturaFipeAlteradaError(nova)
         resp.raise_for_status()
         return dict(resp.json())
+
+
+def _fipe_pct_recalculada(resp: httpx.Response) -> float | None:
+    """Extrai o novo percentual quando a recusa é o portão de reconfirmação."""
+    try:
+        corpo = resp.json()
+    except ValueError:
+        return None
+    if corpo.get("error") != "fipe_price_percentage_covered_changed":
+        return None
+    nova = (corpo.get("context") or {}).get("new_fipe_price_percentage_covered")
+    return float(nova) if nova is not None else None
 
 
 async def obter_checkout_link(quote_id: str) -> dict[str, Any]:

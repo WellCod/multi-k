@@ -8,8 +8,19 @@ export function setUnauthorizedHandler(fn: () => void): void {
   _unauthorizedHandler = fn;
 }
 
+function _mensagemDoDetalhe(rawDetail: unknown): string {
+  if (typeof rawDetail === "string") return rawDetail;
+  // O servidor pode devolver detail estruturado quando a recusa tem dados que
+  // a tela precisa — ver ApiError.detalhe.
+  if (rawDetail && typeof rawDetail === "object" && "mensagem" in rawDetail) {
+    const mensagem = (rawDetail as { mensagem?: unknown }).mensagem;
+    if (typeof mensagem === "string") return mensagem;
+  }
+  return "";
+}
+
 function _traduzirErro(status: number, rawDetail: unknown): string {
-  const detail = typeof rawDetail === "string" ? rawDetail : "";
+  const detail = _mensagemDoDetalhe(rawDetail);
   if (status === 409) return detail || "Este registro mudou. Atualize os dados antes de tentar novamente.";
   if (status === 404) return "Registro não encontrado.";
   if (status === 403) return "Você não tem permissão para esta ação.";
@@ -48,7 +59,7 @@ async function request<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, _traduzirErro(res.status, body.detail));
+    throw new ApiError(res.status, _traduzirErro(res.status, body.detail), body.detail);
   }
 
   if (res.status === 204) return undefined as T;
@@ -59,6 +70,9 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    // Corpo bruto de `detail`. Existe para recusas que carregam dados de
+    // decisão — a mensagem sozinha não permitiria a tela oferecer a ação.
+    public readonly detalhe?: unknown,
   ) {
     super(message);
   }
