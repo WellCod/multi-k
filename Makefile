@@ -26,7 +26,7 @@ down:
 
 dev:
 	@echo "Iniciando backend e frontend em paralelo..."
-	@(cd backend && uvicorn app.main:app --reload --port 8000) &
+	@(cd backend && uvicorn app.main:app --reload --port 8000 --timeout-graceful-shutdown 5) &
 	@(cd frontend && npm run dev) &
 	@wait
 
