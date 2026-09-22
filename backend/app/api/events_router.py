@@ -24,6 +24,13 @@ async def gerar_eventos(uid: uuid.UUID) -> AsyncGenerator[bytes, None]:
 
     Sem esse sinal o gerador nunca termina, e o desligamento gracioso — que
     espera as respostas em curso — fica preso indefinidamente.
+
+    O sinal **não basta sozinho**: o uvicorn espera as conexões fecharem antes
+    de rodar o shutdown do lifespan, que é onde o sinal é emitido. Com um
+    stream aberto, cada lado espera o outro. Quem quebra o impasse é
+    `--timeout-graceful-shutdown` no comando do uvicorn (backend/Dockerfile e
+    Makefile); sem essa flag, o processo trava em "Waiting for connections to
+    close". Medido em 22/09/2026: sem ela, indefinido; com ela, 5 segundos.
     """
     q = events_bus.subscribe(uid)
     # asyncio.wait exige um tipo só; o resultado de cada uma é lido à parte.
