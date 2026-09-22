@@ -32,6 +32,19 @@ from app.infra.quote_revision import quote_revision
 router = APIRouter(tags=["propostas"])
 
 
+class _TransmissaoRecusadaError(Exception):
+    """Recusa com certeza de que nada chegou à seguradora.
+
+    Existe para não cair no `except` que marca a tentativa como incerta: aqui
+    há resposta, e ela foi negativa. O corretor pode corrigir e reenviar.
+    """
+
+    def __init__(self, motivo: str, dados: dict[str, object]) -> None:
+        self.motivo = motivo
+        self.dados = dados
+        super().__init__(motivo)
+
+
 # ---------------------------------------------------------------------------
 # Dependência injetável — sobrescrita nos testes com FakeSeguradora(0, 0)
 # ---------------------------------------------------------------------------
@@ -200,7 +213,9 @@ async def transmitir(
         raise HTTPException(
             409, "Já existe uma proposta para esta cotação. Não reenvie."
         )
-    if previous is not None and previous.tipo != "transmissao.liberada":
+    if previous is not None and previous.tipo not in (
+        transmission.LIBERAM_NOVA_TENTATIVA
+    ):
         raise HTTPException(
             409,
             "Transmissão bloqueada. Confira o resultado na seguradora "
@@ -263,6 +278,9 @@ async def transmitir(
         **dict(cotacao.payload_original or {}),
         **job_payload,
         **dict(body.dados_negocio),
+        # A validade da cotação é regra de cada seguradora; o adapter decide o
+        # prazo, aqui só entregamos quando ela nasceu.
+        "cotacao_criada_em": cotacao.criado_em.isoformat(),
     }
     parcela_confirmada: Decimal | None = None
     pagamento_confirmado: dict[str, Any] | None = None
@@ -323,9 +341,19 @@ async def transmitir(
     try:
         resultado = await adapter.transmitir(proposta_canonica)
         if not resultado.sucesso or resultado.protocolo is None:
+            motivo = (
+                resultado.mensagens[0]
+                if resultado.mensagens
+                else "A seguradora não confirmou a transmissão."
+            )
+            # Recusa com certeza de que nada foi criado não é falha de
+            # transmissão: é resposta negativa. Bloquear o reenvio aqui
+            # trancaria o corretor fora de algo que ele pode corrigir.
+            if resultado.nada_transmitido:
+                raise _TransmissaoRecusadaError(motivo, dict(resultado.dados))
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="A seguradora não confirmou a transmissão.",
+                detail=motivo,
             )
         # Truncar o protocolo perderia a única referência ao envio já feito.
         if len(resultado.protocolo) > 100:
@@ -391,6 +419,15 @@ async def transmitir(
         await db.commit()
         link = resultado.dados.get("checkout_url")
         return _proposta_out(proposta, str(link) if link else None)
+
+    except _TransmissaoRecusadaError as exc:
+        await transmission.mark_rejected(
+            db, cotacao_id, actor, attempt_id, body.cia, ip, exc.motivo
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"mensagem": exc.motivo, **exc.dados},
+        ) from exc
 
     except Exception as exc:
         # Mesmo que a gravação de 'incerta' falhe, o início durável bloqueia reenvio.

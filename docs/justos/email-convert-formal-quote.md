@@ -1,6 +1,13 @@
 # E-mail — `convert-formal-quote` falhando em staging
 
-> **Rascunho. Não enviado.** Destinatário: o ponto focal
+> **Enviado e respondido em 21/09/2026.** A seguradora confirmou que o bloqueio
+> era do lado dela, em staging, causado por um fornecedor deles, e orientou como
+> seguir os testes. O ciclo foi fechado no mesmo dia — ver
+> [`prontidao-producao.md`](prontidao-producao.md) §3. As demais respostas estão
+> em [`plano-exportacao-incremental.md`](plano-exportacao-incremental.md) §11.
+> Mantido como registro do que foi perguntado.
+>
+> **Rascunho original.** Destinatário: o ponto focal
 > (`[e-mail do ponto focal]`). Evidência completa em
 > [`prontidao-producao.md`](prontidao-producao.md) §3.
 >

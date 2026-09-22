@@ -47,9 +47,10 @@ Campos opcionais em dados_negocio:
 from __future__ import annotations
 
 import logging
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -204,10 +205,53 @@ def _documento(valor: str) -> str:
     return digitos
 
 
-# J1/J2 §4: broker_commission_percentage é inteiro, de 10 a 25.
-_COMISSAO_MIN = 10
+# broker_commission_percentage é inteiro. A documentação publicada diz 10 a 25;
+# a seguradora confirmou em 17/09/2026 que o mínimo real é 0 — renovação de
+# apólice dela tem piso próprio, aplicado por eles na criação da cotação.
+_COMISSAO_MIN = 0
 _COMISSAO_MAX = 25
 _COMISSAO_PADRAO = 15
+
+
+# A cotação vale 30 dias corridos da criação, até o fim do dia no horário de
+# Brasília (seguradora, 21/09/2026). Passou disso, eles recusam a transmissão.
+_VALIDADE_DIAS = 30
+_FUSO_SEGURADORA = ZoneInfo("America/Sao_Paulo")
+
+
+def _cotacao_vencida(criada_em: object, agora: datetime | None = None) -> str | None:
+    """Mensagem de recusa quando a cotação passou da validade, ou None.
+
+    O corte é o fim do dia no fuso da seguradora, não 30×24h: uma cotação
+    criada às 23h de Brasília vale o dia 30 inteiro, e contar em UTC a
+    venceria cedo demais.
+    """
+    if criada_em is None:
+        return None
+    if isinstance(criada_em, datetime):
+        momento = criada_em
+    else:
+        try:
+            momento = datetime.fromisoformat(str(criada_em))
+        except ValueError:
+            return None
+    if momento.tzinfo is None:
+        momento = momento.replace(tzinfo=UTC)
+
+    dia_local = momento.astimezone(_FUSO_SEGURADORA).date()
+    limite = datetime.combine(
+        dia_local + timedelta(days=_VALIDADE_DIAS),
+        time.max,
+        tzinfo=_FUSO_SEGURADORA,
+    )
+    referencia = (agora or datetime.now(UTC)).astimezone(_FUSO_SEGURADORA)
+    if referencia <= limite:
+        return None
+    return (
+        f"Cotação vencida: a seguradora aceita transmissão por {_VALIDADE_DIAS} "
+        f"dias corridos após a criação, e o prazo terminou em "
+        f"{limite.strftime('%d/%m/%Y')}. Refaça a cotação."
+    )
 
 
 def _comissao_cotada(dados: dict[str, Any]) -> int:
@@ -541,7 +585,10 @@ class JustosSeguradora:
             bonus = _bonus_anterior(risco_dados)
         except ValueError as exc:
             return ResultadoTransmissao(
-                sucesso=False, protocolo=None, mensagens=[str(exc)]
+                sucesso=False,
+                protocolo=None,
+                mensagens=[str(exc)],
+                nada_transmitido=True,
             )
         if bonus > 0 and not ci_code:
             return ResultadoTransmissao(
@@ -551,6 +598,18 @@ class JustosSeguradora:
                     "Classe de bônus maior que zero exige o código CI da apólice "
                     "anterior, que consta no PDF da apólice."
                 ],
+                nada_transmitido=True,
+            )
+
+        # Recusar aqui evita queimar a tentativa contra a seguradora e dá ao
+        # corretor uma mensagem melhor que o erro genérico deles.
+        vencida = _cotacao_vencida(dados.get("cotacao_criada_em"))
+        if vencida is not None:
+            return ResultadoTransmissao(
+                sucesso=False,
+                protocolo=None,
+                mensagens=[vencida],
+                nada_transmitido=True,
             )
 
         # J2 §7: e-mail e telefone vão na formalização; validar antes evita
@@ -558,7 +617,10 @@ class JustosSeguradora:
         contato = _validar_contato(email, telefone)
         if contato is not None:
             return ResultadoTransmissao(
-                sucesso=False, protocolo=None, mensagens=[contato]
+                sucesso=False,
+                protocolo=None,
+                mensagens=[contato],
+                nada_transmitido=True,
             )
 
         if not coverages_selected:
@@ -566,7 +628,14 @@ class JustosSeguradora:
                 sucesso=False,
                 protocolo=None,
                 mensagens=["coverages_selected obrigatório em dados_negocio."],
+                nada_transmitido=True,
             )
+
+        # Só é enviada quando o corretor já viu o recálculo e concordou.
+        fipe_confirmada = dados.get("fipe_pct_confirmada")
+        fipe_pct_confirmada = (
+            float(fipe_confirmada) if fipe_confirmada is not None else None
+        )
 
         try:
             await client.selecionar_coberturas(
@@ -580,17 +649,58 @@ class JustosSeguradora:
                 installments=installments,
                 scheduling_date=scheduling_date,
                 ci_code=ci_code,
+                fipe_pct_confirmada=fipe_pct_confirmada,
             )
             links = await client.obter_checkout_link(quote_id)
+        except client.CoberturaFipeAlteradaError as exc:
+            # Nada foi transmitido. A seguradora está pedindo concordância com
+            # uma cobertura menor que a cotada, e essa decisão é do corretor:
+            # aceitar em silêncio venderia ao cliente algo diferente do que
+            # ele viu na tela.
+            anterior = dados.get("fipe_price_percentage_covered")
+            return ResultadoTransmissao(
+                sucesso=False,
+                protocolo=None,
+                mensagens=[
+                    "A seguradora alterou a cobertura para "
+                    f"{exc.nova_pct:g}% do valor da tabela FIPE"
+                    + (
+                        f", antes {float(anterior):g}%."
+                        if anterior is not None
+                        else "."
+                    )
+                    + " Confirme com o cliente antes de transmitir novamente."
+                ],
+                nada_transmitido=True,
+                dados={
+                    "reconfirmacao": "fipe_pct",
+                    "fipe_pct_nova": exc.nova_pct,
+                    **(
+                        {"fipe_pct_anterior": float(anterior)}
+                        if anterior is not None
+                        else {}
+                    ),
+                },
+            )
         except httpx.HTTPStatusError as exc:
+            # 4xx é recusa: a seguradora avaliou e não criou nada, dá para
+            # corrigir e reenviar. 5xx não diz nada sobre o que aconteceu do
+            # lado dela, e reenviar às cegas duplica proposta.
+            recusa = 400 <= exc.response.status_code < 500
             return ResultadoTransmissao(
                 sucesso=False,
                 protocolo=None,
                 mensagens=[
                     "Justos não confirmou a transmissão "
                     f"(HTTP {exc.response.status_code}). "
-                    "Verifique a situação na seguradora antes de repetir o envio."
+                    + (
+                        "Corrija os dados e tente de novo."
+                        if recusa
+                        else "Verifique a situação na seguradora antes de repetir "
+                        "o envio."
+                    )
                 ],
+                nada_transmitido=recusa,
             )
 
         # J2 §8: o identificador estável é a cotação formalizada. O link de

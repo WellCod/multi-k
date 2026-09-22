@@ -741,3 +741,22 @@ async def test_transmission_restores_rls_context_after_initial_commit(
         assert response.status_code == 201
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+async def test_recusada_libera_nova_tentativa() -> None:
+    """Recusa não é incerteza.
+
+    'incerta' bloqueia porque ninguém sabe se a proposta foi criada.
+    'recusada' é a seguradora dizendo que não criou — reenviar é seguro, e
+    bloquear trancaria o corretor fora de algo que ele pode corrigir.
+    """
+    assert "transmissao.recusada" in control.LIBERAM_NOVA_TENTATIVA
+    assert "transmissao.liberada" in control.LIBERAM_NOVA_TENTATIVA
+    assert "transmissao.incerta" not in control.LIBERAM_NOVA_TENTATIVA
+    assert "transmissao.iniciada" not in control.LIBERAM_NOVA_TENTATIVA
+
+
+async def test_recusada_faz_parte_do_diario() -> None:
+    """Sem estar em TYPES, `latest` não enxergaria o evento e o portão abriria
+    por engano, como se não houvesse tentativa anterior."""
+    assert "transmissao.recusada" in control.TYPES

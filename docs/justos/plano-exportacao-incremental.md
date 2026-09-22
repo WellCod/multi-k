@@ -4,6 +4,12 @@ Data: 16/09/2026. Revisado em 17/09/2026 com as respostas da seguradora.
 Cobre o item 6 da ordem de ação de
 [`../auditoria-requisitos-justos.md`](../auditoria-requisitos-justos.md).
 
+> **SUSPENSO em 21/09/2026, a pedido da seguradora.** O layout da exportação
+> ainda não está fechado e eles pediram para segurar a construção da varredura:
+> *"a gente está fechando o molde final nos próximos dias, e assim que fechar eu
+> te mando o layout junto com o changelog. Construir agora é retrabalho
+> garantido."* As etapas do §10 ficam paradas até o layout chegar.
+
 **Este documento é desenho, não implantação.** A auditoria pede "planejar
 exportação e documentos com cursor, idempotência e eventos corretos; somente
 ativar após aprovação do gate de fase". Nada aqui autoriza ligar a
@@ -162,15 +168,28 @@ etapa é um lote com gate próprio, como manda o plano da fase 5.
 | 6 | Documentos (§9), depois de decidir retenção | 5 |
 | 7 | Agendamento **a cada hora** (resposta 4) — **só aqui a sincronização liga** | gate de fase |
 
-As etapas 1 e 2 não tocam o domínio nem ligam nada: constroem a varredura e a
-persistência com o agendador desligado. É o maior avanço possível sem o gate.
+As etapas 1 e 2 não tocam o domínio nem ligam nada. Eram o maior avanço
+possível sem o gate de fase — mas **estão suspensas desde 21/09/2026**: ambas
+constroem cursor, paginação e projeção sobre um layout que a seguradora ainda
+está fechando.
 
 ## 11. Em aberto
 
-1. **Responder à seguradora** se a ausência do campo de causa do `INACTIVE` é
-   bloqueante (§5).
-2. **Layout em homologação:** acompanhar o changelog da documentação. Evitar
-   amarrar o domínio a campos que ainda podem mudar.
-3. Validade da cotação continua sem fonte: `validUntil` de J3 é vigência de
-   **apólice**, não prazo de cotação. Não automatizar expiração antes de
-   confirmação contratual.
+1. ~~Responder à seguradora sobre o campo de causa do `INACTIVE`~~ —
+   respondido em 21/09/2026: não bloqueia integrar, bloqueia automatizar
+   estorno de comissão e ação de retenção. Eles anotaram para avaliar no
+   futuro; segue o §5, registrando encerramento sem inferir motivo.
+2. **Layout ainda não fechado.** Não há changelog publicado. A seguradora
+   enviará o layout junto com o changelog quando fechar. **É o que suspende
+   este plano.**
+3. ~~Validade da cotação sem fonte~~ — confirmada em 21/09/2026: **30 dias
+   corridos da criação, até o fim do dia no horário de Brasília**. Passou
+   disso, a transmissão é recusada. Implementado em `_cotacao_vencida`, que
+   recusa localmente antes de gastar a tentativa.
+
+### Pendência nossa com a seguradora
+
+Confirmar se o recálculo da porcentagem da FIPE coberta entre cotação e
+transmissão também ocorre em produção, ou é comportamento do staging. Não muda
+o código — a reconfirmação pelo corretor está certa nos dois casos —, mas muda
+a prioridade da tela que exibe a divergência.
