@@ -97,6 +97,11 @@ class ResultadoTransmissao:
     protocolo: str | None
     mensagens: list[str] = field(default_factory=list)
     dados: dict[str, object] = field(default_factory=dict)
+    # True só quando o adapter tem certeza de que nada chegou à seguradora:
+    # validação local, ou recusa explícita dela antes de criar a proposta.
+    # Falso é o padrão seguro — na dúvida, a tentativa fica bloqueada até
+    # conferência humana, porque reenviar o que já foi cria proposta duplicada.
+    nada_transmitido: bool = False
 
 
 @dataclass(frozen=True)

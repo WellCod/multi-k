@@ -158,8 +158,40 @@ async def test_transmission_error_does_not_expose_provider_body() -> None:
         )
     assert not result.sucesso
     message = " ".join(result.mensagens)
-    assert "antes de repetir" in message
     assert "private@example.invalid" not in message
+    assert "private-token" not in message
+    # 400: a seguradora avaliou e recusou — nada foi criado, dá para corrigir.
+    assert result.nada_transmitido is True
+
+
+async def test_erro_5xx_nao_libera_reenvio() -> None:
+    """500 não diz o que aconteceu do lado deles.
+
+    Reenviar às cegas depois de um 5xx é o caminho para proposta duplicada,
+    então a tentativa fica bloqueada até conferência humana.
+    """
+    with respx.mock as r:
+        _mock_auth(r)
+        r.put(_COVERAGES_URL).mock(
+            return_value=Response(500, json={"trace": "private@example.invalid"})
+        )
+        result = await JustosSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="Q-001",
+                risco=RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO),
+                dados_negocio={
+                    "email": "joao@test.com",
+                    "telefone": "11999990000",
+                    "coverages_selected": {"collision": "full"},
+                },
+            )
+        )
+
+    assert not result.sucesso
+    assert result.nada_transmitido is False
+    message = " ".join(result.mensagens)
+    assert "private@example.invalid" not in message
+    assert "antes de repetir" in message
     assert "private-token" not in message
 
 
@@ -519,3 +551,119 @@ async def test_gerar_pdf_cotacao_producao(
 
     assert result == b"%PDF-prod"
     assert captured_urls and "staging" not in captured_urls[-1]
+
+
+_FIPE_ALTERADA = {
+    "error": "fipe_price_percentage_covered_changed",
+    "context": {
+        "new_fipe_price_percentage_covered": 70,
+        "title": "Porcentagem da FIPE alterada",
+    },
+}
+
+
+async def test_recalculo_da_fipe_nao_transmite_sozinho() -> None:
+    """A seguradora pede concordância; aceitar em silêncio vende outra coisa.
+
+    Ela recusa a formalização quando recalcula a cobertura entre a cotação e a
+    transmissão. Confirmar automaticamente entregaria ao cliente uma apólice
+    com cobertura menor que a exibida na tela.
+    """
+    with respx.mock as r:
+        _mock_auth(r)
+        r.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
+        r.post(_CONVERT_URL).mock(return_value=Response(400, json=_FIPE_ALTERADA))
+
+        resultado = await JustosSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="Q-001",
+                risco=RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO),
+                dados_negocio={
+                    "email": "joao@test.com",
+                    "telefone": "11999990000",
+                    "fipe_price_percentage_covered": 100,
+                    "coverages_selected": {
+                        "colisao-e-desastres-naturais": "colisao-franquia-20"
+                    },
+                },
+            )
+        )
+
+    assert resultado.sucesso is False
+    assert resultado.protocolo is None
+    assert resultado.nada_transmitido is True
+    assert resultado.dados["reconfirmacao"] == "fipe_pct"
+    assert resultado.dados["fipe_pct_nova"] == 70
+    assert resultado.dados["fipe_pct_anterior"] == 100
+    assert "70%" in resultado.mensagens[0]
+    assert "100%" in resultado.mensagens[0]
+
+
+async def test_fipe_confirmada_pelo_corretor_segue_na_transmissao() -> None:
+    """Depois que o corretor concorda, o percentual vai no corpo do convert."""
+    captured: list[dict] = []
+
+    with respx.mock as r:
+        _mock_auth(r)
+        r.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
+
+        def _capture(request: respx.patterns.M) -> Response:  # type: ignore[name-defined]
+            import json
+
+            captured.append(json.loads(request.content))
+            return Response(200, json={})
+
+        r.post(_CONVERT_URL).mock(side_effect=_capture)
+        r.get(_CHECKOUT_URL).mock(return_value=Response(200, json=_RESP_CHECKOUT))
+
+        resultado = await JustosSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="Q-001",
+                risco=RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO),
+                dados_negocio={
+                    "email": "joao@test.com",
+                    "telefone": "11999990000",
+                    "fipe_pct_confirmada": 70,
+                    "coverages_selected": {
+                        "colisao-e-desastres-naturais": "colisao-franquia-20"
+                    },
+                },
+            )
+        )
+
+    assert resultado.sucesso is True
+    assert captured[0]["fipe_price_percentage_covered"] == 70
+
+
+async def test_sem_confirmacao_o_percentual_nao_vai_no_corpo() -> None:
+    """Enviar o campo por padrão burlaria o portão de concordância."""
+    captured: list[dict] = []
+
+    with respx.mock as r:
+        _mock_auth(r)
+        r.put(_COVERAGES_URL).mock(return_value=Response(200, json={}))
+
+        def _capture(request: respx.patterns.M) -> Response:  # type: ignore[name-defined]
+            import json
+
+            captured.append(json.loads(request.content))
+            return Response(200, json={})
+
+        r.post(_CONVERT_URL).mock(side_effect=_capture)
+        r.get(_CHECKOUT_URL).mock(return_value=Response(200, json=_RESP_CHECKOUT))
+
+        await JustosSeguradora().transmitir(
+            PropostaCanonica(
+                cotacao_id="Q-001",
+                risco=RiscoCanonico(ramo="auto", dados=_RISCO_AUTO_PLANO),
+                dados_negocio={
+                    "email": "joao@test.com",
+                    "telefone": "11999990000",
+                    "coverages_selected": {
+                        "colisao-e-desastres-naturais": "colisao-franquia-20"
+                    },
+                },
+            )
+        )
+
+    assert "fipe_price_percentage_covered" not in captured[0]
