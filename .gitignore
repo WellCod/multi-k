@@ -13,8 +13,11 @@
 
 # Documentação confidencial da Yelum (cláusula de não-reprodução)
 docs/yelum/
-docs/justos/*.txt
-docs/justos/logo/
+# Justos: documentação, marca, correspondência e matriz de aderência
+docs/justos/
+docs/auditoria-requisitos-justos.md
+# roteiro de trabalho local
+docs/prompts.md
 *.pdf
 
 # Segredos, chaves e certificados

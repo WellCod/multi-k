@@ -45,9 +45,9 @@ Preservar alterações de logos e comparação já presentes no diretório.
 8. **Regressão integrada** — lint, tipos, testes backend, build frontend; cenário
    isolado de login → cotação fake → comparação → proposta; integração Justos
    apenas mockada nesta execução. Homologação externa depende de autorização.
-9. **Aderência à documentação Justos** — conferir todos os documentos de
-   `docs/justos`, registrar requisito → código → teste → lacuna e priorizar
-   correções. Matriz: [auditoria-requisitos-justos.md](auditoria-requisitos-justos.md).
+9. **Aderência à documentação Justos** — conferir todos os documentos da
+   seguradora, registrar requisito → código → teste → lacuna e priorizar
+   correções. A matriz fica fora do repositório, junto com a documentação.
    Não confundir implementação parcial com homologação. Exportação automática
    continua sujeita ao gate de fase; não avançar para E-Retorno por inferência.
 
@@ -71,7 +71,7 @@ Atualização de 16/09/2026:
   registradas na matriz. Corrigido envio de inicio_vigencia para scheduling_date;
   não foram alteradas regras comerciais, ativada sincronização ou feitas chamadas reais.
 
-- Condições de pagamento documentadas em `docs/justos/documento_da_api.txt`
+- Condições de pagamento documentadas pela seguradora
   (monthly/annual.installments) e no adendo de pricing agora são normalizadas
   no adapter, preservadas ao aplicar revisão e retornadas pelo comparativo.
   Somente periodicidade, quantidade, valor explícito da parcela e total são

@@ -89,9 +89,9 @@ O produto atende **Auto e Moto**. O código não depende de nenhuma seguradora e
 | **Yelum** | Imóvel | Adapter pronto e isolado, **sem uso no produto por ora**: o ramo imóvel está fora de escopo e não é oferecido na interface. O código permanece, com as mesmas regras da Justos; reativar é devolver a opção no frontend. Depende também da credencial de homologação. |
 | **Fake** | Todos | Simulador usado em desenvolvimento e nos testes. Nenhum teste da suíte faz chamada real. |
 
-A aderência da integração Justos ao contrato publicado é acompanhada requisito a requisito em [`docs/auditoria-requisitos-justos.md`](docs/auditoria-requisitos-justos.md): cada linha aponta evidência no código, teste e lacuna.
+A aderência da integração Justos à documentação da seguradora é acompanhada requisito a requisito numa matriz interna: cada linha aponta evidência no código, teste e lacuna.
 
-A importação automática de apólices vendidas (E-Retorno) está **desenhada e não ligada**. O desenho — cursor durável, idempotência, encerramento sem causa inventada — e as etapas de execução estão em [`docs/justos/plano-exportacao-incremental.md`](docs/justos/plano-exportacao-incremental.md), já revisados com as respostas da seguradora. A API de exportação segue em homologação, com layout sujeito a ajuste.
+A importação automática de apólices vendidas (E-Retorno) está **desenhada e não ligada**. O desenho — cursor durável, idempotência, encerramento sem causa inventada — e as etapas de execução já foram revisados com a seguradora. A API de exportação segue em homologação, com layout sujeito a ajuste.
 
 ---
 
@@ -307,13 +307,10 @@ docs/
   adr.md                           # Architecture Decision Records
   escopo.md                        # escopo, requisitos e riscos
   plano-seguranca-fluxo-fase5.md   # plano de execução por lote, com gates
-  auditoria-requisitos-justos.md   # matriz requisito → código → teste → lacuna
-  justos/                          # planos e auditorias derivados do contrato
 ```
 
-A documentação das seguradoras e os arquivos de marca delas ficam **fora do
-versionamento** — vale para `docs/yelum/` e para `docs/justos/*.txt`. É material
-de parceiro, não nosso.
+A documentação das seguradoras, a correspondência com elas e os arquivos de
+marca ficam **fora do versionamento**: é material de parceiro, não nosso.
 
 ---
 
