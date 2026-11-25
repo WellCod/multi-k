@@ -35,9 +35,9 @@ if _ENV.exists():
 # ---------------------------------------------------------------------------
 # Dados de teste — substitua por veículo real para staging Justos
 # ---------------------------------------------------------------------------
-TEST_CPF = os.environ.get(
-    "TEST_CPF", ""
-)  # passe via: set TEST_CPF=seucpf && python scripts/e2e_justos_staging.py
+# CPF e e-mail vêm do ambiente para nunca ficarem gravados no repositório.
+# Exemplo: set TEST_CPF=... && python scripts/e2e_justos_staging.py
+TEST_CPF = os.environ.get("TEST_CPF", "")
 TEST_NOME = "João Teste Silva"
 TEST_PLACA = "DVK0101"
 TEST_FIPE = "014050-3"  # Honda Civic Sedan EXS 1.8 Flex 16V Aut. 2007
@@ -238,8 +238,8 @@ async def run() -> None:
         # o corretor decidir, porque aceitar em silêncio venderia ao cliente
         # cobertura menor que a exibida. Ver JustosSeguradora.transmitir.
         if r.status_code == 400 and "fipe_price_percentage_covered_changed" in r.text:
-            nova_pct = r.json()["context"]["new_fipe_price_percentage_covered"]
-            print(f"[INFO] FIPE coberta mudou para {nova_pct}% — reconfirmando")
+            nova_fipe_pct = r.json()["context"]["new_fipe_price_percentage_covered"]
+            print(f"[INFO] FIPE coberta mudou para {nova_fipe_pct}% — reconfirmando")
             r = await c.post(
                 "/brokers/quote/convert-formal-quote",
                 json={
@@ -248,7 +248,7 @@ async def run() -> None:
                     "given_phone_number": TEST_TELEFONE,
                     "policy_type": "monthly",
                     "scheduling_date": None,
-                    "fipe_price_percentage_covered": nova_pct,
+                    "fipe_price_percentage_covered": nova_fipe_pct,
                 },
                 headers=headers,
             )

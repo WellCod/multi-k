@@ -126,6 +126,50 @@ async def record(
     )
 
 
+async def _close_attempt(
+    db: AsyncSession,
+    quote_id: uuid.UUID,
+    user: Actor,
+    attempt_id: uuid.UUID,
+    cia: str,
+    ip: str | None,
+    final_kind: str,
+    justification: str | None = None,
+) -> None:
+    """Grava o desfecho de uma tentativa que falhou, em transação própria.
+
+    Roda a partir dos tratadores de erro da transmissão, quando a sessão pode
+    ter ficado com trabalho pela metade. Por isso começa do zero.
+    """
+    # Descarta o que a tentativa deixou pendente na sessão.
+    await db.rollback()
+    # O rollback apaga o SET LOCAL do RLS; sem restaurar, a consulta abaixo
+    # não enxergaria a cotação do usuário.
+    await restore_context(db, user)
+    # O lock serializa com qualquer outra decisão sobre a mesma cotação.
+    quote = await quote_for_user(db, quote_id, user, lock=True)
+    previous = await latest(db, quote)
+    # Só fecha se o último registro ainda é o início DESTA tentativa. Se já
+    # existe outro desfecho, ou outra tentativa começou, não sobrescreve.
+    is_this_attempt_still_open = (
+        previous is not None
+        and previous.tipo == "transmissao.iniciada"
+        and previous.dados.get("tentativa_id") == str(attempt_id)
+    )
+    if is_this_attempt_still_open:
+        await record(
+            db,
+            quote,
+            user,
+            final_kind,
+            attempt_id,
+            cia,
+            ip=ip,
+            justification=justification,
+        )
+    await db.commit()
+
+
 async def mark_rejected(
     db: AsyncSession,
     quote_id: uuid.UUID,
@@ -138,28 +182,18 @@ async def mark_rejected(
     """Fecha a tentativa como recusada: a seguradora não criou proposta.
 
     Diferente de `mark_uncertain`, não bloqueia o reenvio — aqui existe
-    resposta, e ela foi 'não'.
+    resposta, e ela foi 'não'. O motivo fica gravado como justificativa.
     """
-    await db.rollback()
-    await restore_context(db, user)
-    quote = await quote_for_user(db, quote_id, user, lock=True)
-    previous = await latest(db, quote)
-    if (
-        previous is not None
-        and previous.tipo == "transmissao.iniciada"
-        and previous.dados.get("tentativa_id") == str(attempt_id)
-    ):
-        await record(
-            db,
-            quote,
-            user,
-            "transmissao.recusada",
-            attempt_id,
-            cia,
-            ip=ip,
-            justification=motivo,
-        )
-    await db.commit()
+    await _close_attempt(
+        db,
+        quote_id,
+        user,
+        attempt_id,
+        cia,
+        ip,
+        final_kind="transmissao.recusada",
+        justification=motivo,
+    )
 
 
 async def mark_uncertain(
@@ -170,14 +204,17 @@ async def mark_uncertain(
     cia: str,
     ip: str | None,
 ) -> None:
-    await db.rollback()
-    await restore_context(db, user)
-    quote = await quote_for_user(db, quote_id, user, lock=True)
-    previous = await latest(db, quote)
-    if (
-        previous is not None
-        and previous.tipo == "transmissao.iniciada"
-        and previous.dados.get("tentativa_id") == str(attempt_id)
-    ):
-        await record(db, quote, user, "transmissao.incerta", attempt_id, cia, ip=ip)
-    await db.commit()
+    """Fecha a tentativa como incerta: não se sabe se a proposta foi criada.
+
+    Bloqueia novas tentativas até alguém conferir na seguradora e liberar,
+    porque reenviar sem saber pode duplicar a proposta.
+    """
+    await _close_attempt(
+        db,
+        quote_id,
+        user,
+        attempt_id,
+        cia,
+        ip,
+        final_kind="transmissao.incerta",
+    )

@@ -219,38 +219,86 @@ _VALIDADE_DIAS = 30
 _FUSO_SEGURADORA = ZoneInfo("America/Sao_Paulo")
 
 
-def _cotacao_vencida(criada_em: object, agora: datetime | None = None) -> str | None:
+def _motivo_cotacao_vencida(
+    criada_em: object, agora: datetime | None = None
+) -> str | None:
     """Mensagem de recusa quando a cotação passou da validade, ou None.
 
     O corte é o fim do dia no fuso da seguradora, não 30×24h: uma cotação
     criada às 23h de Brasília vale o dia 30 inteiro, e contar em UTC a
     venceria cedo demais.
+
+    `criada_em` aceita datetime ou texto ISO 8601, porque chega pelos
+    dados_negocio já serializado. `agora` existe para os testes fixarem o
+    relógio; em produção fica None e vale o horário atual.
     """
+    # Data ausente ou ilegível não bloqueia: a seguradora continua sendo a
+    # fonte da verdade e recusa a transmissão se a cotação estiver vencida.
+    # Bloquear aqui por falta de dado travaria um envio legítimo.
     if criada_em is None:
         return None
     if isinstance(criada_em, datetime):
-        momento = criada_em
+        momento_criacao = criada_em
     else:
         try:
-            momento = datetime.fromisoformat(str(criada_em))
+            momento_criacao = datetime.fromisoformat(str(criada_em))
         except ValueError:
             return None
-    if momento.tzinfo is None:
-        momento = momento.replace(tzinfo=UTC)
+    # O banco grava criado_em com fuso, em UTC. Um valor sem fuso só aparece
+    # em teste ou dado montado à mão, e é lido como UTC pelo mesmo critério.
+    if momento_criacao.tzinfo is None:
+        momento_criacao = momento_criacao.replace(tzinfo=UTC)
 
-    dia_local = momento.astimezone(_FUSO_SEGURADORA).date()
-    limite = datetime.combine(
-        dia_local + timedelta(days=_VALIDADE_DIAS),
+    dia_criacao_no_fuso = momento_criacao.astimezone(_FUSO_SEGURADORA).date()
+    fim_da_validade = datetime.combine(
+        dia_criacao_no_fuso + timedelta(days=_VALIDADE_DIAS),
         time.max,
         tzinfo=_FUSO_SEGURADORA,
     )
-    referencia = (agora or datetime.now(UTC)).astimezone(_FUSO_SEGURADORA)
-    if referencia <= limite:
+    agora_no_fuso = (agora or datetime.now(UTC)).astimezone(_FUSO_SEGURADORA)
+    if agora_no_fuso <= fim_da_validade:
         return None
     return (
         f"Cotação vencida: a seguradora aceita transmissão por {_VALIDADE_DIAS} "
         f"dias corridos após a criação, e o prazo terminou em "
-        f"{limite.strftime('%d/%m/%Y')}. Refaça a cotação."
+        f"{fim_da_validade.strftime('%d/%m/%Y')}. Refaça a cotação."
+    )
+
+
+def _resultado_cobertura_fipe_alterada(
+    fipe_pct_nova: float, fipe_pct_cotada: float | Decimal | str | None
+) -> ResultadoTransmissao:
+    """Recusa que devolve ao corretor a decisão sobre a nova cobertura FIPE.
+
+    `fipe_pct_cotada` é o percentual que o cliente viu na cotação; pode faltar
+    em cotações antigas, e então a mensagem só informa o valor novo.
+
+    Os `dados` levam os dois percentuais em formato estruturado para a tela
+    montar o pedido de confirmação. `nada_transmitido=True` libera o reenvio
+    depois que o corretor concordar.
+    """
+    mensagem = (
+        f"A seguradora alterou a cobertura para {fipe_pct_nova:g}% do valor da "
+        "tabela FIPE"
+    )
+    dados_para_reconfirmacao: dict[str, object] = {
+        "reconfirmacao": "fipe_pct",
+        "fipe_pct_nova": fipe_pct_nova,
+    }
+    if fipe_pct_cotada is not None:
+        fipe_pct_anterior = float(fipe_pct_cotada)
+        mensagem += f", antes {fipe_pct_anterior:g}%."
+        dados_para_reconfirmacao["fipe_pct_anterior"] = fipe_pct_anterior
+    else:
+        mensagem += "."
+    mensagem += " Confirme com o cliente antes de transmitir novamente."
+
+    return ResultadoTransmissao(
+        sucesso=False,
+        protocolo=None,
+        mensagens=[mensagem],
+        nada_transmitido=True,
+        dados=dados_para_reconfirmacao,
     )
 
 
@@ -603,12 +651,12 @@ class JustosSeguradora:
 
         # Recusar aqui evita queimar a tentativa contra a seguradora e dá ao
         # corretor uma mensagem melhor que o erro genérico deles.
-        vencida = _cotacao_vencida(dados.get("cotacao_criada_em"))
-        if vencida is not None:
+        motivo_vencimento = _motivo_cotacao_vencida(dados.get("cotacao_criada_em"))
+        if motivo_vencimento is not None:
             return ResultadoTransmissao(
                 sucesso=False,
                 protocolo=None,
-                mensagens=[vencida],
+                mensagens=[motivo_vencimento],
                 nada_transmitido=True,
             )
 
@@ -631,10 +679,12 @@ class JustosSeguradora:
                 nada_transmitido=True,
             )
 
-        # Só é enviada quando o corretor já viu o recálculo e concordou.
-        fipe_confirmada = dados.get("fipe_pct_confirmada")
+        # Percentual da FIPE que o corretor aceitou na tela depois de um
+        # recálculo da seguradora. Fica None na primeira tentativa, e então o
+        # campo nem é enviado (ver client.converter_proposta).
+        fipe_pct_informada = dados.get("fipe_pct_confirmada")
         fipe_pct_confirmada = (
-            float(fipe_confirmada) if fipe_confirmada is not None else None
+            float(fipe_pct_informada) if fipe_pct_informada is not None else None
         )
 
         try:
@@ -657,50 +707,30 @@ class JustosSeguradora:
             # uma cobertura menor que a cotada, e essa decisão é do corretor:
             # aceitar em silêncio venderia ao cliente algo diferente do que
             # ele viu na tela.
-            anterior = dados.get("fipe_price_percentage_covered")
-            return ResultadoTransmissao(
-                sucesso=False,
-                protocolo=None,
-                mensagens=[
-                    "A seguradora alterou a cobertura para "
-                    f"{exc.nova_pct:g}% do valor da tabela FIPE"
-                    + (
-                        f", antes {float(anterior):g}%."
-                        if anterior is not None
-                        else "."
-                    )
-                    + " Confirme com o cliente antes de transmitir novamente."
-                ],
-                nada_transmitido=True,
-                dados={
-                    "reconfirmacao": "fipe_pct",
-                    "fipe_pct_nova": exc.nova_pct,
-                    **(
-                        {"fipe_pct_anterior": float(anterior)}
-                        if anterior is not None
-                        else {}
-                    ),
-                },
+            return _resultado_cobertura_fipe_alterada(
+                fipe_pct_nova=exc.nova_pct,
+                fipe_pct_cotada=dados.get("fipe_price_percentage_covered"),
             )
         except httpx.HTTPStatusError as exc:
             # 4xx é recusa: a seguradora avaliou e não criou nada, dá para
             # corrigir e reenviar. 5xx não diz nada sobre o que aconteceu do
             # lado dela, e reenviar às cegas duplica proposta.
-            recusa = 400 <= exc.response.status_code < 500
+            status_http = exc.response.status_code
+            seguradora_recusou = 400 <= status_http < 500
+            if seguradora_recusou:
+                orientacao = "Corrija os dados e tente de novo."
+            else:
+                orientacao = (
+                    "Verifique a situação na seguradora antes de repetir o envio."
+                )
             return ResultadoTransmissao(
                 sucesso=False,
                 protocolo=None,
                 mensagens=[
-                    "Justos não confirmou a transmissão "
-                    f"(HTTP {exc.response.status_code}). "
-                    + (
-                        "Corrija os dados e tente de novo."
-                        if recusa
-                        else "Verifique a situação na seguradora antes de repetir "
-                        "o envio."
-                    )
+                    f"Justos não confirmou a transmissão (HTTP {status_http}). "
+                    f"{orientacao}"
                 ],
-                nada_transmitido=recusa,
+                nada_transmitido=seguradora_recusou,
             )
 
         # J2 §8: o identificador estável é a cotação formalizada. O link de

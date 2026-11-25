@@ -9,6 +9,28 @@ import { Field, Stack, Row } from "@/components/primitives";
 import { TransmissionReview } from "@/components/TransmissionReview";
 
 interface Props { cotacaoId: string; ramo?: string; cia: string; revisaoBase?: string; vigenciaInicio?: string; onClose: () => void; onSuccess: (p: Proposta) => void }
+
+/** Percentuais da tabela FIPE cobertos: o que foi cotado e o que a seguradora recalculou. */
+type CoberturaFipeAlterada = { anterior?: number; nova: number };
+
+/**
+ * Reconhece a recusa em que a seguradora pede concordância com uma nova
+ * cobertura FIPE. Devolve os percentuais para a tela pedir a confirmação do
+ * corretor, ou null se o erro for de qualquer outro tipo.
+ *
+ * O backend manda esses dados no `detail` estruturado da resposta 409
+ * (ver ApiError.detalhe); a mensagem de texto sozinha não bastaria.
+ */
+function extrairCoberturaFipeAlterada(erro: unknown): CoberturaFipeAlterada | null {
+  if (!(erro instanceof ApiError)) return null;
+  const detalhe = erro.detalhe as Record<string, unknown> | undefined;
+  const ehPedidoDeReconfirmacao = detalhe?.reconfirmacao === "fipe_pct" && typeof detalhe.fipe_pct_nova === "number";
+  if (!ehPedidoDeReconfirmacao) return null;
+  return {
+    nova: detalhe.fipe_pct_nova as number,
+    anterior: typeof detalhe.fipe_pct_anterior === "number" ? detalhe.fipe_pct_anterior : undefined,
+  };
+}
 export function TransmitirModal({ cotacaoId, ramo, cia, revisaoBase, vigenciaInicio, onClose, onSuccess }: Props) {
   const [carrier, setCarrier] = useState<Seguradora | null>(null);
   const [plano, setPlano] = useState("");
@@ -23,7 +45,7 @@ export function TransmitirModal({ cotacaoId, ramo, cia, revisaoBase, vigenciaIni
   const [reviewVersion, setReviewVersion] = useState(0);
   // A seguradora pode recalcular a cobertura entre a cotação e a transmissão e
   // recusar até haver concordância. Não é erro: é uma decisão do corretor.
-  const [coberturaAlterada, setCoberturaAlterada] = useState<{ anterior?: number; nova: number } | null>(null);
+  const [coberturaAlterada, setCoberturaAlterada] = useState<CoberturaFipeAlterada | null>(null);
   const [coberturaAceita, setCoberturaAceita] = useState(false);
   useEffect(() => {
     let disposed = false;
@@ -69,20 +91,27 @@ export function TransmitirModal({ cotacaoId, ramo, cia, revisaoBase, vigenciaIni
     const selectedMode = carrier.modos_transmissao.find(m => m.id === mode);
     const business = { ...selectedMode?.dados_negocio };
     if (selectedMode?.campo_parcelas) business[selectedMode.campo_parcelas] = plan.parcelas;
+    // Só vai no reenvio, depois que o corretor marcou a concordância com a
+    // nova cobertura. Na primeira tentativa o campo não existe.
     if (coberturaAlterada && coberturaAceita) business.fipe_pct_confirmada = coberturaAlterada.nova;
     try {
       onSuccess(await api.cotacoes.transmitir(cotacaoId, { ...(option ? { opcao_pagamento: Number(plano) } : {}), revisao_base: revisaoBase, chave_idempotencia: crypto.randomUUID(), cia, plano_pagamento: plan.codigo, n_parcelas: plan.parcelas, comissao_pct: (percent / 100).toFixed(4), inicio_vigencia: vigencia, dados_negocio: business }));
-    } catch (e) {
-      setTransmissionBlocked(true); setReviewVersion(v => v + 1);
-      const detalhe = e instanceof ApiError ? e.detalhe as Record<string, unknown> | undefined : undefined;
-      if (detalhe?.reconfirmacao === "fipe_pct" && typeof detalhe.fipe_pct_nova === "number") {
+    } catch (erro) {
+      // Qualquer falha trava o botão e recarrega a conferência: é o servidor
+      // que diz se a tentativa ficou recusada (libera) ou incerta (bloqueia).
+      setTransmissionBlocked(true);
+      setReviewVersion(versao => versao + 1);
+
+      const novaCobertura = extrairCoberturaFipeAlterada(erro);
+      if (novaCobertura) {
         // Nada foi transmitido. A seguradora está pedindo concordância com uma
         // cobertura menor, e quem decide é quem falou com o cliente.
-        setCoberturaAlterada({ nova: detalhe.fipe_pct_nova, anterior: typeof detalhe.fipe_pct_anterior === "number" ? detalhe.fipe_pct_anterior : undefined });
-        setCoberturaAceita(false); setError("");
+        setCoberturaAlterada(novaCobertura);
+        setCoberturaAceita(false);
+        setError("");
       } else {
         setCoberturaAlterada(null);
-        setError(e instanceof Error ? e.message : "Não foi possível confirmar o envio. Consulte a situação antes de tentar novamente.");
+        setError(erro instanceof Error ? erro.message : "Não foi possível confirmar o envio. Consulte a situação antes de tentar novamente.");
       }
     }
     finally { setLoading(false); }
