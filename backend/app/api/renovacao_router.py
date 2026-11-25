@@ -61,14 +61,19 @@ async def _query_renovacoes(
     hoje = date.today()
     renovacoes: list[RenovacaoOut] = []
     for proposta, cotacao in result.all():
-        fim_vigencia = proposta.inicio_vigencia + timedelta(days=_VIGENCIA_DIAS)
+        inicio_vigencia = proposta.inicio_vigencia
+        # A consulta já exclui propostas sem início de vigência; a checagem
+        # existe para o mypy, que enxerga a coluna como `date | None`.
+        if inicio_vigencia is None:
+            continue
+        fim_vigencia = inicio_vigencia + timedelta(days=_VIGENCIA_DIAS)
         dias_para_vencer = (fim_vigencia - hoje).days
         if not (0 <= dias_para_vencer <= dias):
             continue
-        j = _janela(dias_para_vencer)
+        janela_da_proposta = _janela(dias_para_vencer)
         if ramo and cotacao.ramo != ramo:
             continue
-        if janela and j != janela:
+        if janela and janela_da_proposta != janela:
             continue
         renovacoes.append(
             RenovacaoOut(
@@ -77,10 +82,10 @@ async def _query_renovacoes(
                 cliente_id=cotacao.cliente_id,
                 protocolo=proposta.protocolo,
                 ramo=cotacao.ramo,
-                inicio_vigencia=proposta.inicio_vigencia,
+                inicio_vigencia=inicio_vigencia,
                 fim_vigencia=fim_vigencia,
                 dias_para_vencer=dias_para_vencer,
-                janela=j,
+                janela=janela_da_proposta,
                 premio_total=cotacao.premio_total,
             )
         )
@@ -110,13 +115,17 @@ async def contar_renovacoes(
     hoje = date.today()
     d30 = d45 = d60 = 0
     for proposta, _cotacao in result.all():
-        fim = proposta.inicio_vigencia + timedelta(days=_VIGENCIA_DIAS)
-        dias = (fim - hoje).days
-        if 0 <= dias <= 30:
+        inicio_vigencia = proposta.inicio_vigencia
+        # Mesma situação de _query_renovacoes: a consulta já filtra os nulos.
+        if inicio_vigencia is None:
+            continue
+        fim_vigencia = inicio_vigencia + timedelta(days=_VIGENCIA_DIAS)
+        dias_para_vencer = (fim_vigencia - hoje).days
+        if 0 <= dias_para_vencer <= 30:
             d30 += 1
-        elif dias <= 45:
+        elif dias_para_vencer <= 45:
             d45 += 1
-        elif dias <= 60:
+        elif dias_para_vencer <= 60:
             d60 += 1
     return RenovacaoCountOut(D30=d30, D45=d45, D60=d60, total=d30 + d45 + d60)
 
