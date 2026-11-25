@@ -12,6 +12,7 @@ from fastapi.responses import Response as HttpResponse
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, nullsfirst, nullslast, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.registry import cias_para_ramo
@@ -356,10 +357,14 @@ async def listar_cotacoes(
     proposta_map: dict[uuid.UUID, tuple[uuid.UUID, str | None]] = {}
     if cotacoes:
         ids = [c.id for c in cotacoes]
+        # DISTINCT ON (cotacao_id) + ordem por transmitida_em desc: uma linha
+        # por cotação, a da proposta mais recente. Desde o SQLAlchemy 2.1 isso
+        # se escreve com postgresql.distinct_on; .distinct(coluna) foi
+        # descontinuado.
         p_rows = await db.execute(
             select(Proposta.cotacao_id, Proposta.id, Proposta.numero_apolice)
             .where(Proposta.cotacao_id.in_(ids))
-            .distinct(Proposta.cotacao_id)
+            .ext(distinct_on(Proposta.cotacao_id))
             .order_by(Proposta.cotacao_id, Proposta.transmitida_em.desc())
         )
         proposta_map = {row[0]: (row[1], row[2]) for row in p_rows}
