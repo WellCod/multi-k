@@ -24,6 +24,8 @@ down:
 
 # --- Dev local (sem Docker para o app) ---
 
+# --timeout-graceful-shutdown 5: sem ele, um stream SSE aberto trava o reload
+# do uvicorn indefinidamente. Explicação completa em backend/Dockerfile.
 dev:
 	@echo "Iniciando backend e frontend em paralelo..."
 	@(cd backend && uvicorn app.main:app --reload --port 8000 --timeout-graceful-shutdown 5) &

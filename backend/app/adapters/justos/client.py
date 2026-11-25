@@ -258,24 +258,32 @@ async def converter_proposta(
             headers={"Authorization": f"Bearer {token}"},
             timeout=60.0,
         )
+        # O pedido de reconfirmação da FIPE chega como 400, igual a qualquer
+        # erro de validação. Separamos esse caso antes do raise_for_status para
+        # que o adapter o trate como decisão do corretor, não como falha.
         if resp.status_code == 400:
-            nova = _fipe_pct_recalculada(resp)
-            if nova is not None:
-                raise CoberturaFipeAlteradaError(nova)
+            nova_fipe_pct = _fipe_pct_recalculada(resp)
+            if nova_fipe_pct is not None:
+                raise CoberturaFipeAlteradaError(nova_fipe_pct)
         resp.raise_for_status()
         return dict(resp.json())
 
 
 def _fipe_pct_recalculada(resp: httpx.Response) -> float | None:
-    """Extrai o novo percentual quando a recusa é o portão de reconfirmação."""
+    """Novo percentual da FIPE se a recusa for o pedido de reconfirmação.
+
+    Devolve None para qualquer outro 400, inclusive corpo que não seja JSON:
+    nesses casos o erro segue o caminho normal de raise_for_status.
+    """
     try:
-        corpo = resp.json()
+        corpo_resposta = resp.json()
     except ValueError:
         return None
-    if corpo.get("error") != "fipe_price_percentage_covered_changed":
+    if corpo_resposta.get("error") != "fipe_price_percentage_covered_changed":
         return None
-    nova = (corpo.get("context") or {}).get("new_fipe_price_percentage_covered")
-    return float(nova) if nova is not None else None
+    contexto_do_erro = corpo_resposta.get("context") or {}
+    nova_fipe_pct = contexto_do_erro.get("new_fipe_price_percentage_covered")
+    return float(nova_fipe_pct) if nova_fipe_pct is not None else None
 
 
 async def obter_checkout_link(quote_id: str) -> dict[str, Any]:
