@@ -3,6 +3,7 @@
 import csv
 import io
 import uuid
+from collections import Counter
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated
@@ -21,6 +22,9 @@ router = APIRouter(prefix="/renovacoes", tags=["renovacoes"])
 
 _VIGENCIA_DIAS = 365
 
+# O badge do menu cobre até a janela mais distante, D60.
+_HORIZONTE_BADGE_DIAS = 60
+
 
 class RenovacaoOut(BaseModel):
     proposta_id: uuid.UUID
@@ -36,6 +40,11 @@ class RenovacaoOut(BaseModel):
 
 
 def _janela(dias: int) -> str:
+    """Janela de renovação para quem vence em `dias` dias.
+
+    Só classifica: quem chama garante que a apólice ainda não venceu
+    (`dias >= 0`) e está dentro do horizonte consultado.
+    """
     if dias <= 30:
         return "D30"
     if dias <= 45:
@@ -105,29 +114,22 @@ async def contar_renovacoes(
     usuario: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RenovacaoCountOut:
-    """Contagem de renovações por janela — usado pelo badge do sidebar."""
-    result = await db.execute(
-        select(Proposta, Cotacao)
-        .join(Cotacao, Proposta.cotacao_id == Cotacao.id)
-        .where(Proposta.usuario_id == usuario.id)
-        .where(Proposta.inicio_vigencia.is_not(None))
+    """Contagem de renovações por janela — usado pelo badge do sidebar.
+
+    Conta exatamente as apólices que a tela de renovações lista no horizonte
+    padrão de 60 dias, reaproveitando a mesma consulta. Antes havia uma regra
+    própria aqui, e ela contava apólices já vencidas como D45.
+    """
+    renovacoes = await _query_renovacoes(
+        usuario.id, db, dias=_HORIZONTE_BADGE_DIAS, ramo=None, janela=None
     )
-    hoje = date.today()
-    d30 = d45 = d60 = 0
-    for proposta, _cotacao in result.all():
-        inicio_vigencia = proposta.inicio_vigencia
-        # Mesma situação de _query_renovacoes: a consulta já filtra os nulos.
-        if inicio_vigencia is None:
-            continue
-        fim_vigencia = inicio_vigencia + timedelta(days=_VIGENCIA_DIAS)
-        dias_para_vencer = (fim_vigencia - hoje).days
-        if 0 <= dias_para_vencer <= 30:
-            d30 += 1
-        elif dias_para_vencer <= 45:
-            d45 += 1
-        elif dias_para_vencer <= 60:
-            d60 += 1
-    return RenovacaoCountOut(D30=d30, D45=d45, D60=d60, total=d30 + d45 + d60)
+    quantidade_por_janela = Counter(renovacao.janela for renovacao in renovacoes)
+    return RenovacaoCountOut(
+        D30=quantidade_por_janela["D30"],
+        D45=quantidade_por_janela["D45"],
+        D60=quantidade_por_janela["D60"],
+        total=len(renovacoes),
+    )
 
 
 @router.get("/csv")

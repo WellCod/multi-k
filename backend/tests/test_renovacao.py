@@ -173,6 +173,38 @@ async def test_count_total_e_soma_das_janelas(
     assert body["total"] == body["D30"] + body["D45"] + body["D60"]
 
 
+async def test_count_ignora_apolice_ja_vencida(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """Apólice vencida não é renovação pendente e não entra em janela alguma.
+
+    Regressão: com prazo negativo, a classificação caía em D45 e inflava o
+    badge do menu.
+    """
+    usuario_id = await _login(client, db, "ren_count_vencida@test.com")
+    await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer=-10)
+
+    r = await client.get("/renovacoes/count")
+    assert r.status_code == 200
+    assert r.json() == {"D30": 0, "D45": 0, "D60": 0, "total": 0}
+
+
+async def test_count_coincide_com_a_lista_de_renovacoes(
+    db: AsyncSession, client: AsyncClient, engine: AsyncEngine
+) -> None:
+    """O badge do menu e a tela de renovações contam as mesmas apólices."""
+    usuario_id = await _login(client, db, "ren_count_lista@test.com")
+    for dias_para_vencer in (-30, -1, 0, 20, 40, 55, 60, 61, 90):
+        await _criar_proposta_vencendo(db, usuario_id, dias_para_vencer)
+
+    contagem = (await client.get("/renovacoes/count")).json()
+    lista = (await client.get("/renovacoes?dias=60")).json()
+
+    assert contagem["total"] == len(lista)
+    for janela in ("D30", "D45", "D60"):
+        assert contagem[janela] == sum(1 for item in lista if item["janela"] == janela)
+
+
 async def test_filtro_ramo(
     db: AsyncSession, client: AsyncClient, engine: AsyncEngine
 ) -> None:
